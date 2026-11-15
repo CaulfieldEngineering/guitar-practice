@@ -1,0 +1,213 @@
+# Builds Practice (Joe's guitar practice iPhone app) on GitHub's macOS runners, runs its tests on the iPhone
+# simulator, and on main publishes the signed build for over-the-air install, the same route as the HQ and Browser
+# iPhone apps: no Mac, no cable.
+#
+# Flow: XcodeGen makes the Xcode project from ios/project.yml; the unit tests run on a simulator; then archive +
+# ad-hoc export, and app.ipa, manifest.plist, version.json, the icon and the install page are pushed to the public
+# repo CaulfieldEngineering/practice-install, served by GitHub Pages at
+# https://caulfieldengineering.github.io/practice-install/.
+#
+# Signing: Blocks' Apple team and distribution certificate, Practice's own ad-hoc profile "Practice AdHoc"
+# (scripts/apple-provision.mjs, then scripts/apple-secrets.mjs). Until the profile secret is there, or on any branch
+# but main, the run only compiles and tests.
+
+name: iOS build (OTA)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths:
+      - 'ios/**'
+      - 'catalog/**'
+      - '.github/workflows/ios-build.yml'
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PAGES: https://caulfieldengineering.github.io/practice-install
+  BUNDLE_ID: com.caulfieldengineering.practice
+  PROFILE_NAME: Practice AdHoc
+  APP_TITLE: Practice
+  VERSION: 0.1.${{ github.run_number }}
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make the Xcode project
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+
+      - name: Can it sign?
+        id: signing
+        env:
+          PROFILE: ${{ secrets.IOS_ADHOC_PROFILE_BASE64 }}
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ] && [ -n "$PROFILE" ]; then echo "signed=true" >> "$GITHUB_OUTPUT"; else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Not signing: not main, or IOS_ADHOC_PROFILE_BASE64 is not set (scripts/apple-provision.mjs, apple-secrets.mjs)."
+          fi
+
+      - name: Test on the iPhone simulator
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=[x for g in json.load(sys.stdin)["devices"].values() for x in g if "iPhone" in x["name"]]; pick=[x for x in d if "Pro" in x["name"] and "Max" not in x["name"]] or d; print(pick[0]["udid"])')
+          xcodebuild test -project ios/Practice.xcodeproj -scheme Practice -configuration Debug \
+            -destination "platform=iOS Simulator,id=$DEVICE" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO > "$RUNNER_TEMP/test.log" 2>&1 || true
+          grep -E "error:|Test Case .* failed|XCTAssert|Executed|TEST (SUCCEEDED|FAILED)|BUILD FAILED" "$RUNNER_TEMP/test.log" | head -150 || true
+          grep -q "TEST SUCCEEDED" "$RUNNER_TEMP/test.log"
+
+      - name: Compile for the device (unsigned)
+        if: steps.signing.outputs.signed != 'true'
+        run: |
+          xcodebuild build -project ios/Practice.xcodeproj -scheme Practice -configuration Release \
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO > "$RUNNER_TEMP/build.log" 2>&1 || true
+          grep -E "error:|BUILD (SUCCEEDED|FAILED)" "$RUNNER_TEMP/build.log" | head -80 || true
+          grep -q "BUILD SUCCEEDED" "$RUNNER_TEMP/build.log"
+
+      - name: Import signing certificate and provisioning profile
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          PROVISION_PROFILE_BASE64: ${{ secrets.IOS_ADHOC_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH=$RUNNER_TEMP/dist.p12
+          PROFILE_PATH=$RUNNER_TEMP/adhoc.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain-db
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERT_PATH"
+          echo -n "$PROVISION_PROFILE_BASE64" | base64 --decode -o "$PROFILE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          UUID=$(security cms -D -i "$PROFILE_PATH" | plutil -extract UUID raw -)
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+
+      - name: Archive
+        if: steps.signing.outputs.signed == 'true'
+        run: |
+          xcodebuild archive -project ios/Practice.xcodeproj -scheme Practice -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Practice.xcarchive" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" > "$RUNNER_TEMP/archive.log" 2>&1 || true
+          grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)" "$RUNNER_TEMP/archive.log" | head -80 || true
+          grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/archive.log"
+
+      - name: Export ad-hoc IPA
+        if: steps.signing.outputs.signed == 'true'
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>ad-hoc</string>
+            <key>teamID</key><string>${{ secrets.IOS_TEAM_ID }}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict><key>$BUNDLE_ID</key><string>$PROFILE_NAME</string></dict>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Practice.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+          ls -la "$RUNNER_TEMP/export"
+
+      - name: Publish to the install page (GitHub Pages, practice-install)
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          DEPLOY_KEY: ${{ secrets.INSTALL_DEPLOY_KEY }}
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then echo "::error::INSTALL_DEPLOY_KEY is not set"; exit 1; fi
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/install_key
+          chmod 600 ~/.ssh/install_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/install_key -o IdentitiesOnly=yes"
+          git clone --depth 1 git@github.com:CaulfieldEngineering/practice-install.git "$RUNNER_TEMP/pages"
+          OUT="$RUNNER_TEMP/pages"
+          cp "$RUNNER_TEMP"/export/*.ipa "$OUT/app.ipa"
+          cp ios/Practice/Assets.xcassets/AppIcon.appiconset/icon-1024.png "$OUT/icon.png"
+          BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          BUILT_ON="$(date -u '+%-d %B %Y, %H:%M UTC')"
+          cat > "$OUT/manifest.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>items</key>
+            <array>
+              <dict>
+                <key>assets</key>
+                <array>
+                  <dict><key>kind</key><string>software-package</string><key>url</key><string>$PAGES/app.ipa</string></dict>
+                  <dict><key>kind</key><string>display-image</string><key>url</key><string>$PAGES/icon.png</string></dict>
+                  <dict><key>kind</key><string>full-size-image</string><key>url</key><string>$PAGES/icon.png</string></dict>
+                </array>
+                <key>metadata</key>
+                <dict>
+                  <key>bundle-identifier</key><string>$BUNDLE_ID</string>
+                  <key>bundle-version</key><string>$VERSION</string>
+                  <key>kind</key><string>software</string>
+                  <key>title</key><string>$APP_TITLE</string>
+                </dict>
+              </dict>
+            </array>
+          </dict>
+          </plist>
+          PLIST
+          printf '{ "version": "%s", "build": %s, "commit": "%s", "builtAt": "%s" }\n' "$VERSION" "${{ github.run_number }}" "${{ github.sha }}" "$BUILT_AT" > "$OUT/version.json"
+          cat > "$OUT/index.html" <<HTML
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+            <title>Install Practice</title>
+            <link rel="apple-touch-icon" href="icon.png" /><link rel="icon" href="icon.png" />
+            <meta name="color-scheme" content="dark light" />
+            <style>
+              :root { --bg: #141518; --text: #e3e4e8; --muted: #9a9ea8; --faint: #62666f; --accent: #6FB7A0; --on-accent: #0f1f1a; }
+              @media (prefers-color-scheme: light) { :root { --bg: #fafafa; --text: #1a1b1e; --muted: #666a73; --faint: #a0a3ab; --accent: #3f9a80; --on-accent: #ffffff; } }
+              * { box-sizing: border-box; }
+              body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom); background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+              main { max-width: 320px; text-align: center; }
+              img { display: block; margin: 0 auto 16px; border-radius: 20px; }
+              h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+              p { margin: 0 0 12px; color: var(--muted); }
+              .install { display: block; margin: 24px auto 20px; padding: 14px 24px; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-size: 17px; font-weight: 600; text-decoration: none; }
+              .meta { font-size: 13px; color: var(--faint); }
+            </style>
+          </head>
+          <body>
+            <main>
+              <img src="icon.png" alt="" width="88" height="88" />
+              <h1>Practice</h1>
+              <p class="meta">Version $VERSION, built $BUILT_ON</p>
+              <a class="install" href="itms-services://?action=download-manifest&amp;url=$PAGES/manifest.plist">Install</a>
+              <p>Metronome, interval routines and picking drills to play along with.</p>
+            </main>
+          </body>
+          </html>
+          HTML
+          touch "$OUT/.nojekyll"
+          cd "$OUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -q --orphan fresh
+          git add -A
+          git commit -q -m "Practice $VERSION"
+          git push -f origin fresh:main

@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "routines": [
+    {
+      "name": "Starting Protocol",
+      "countInBeats": 0,
+      "notes": "Capo on 12 for the motion blocks. Motion, not speed. Anti-Rotation at a mid tempo for you.",
+      "intervals": [
+        {
+          "kind": "motion",
+          "seconds": 180,
+          "label": "Wrist Holds"
+        },
+        {
+          "kind": "motion",
+          "seconds": 120,
+          "label": "Anti-Chopping"
+        },
+        {
+          "kind": "motion",
+          "seconds": 120,
+          "label": "Front Observe"
+        },
+        {
+          "kind": "motion",
+          "seconds": 120,
+          "label": "Side Observe"
+        },
+        {
+          "kind": "motion",
+          "seconds": 120,
+          "label": "Smallest Movement"
+        },
+        {
+          "kind": "motion",
+          "seconds": 180,
+          "label": "Single notes, relax"
+        },
+        {
+          "kind": "play",
+          "seconds": 120,
+          "bpm": 90,
+          "label": "Anti-Rotation, down"
+        },
+        {
+          "kind": "play",
+          "seconds": 120,
+          "bpm": 90,
+          "label": "Anti-Rotation, up"
+        }
+      ],
+      "intro": "The Perfect Picking starting protocol. Motion blocks with no click first: wrist holds, anti-chopping, observing, the smallest movement, then single notes. Then anti-rotation with the click."
+    },
+    {
+      "name": "3's to 4's",
+      "notes": "Triplets to sixteenths and back, G and B strings. Up 6 bpm a set. Set the tempos to where you are.",
+      "intervals": [
+        {
+          "kind": "play",
+          "seconds": 120,
+          "bpm": 80,
+          "label": "Set 1, easy and clean"
+        },
+        {
+          "kind": "rest",
+          "seconds": 30
+        },
+        {
+          "kind": "play",
+          "seconds": 120,
+          "bpm": 86,
+          "label": "Set 2"
+        },
+        {
+          "kind": "rest",
+          "seconds": 30
+        },
+        {
+          "kind": "play",
+          "seconds": 120,
+          "bpm": 92,
+          "label": "Set 3"
+        },
+        {
+          "kind": "rest",
+          "seconds": 30
+        },
+        {
+          "kind": "play",
+          "seconds": 120,
+          "bpm": 98,
+          "label": "Set 4"
+        },
+        {
+          "kind": "rest",
+          "seconds": 30
+        },
+        {
+          "kind": "play",
+          "seconds": 120,
+          "bpm": 104,
+          "label": "Set 5"
+        },
+        {
+          "kind": "rest",
+          "seconds": 30
+        },
+        {
+          "kind": "play",
+          "seconds": 60,
+          "bpm": 112,
+          "label": "Breaking point"
+        },
+        {
+          "kind": "rest",
+          "seconds": 30
+        },
+        {
+          "kind": "play",
+          "seconds": 60,
+          "bpm": 104,
+          "label": "Prior max"
+        }
+      ],
+      "intro": "Three's to four's, in sets. Start easy and clean, up six each set, then your breaking point, then back to your prior max."
+    },
+    {
+      "name": "Speed ladder",
+      "rounds": 8,
+      "stepBPM": 4,
+      "subdivision": 4,
+      "notes": "Sixteenths. Up 4 bpm each round. Picking small, cruise speed.",
+      "intervals": [
+        {
+          "kind": "play",
+          "seconds": 60,
+          "bpm": 100
+        },
+        {
+          "kind": "rest",
+          "seconds": 30
+        }
+      ],
+      "intro": "Speed ladder. A minute of sixteenths, thirty seconds off, four faster each round."
+    },
+    {
+      "name": "Bursts",
+      "rounds": 8,
+      "notes": "Full speed for 20 seconds, 10 off.",
+      "intervals": [
+        {
+          "kind": "play",
+          "seconds": 20,
+          "bpm": 130,
+          "label": "Burst"
+        },
+        {
+          "kind": "rest",
+          "seconds": 10
+        }
+      ],
+      "intro": "Bursts. Twenty seconds flat out, ten seconds off, eight times."
+    },
+    {
+      "name": "Cruise speed",
+      "rounds": 5,
+      "stepBPM": 3,
+      "subdivision": 2,
+      "notes": "Eighths. Stay relaxed; it should feel easy.",
+      "intervals": [
+        {
+          "kind": "play",
+          "seconds": 120,
+          "bpm": 90
+        },
+        {
+          "kind": "rest",
+          "seconds": 20
+        }
+      ],
+      "intro": "Cruise speed. Eighths, relaxed, a little faster each round."
+    }
+  ]
+}

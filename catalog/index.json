@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "version": 1,
+  "updated": "2026-11-14",
+  "files": [
+    {
+      "path": "exercises/right-hand.json",
+      "kind": "exercises"
+    },
+    {
+      "path": "routines/perfect-picking.json",
+      "kind": "routines"
+    }
+  ]
+}

@@ -1,0 +1,246 @@
+{
+  "schema": 1,
+  "exercises": [
+    {
+      "id": "trip16x4",
+      "version": 1,
+      "name": "Triplets to sixteenths, 4 and 4",
+      "detail": "Four beats of triplets, then four beats of sixteenths, alternate picking, round and round. One string, muted or open.",
+      "intro": "Triplets to sixteenths, four and four. Four beats of triplets, then four beats of sixteenths, alternate picking on one string. Keep the motion small and the switch clean.",
+      "groups": [
+        3,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        4
+      ],
+      "tempo": {
+        "start": 80,
+        "min": 40,
+        "max": 200,
+        "stepOnPass": 4
+      },
+      "session": {
+        "kind": "endurance",
+        "cycles": 4,
+        "seconds": 120,
+        "targetPercent": 85,
+        "toleranceMs": 30,
+        "windowCycles": 2,
+        "ladderStep": 0
+      },
+      "levels": [
+        {
+          "name": "Level 1",
+          "bpm": 70,
+          "session": {
+            "kind": "cycles",
+            "cycles": 4,
+            "targetPercent": 80,
+            "toleranceMs": 40
+          }
+        },
+        {
+          "name": "Level 2",
+          "bpm": 80,
+          "session": {
+            "kind": "cycles",
+            "cycles": 8,
+            "targetPercent": 85,
+            "toleranceMs": 30
+          }
+        },
+        {
+          "name": "Level 3",
+          "bpm": 90,
+          "session": {
+            "kind": "endurance",
+            "targetPercent": 85,
+            "toleranceMs": 30,
+            "windowCycles": 2
+          }
+        },
+        {
+          "name": "Level 4",
+          "bpm": 100,
+          "session": {
+            "kind": "endurance",
+            "targetPercent": 85,
+            "toleranceMs": 30,
+            "windowCycles": 2
+          }
+        },
+        {
+          "name": "Ladder",
+          "bpm": 80,
+          "session": {
+            "kind": "duration",
+            "seconds": 180,
+            "targetPercent": 85,
+            "toleranceMs": 30,
+            "ladderStep": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "alt8",
+      "version": 1,
+      "name": "Alternate picking, eighths",
+      "detail": "Two notes a beat, down up. One string, muted or open.",
+      "intro": "Alternate picking in eighths. Two notes a beat, down then up, on one string.",
+      "groups": [
+        2
+      ],
+      "tempo": {
+        "start": 120,
+        "min": 40,
+        "max": 260
+      }
+    },
+    {
+      "id": "alt3",
+      "version": 1,
+      "name": "Alternate picking, triplets",
+      "detail": "Three a beat; the pick direction flips each beat.",
+      "intro": "Alternate picking in triplets. Three notes a beat, so each beat starts on the other pick stroke.",
+      "groups": [
+        3
+      ],
+      "tempo": {
+        "start": 100,
+        "min": 40,
+        "max": 240
+      }
+    },
+    {
+      "id": "alt16",
+      "version": 1,
+      "name": "Alternate picking, sixteenths",
+      "detail": "Four a beat. Picking small, cruise speed.",
+      "intro": "Alternate picking in sixteenths. Four notes a beat. Picking small, at cruise speed.",
+      "groups": [
+        4
+      ],
+      "tempo": {
+        "start": 90,
+        "min": 40,
+        "max": 220
+      }
+    },
+    {
+      "id": "3to4",
+      "version": 1,
+      "name": "3's to 4's",
+      "detail": "A beat of triplets, a beat of sixteenths, back and forth. Start on the G and B strings.",
+      "intro": "Three's to four's. One beat of triplets, one beat of sixteenths, back and forth.",
+      "groups": [
+        3,
+        4
+      ],
+      "tempo": {
+        "start": 80,
+        "min": 40,
+        "max": 200,
+        "stepOnPass": 6
+      }
+    },
+    {
+      "id": "burst",
+      "version": 1,
+      "name": "Speed bursts",
+      "detail": "One bar of sixteenths at full speed, one bar off.",
+      "intro": "Speed bursts. One bar of sixteenths as fast and clean as you can, then one bar off.",
+      "groups": [
+        4,
+        4,
+        4,
+        4,
+        0,
+        0,
+        0,
+        0
+      ],
+      "tempo": {
+        "start": 110,
+        "min": 40,
+        "max": 240
+      }
+    },
+    {
+      "id": "accent16",
+      "version": 1,
+      "name": "Accents, sixteenths",
+      "detail": "Four a beat, the first of each louder.",
+      "intro": "Accents in sixteenths. Four notes a beat, the first of each beat louder.",
+      "groups": [
+        4
+      ],
+      "accent": "first",
+      "tempo": {
+        "start": 80,
+        "min": 40,
+        "max": 200
+      }
+    },
+    {
+      "id": "accent3",
+      "version": 1,
+      "name": "Accents, triplets",
+      "detail": "Three a beat, the first of each louder.",
+      "intro": "Accents in triplets. Three notes a beat, the first of each beat louder.",
+      "groups": [
+        3
+      ],
+      "accent": "first",
+      "tempo": {
+        "start": 90,
+        "min": 40,
+        "max": 220
+      }
+    },
+    {
+      "id": "gallop",
+      "version": 1,
+      "name": "Gallop",
+      "detail": "Eighth and two sixteenths: down, down up. Accent the first.",
+      "intro": "The gallop. An eighth and two sixteenths: down, down up. Accent the first.",
+      "cycleBeats": 1,
+      "notes": [
+        {
+          "at": {
+            "beat": 0,
+            "step": 0,
+            "of": 4
+          },
+          "pick": "down",
+          "accent": true
+        },
+        {
+          "at": {
+            "beat": 0,
+            "step": 2,
+            "of": 4
+          },
+          "pick": "down"
+        },
+        {
+          "at": {
+            "beat": 0,
+            "step": 3,
+            "of": 4
+          },
+          "pick": "up"
+        }
+      ],
+      "tempo": {
+        "start": 100,
+        "min": 40,
+        "max": 220
+      }
+    }
+  ]
+}
