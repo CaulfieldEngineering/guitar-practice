@@ -93,9 +93,11 @@ struct PlayAlongView: View {
                         Text("On the speaker the phone hears its own sound. Headphones or an interface work best.")
                             .font(.system(size: 13)).foregroundStyle(Theme.warn)
                     }
+                    if let note = pa.routeNote {
+                        Text(note).font(.system(size: 13)).foregroundStyle(Theme.warn)
+                    }
                     HStack {
-                        Text(pa.offset.map { "Timing offset \(Int(($0 * 1000).rounded())) ms, calibrated." } ?? "Not calibrated yet.")
-                            .font(.system(size: 13)).foregroundStyle(Theme.muted)
+                        Text(offsetLine).font(.system(size: 13)).foregroundStyle(Theme.muted)
                         Spacer()
                         Button("Calibrate") { pa.calibrate() }.font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.accent)
                     }
@@ -139,6 +141,11 @@ struct PlayAlongView: View {
             .buttonStyle(.plain)
             Rectangle().fill(Theme.line).frame(height: 1)
         }
+    }
+
+    private var offsetLine: String {
+        let ms = Int((pa.currentOffset * 1000).rounded())
+        return pa.calibration != nil ? "Timing offset \(ms) ms, calibrated for this setup." : "Timing offset about \(ms) ms, from what the phone reports."
     }
 
     private var bestLine: String {
@@ -187,7 +194,7 @@ struct PlayAlongView: View {
             }
             .padding(.horizontal, 16)
 
-            Text(pa.phase == .calibrating ? "Play one note on each click." : pa.exercise.name)
+            Text(pa.phase == .calibrating ? "Play one note on each of the twelve clicks." : pa.exercise.name)
                 .font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16)
 

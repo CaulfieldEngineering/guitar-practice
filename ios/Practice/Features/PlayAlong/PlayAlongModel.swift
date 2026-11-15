@@ -21,8 +21,10 @@ final class PlayAlong: ObservableObject {
     @Published var session: SessionSettings { didSet { saveSettings() } }
     @Published var guided: Bool { didSet { UserDefaults.standard.set(guided, forKey: "pa.guided") } }
     @Published var gridClicks: Bool { didSet { UserDefaults.standard.set(gridClicks, forKey: "pa.click") } }
-    /// Seconds between when a note is played and when it is heard back here, measured by calibration.
-    @Published var offset: Double? { didSet { UserDefaults.standard.set(offset, forKey: "pa.offset") } }
+    /// This route's calibration (Engine/Latency.swift), if it has one.
+    @Published private(set) var calibration: Calibration?
+    /// The route changed during a run, or this route has never been calibrated.
+    @Published private(set) var routeNote: String?
 
     @Published private(set) var phase: Phase = .ready
     @Published private(set) var now: Double = 0
@@ -32,7 +34,7 @@ final class PlayAlong: ObservableObject {
     @Published private(set) var lastRunWasGuided = false
     @Published private(set) var newBest = false
     @Published private(set) var message: String?
-    @Published private(set) var route = AudioEngine.routeDescription()
+    @Published private(set) var route = Latency.currentRoute()
     @Published private(set) var rolling: Double?          // endurance: accuracy over the last cycles
     @Published private(set) var lastCycleAccuracy: Double?
     @Published private(set) var currentBPM: Double = 0
@@ -74,10 +76,10 @@ final class PlayAlong: ObservableObject {
         session = PlayAlong.storedSession(id) ?? ex.session
         guided = d.object(forKey: "pa.guided") as? Bool ?? true
         gridClicks = d.object(forKey: "pa.click") as? Bool ?? true
-        offset = d.object(forKey: "pa.offset") as? Double
         NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.route = AudioEngine.routeDescription() }
+            MainActor.assumeIsolated { self?.routeChanged() }
         }
+        routeChanged()
     }
 
     // MARK: Settings per exercise
@@ -212,10 +214,10 @@ final class PlayAlong: ObservableObject {
         countInEnd = cEnd
         scheduledUntil = cEnd
         if calibrating {
-            calibrationClicks = (0..<8).map { cEnd + Double($0) * 60 / startBPM }
+            calibrationClicks = (0..<12).map { cEnd + Double($0) * 60 / startBPM }
             notes = calibrationClicks.map { Exercise.Note(time: $0, accent: false, beat: 0) }
-            states = Array(repeating: .waiting, count: 8)
-            plannedEnd = cEnd + 8 * 60 / startBPM
+            states = Array(repeating: .waiting, count: 12)
+            plannedEnd = cEnd + 12 * 60 / startBPM
         } else {
             switch runSettings.kind {
             case .cycles: plannedEnd = nil
@@ -246,12 +248,16 @@ final class PlayAlong: ObservableObject {
             return
         }
         if !calibrating { scheduleAhead() }
-        route = AudioEngine.routeDescription()
+        routeChanged()
+        runRouteKey = route.key
         phase = calibrating ? .calibrating : .running
         player.onFrame = { [weak self] in self?.frame() }
         player.onStopped = { [weak self] in
             guard let self, self.phase == .running || self.phase == .calibrating else { return }
+            let now = Latency.currentRoute()
+            if now.key != self.runRouteKey { self.message = "The audio changed to \(now.name), so the run stopped." }
             self.phase = self.score == nil ? .ready : .result
+            self.routeChanged()
         }
     }
 
@@ -300,7 +306,32 @@ final class PlayAlong: ObservableObject {
         return (f - origin) / a.sampleRate
     }
 
-    private var shift: Double { phase == .calibrating ? 0 : (offset ?? AudioEngine.reportedLatency) }
+    /// The offset in use now: today's estimate for this route plus its calibration.
+    var currentOffset: Double { Latency.offset(estimate: Latency.currentEstimate(), calibration: calibration) }
+
+    /// While calibrating, picks are moved by the estimate only, so the 250 ms match window is around the real delay
+    /// even on Bluetooth; what is left is the residual.
+    private var shift: Double { phase == .calibrating ? Latency.currentEstimate() : currentOffset }
+    private var runRouteKey = ""
+
+    /// Re-reads the route: picks up its calibration, and warns about hands-free Bluetooth or an uncalibrated route.
+    /// A route change in the middle of a run stops it (the engine restarts on the new route), and says why.
+    func routeChanged() {
+        let r = Latency.currentRoute()
+        let changed = r.key != route.key
+        route = r
+        calibration = CalibrationStore.get(r.key)
+        if r.handsFree {
+            routeNote = "The headphones are in call mode, which sounds poor and lags. Turn off their microphone for this app, or reconnect them."
+        } else if calibration == nil {
+            routeNote = "New audio setup (\(r.name)): calibrate once so the timing is right."
+        } else {
+            routeNote = nil
+        }
+        if changed && (phase == .running || phase == .calibrating) && r.key != runRouteKey {
+            message = "The audio changed to \(r.name), so the run stopped."
+        }
+    }
 
     private var window: Double {
         phase == .calibrating ? 0.25 : runExercise.window(bpm: slots.map(\.bpm).max() ?? currentBPM)
@@ -386,17 +417,24 @@ final class PlayAlong: ObservableObject {
 
     private func finish(stoppedEarly: Bool) {
         let wasCalibrating = phase == .calibrating
+        let runShift = shift
         player.onFrame = nil
+        player.onStopped = nil
         player.stop()
         for o in input.finish() where o.time > 0 {
-            played.append(Onset(time: planTime(host: o.time) - shift, strength: o.strength))
+            played.append(Onset(time: planTime(host: o.time) - runShift, strength: o.strength))
         }
         if wasCalibrating {
-            if let o = Scoring.calibrate(clicks: calibrationClicks, played: played.map(\.time)) {
-                offset = o
-                message = "Calibrated: \(Int((o * 1000).rounded())) ms."
+            if let residual = Scoring.calibrate(clicks: calibrationClicks, played: played.map(\.time)) {
+                let measured = Latency.currentEstimate() + residual
+                let c = Calibration(residual: residual, measured: measured,
+                                    routeName: route.name, date: Date())
+                CalibrationStore.set(c, for: route.key)
+                calibration = c
+                routeChanged()
+                message = "Calibrated for \(route.name): \(Int((measured * 1000).rounded())) ms."
             } else {
-                message = "Not enough notes heard. Play one note on each of the eight clicks."
+                message = "Not enough notes heard. Play one note on each of the twelve clicks."
             }
             phase = .ready
             return
@@ -422,7 +460,7 @@ final class PlayAlong: ObservableObject {
         let isEndurance = runSettings.kind == .endurance
         let held: Double? = isEndurance ? sustained : nil
         let passed: Bool = isEndurance ? sustained > 0 : r.passed
-        let offsetMs: Double? = offset.map { $0 * 1000 }
+        let offsetMs: Double? = currentOffset * 1000
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let result = SessionResult(
             id: UUID(), date: Date(), exerciseID: runExercise.id, exerciseVersion: runExercise.version,

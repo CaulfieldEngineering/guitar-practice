@@ -88,6 +88,16 @@ Runs are kept in one place, `data/sessions.jsonl` (one run a line, appended, nev
 
 A result (`SessionResult`, schema 1): id, date, exercise id, version and name, mode, ladder step, guided, starting and top tempo, seconds played, cycles, notes, hits, missed, extra, within the tight and close windows, the windows, average error and spread (ms), tolerance and target, accuracy within the tolerance, seconds held (endurance), score, passed, accents, the calibration offset, the app version.
 
+## Latency (Bluetooth headphones included)
+
+Joe, 2026-11-14, on his Shokz open-ear headphones: "Is there a way to remove the latency or compensate so that the analysis is still accurate". The delay cannot be removed, so every pick is scored against when the click was heard (Engine/Latency.swift):
+
+- Output stays on A2DP: the session is `playAndRecord` with `.allowBluetoothA2DP` and never `.allowBluetooth` (hands-free), so turning the input on does not flip the headphones into call mode. The input is the interface when one is plugged in, otherwise the phone's microphone, never the headphones' own (`preferWiredInput`). If the route is hands-free anyway, the screen says so.
+- The estimate is outputLatency (which iOS reports for Bluetooth) + inputLatency + the IO buffer. Calibrate plays twelve clicks; he plays one note on each; picks are moved by the estimate and the median of what is left is the residual. The offset in use is today's estimate plus that residual, so it follows iOS when the reported Bluetooth delay moves.
+- Calibrations are kept per route (the input and output ports), applied by themselves when that route is active; a route with none says "New audio setup ... calibrate once". The current offset in ms is on the Play along screen, and each result keeps the offset it used.
+- A route change in the middle of a run stops it (the engine restarts on the new route) and says why; the setup screen re-reads the route.
+- Spoken cues and the guide notes go to the headphones too; only on the phone's own speaker and microphone does the phone hear itself.
+
 ## Building and installing
 
 The same route as the HQ and Browser iPhone apps. `.github/workflows/ios-build.yml` runs on a push touching `ios/`, `catalog/` or itself: XcodeGen makes the project from `ios/project.yml`, the unit tests run on the iPhone simulator and must pass, then on `main` it archives, exports ad hoc, and publishes `app.ipa`, `manifest.plist`, `version.json`, the icon and the install page to the public repo `CaulfieldEngineering/practice-install` (GitHub Pages). Versions are `0.1.<run number>`. Other branches build and test only.
@@ -101,7 +111,7 @@ Tests: `ios/PracticeTests` (the sequencers to the frame, block size, drift over 
 ## Limits, honestly
 
 - Onset detection is energy based with a high-pass: right for one picked string, muted or open. Chords, legato, heavy distortion with long sustain and noisy rooms will miss or add notes. A spectral-flux or learned detector can drop in behind `OnsetDetecting`.
-- On the phone's own speaker and microphone the phone hears its own click and guide notes, and the room. Headphones, or an interface with headphones, score properly; the app says so on that route. Bluetooth headphones add a large, varying delay: wired or the interface's headphone out is better. Calibrate after changing the setup.
+- On the phone's own speaker and microphone the phone hears its own click and guide notes, and the room. Headphones, or an interface with headphones, score properly; the app says so on that route. Bluetooth headphones (his Shokz) are fine: see Latency. If the headphones drop into call mode (hands-free), the app says so; the sound is poor and the delay changes, so reconnect them.
 - The guide sound is a synthesized muted pluck, not a sampled guitar (`SoundBank` is the place for one).
 - The ladder's tempo step can lag a cycle behind the result for short cycles (see Session modes).
 - Pitch is not checked: a note on the wrong string or fret still counts. Left-hand drills need pitch; the schema already carries string and fret.

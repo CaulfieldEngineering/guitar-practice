@@ -198,7 +198,11 @@ final class AudioEngine {
         stop()
         let session = AVAudioSession.sharedInstance()
         if record {
+            // A2DP only (never .allowBluetooth, which is hands-free): Bluetooth headphones stay in their listening
+            // mode, and the input is the interface or the phone's microphone, never the headphones' own.
             try session.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+            try? session.setActive(true)
+            AudioEngine.preferWiredInput(session)
         } else {
             try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         }
@@ -261,14 +265,16 @@ final class AudioEngine {
         return r.anchorHost + (f - Double(r.anchorFrame)) / sampleRate
     }
 
-    /// The input and output in plain words: "Scarlett 2i2 USB in, headphones out".
-    static func routeDescription() -> (input: String, output: String, phoneSpeakerAndMic: Bool) {
-        let route = AVAudioSession.sharedInstance().currentRoute
-        let input = route.inputs.first?.portName ?? "No input"
-        let output = route.outputs.first?.portName ?? "No output"
-        let builtInMic = route.inputs.first?.portType == .builtInMic
-        let speaker = route.outputs.contains { $0.portType == .builtInSpeaker || $0.portType == .builtInReceiver }
-        return (input, output, builtInMic && speaker)
+    /// The interface (USB or a wired headset input) when there is one, otherwise the phone's microphone.
+    static func preferWiredInput(_ session: AVAudioSession) {
+        let inputs = session.availableInputs ?? []
+        let order: [AVAudioSession.Port] = [.usbAudio, .lineIn, .headsetMic, .builtInMic]
+        for type in order {
+            if let port = inputs.first(where: { $0.portType == type }) {
+                if session.preferredInput?.uid != port.uid { try? session.setPreferredInput(port) }
+                return
+            }
+        }
     }
 
     /// Before speaking with nothing running: the playback session, mixing with other apps. Leaves a running one alone.
@@ -280,9 +286,4 @@ final class AudioEngine {
         try? s.setActive(true)
     }
 
-    /// Latency the hardware reports, as the starting guess before calibration.
-    static var reportedLatency: Double {
-        let s = AVAudioSession.sharedInstance()
-        return s.inputLatency + s.outputLatency
-    }
 }
