@@ -45,7 +45,7 @@ struct StatsView: View {
                                 Text(r.mode == "endurance" ? formatClock(r.sustainedSeconds ?? 0) : "\(r.score)").monospacedDigit().foregroundStyle(Theme.text)
                             }
                             .font(.system(size: 15))
-                            Text("\(r.date.formatted(date: .abbreviated, time: .shortened)), \(r.startBPM)\(r.topBPM > r.startBPM ? " to \(r.topBPM)" : "") bpm, \(modeName(r.mode))\(r.guided ? ", guided" : ""), \(r.accuracyPercent)% within \(Int(r.toleranceMs)) ms")
+                            Text(detail(r))
                                 .font(.system(size: 12)).foregroundStyle(Theme.muted)
                         }
                     }
@@ -67,6 +67,13 @@ struct StatsView: View {
         await history.sync()
         server = await DrillServer.fetchSessions()
         loading = false
+    }
+
+    private func detail(_ r: SessionResult) -> String {
+        let date = r.date.formatted(date: .abbreviated, time: .shortened)
+        let tempo = r.topBPM > r.startBPM ? "\(r.startBPM) to \(r.topBPM)" : "\(r.startBPM)"
+        let guided = r.guided ? ", guided" : ""
+        return "\(date), \(tempo) bpm, \(modeName(r.mode))\(guided), \(r.accuracyPercent)% within \(Int(r.toleranceMs)) ms"
     }
 
     private var source: String {

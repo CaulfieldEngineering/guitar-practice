@@ -1,0 +1,11 @@
+{
+  "name": "guitar-practice",
+  "private": true,
+  "description": "Practice: the iPhone app (ios/), its drill catalog (catalog/) and the drill server on the mini PC (server/).",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.mjs",
+    "test": "node --test server/server.test.mjs",
+    "check": "node server/catalog.mjs"
+  }
+}

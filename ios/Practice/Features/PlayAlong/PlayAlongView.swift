@@ -231,7 +231,7 @@ struct PlayAlongView: View {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Theme.line)
-                        Capsule().fill(Theme.accent).frame(width: g.size.width * CGFloat(min(1, max(0, (20 * log10(Double(max(pa.level, 1e-5))) + 60) / 60))))
+                        Capsule().fill(Theme.accent).frame(width: g.size.width * meterFraction(pa.level))
                     }
                 }
                 .frame(height: 4)
@@ -309,6 +309,13 @@ struct PlayAlongView: View {
                 }
             }
         }
+    }
+
+    /// The input level as a fraction of a 60 dB scale.
+    private func meterFraction(_ level: Float) -> CGFloat {
+        let db = 20 * log10(Double(max(level, 1e-5)))
+        let f = (db + 60) / 60
+        return CGFloat(min(1, max(0, f)))
     }
 
     private func stat(_ s: String) -> some View {

@@ -350,20 +350,28 @@ final class PlayAlong: ObservableObject {
         }
     }
 
+    /// One past the last note of slot `i`.
+    private func noteEnd(_ i: Int) -> Int {
+        if i + 1 < noteStart.count { return noteStart[i + 1] }
+        return notes.count
+    }
+
     private func evaluateCycles() {
         let w = window
         while accuracies.count < slots.count {
             let k = accuracies.count
             let s = slots[k]
             guard now > s.end + w + 0.05 else { break }
-            let lo = noteStart[k], hi = k + 1 < noteStart.count ? noteStart[k + 1] : notes.count
+            let lo = noteStart[k]
+            let hi = noteEnd(k)
             let acc = RunBuilder.accuracy(errors: errors[lo..<hi], toleranceMs: runSettings.toleranceMs)
             accuracies.append(acc)
             lastCycleAccuracy = acc
             let passed = acc * 100 >= Double(runSettings.targetPercent)
             lastPassed = passed
             if passed { topBPM = max(topBPM, Int(s.bpm)) }
-            let counts = (0..<accuracies.count).map { i in (i + 1 < noteStart.count ? noteStart[i + 1] : notes.count) - noteStart[i] }
+            var counts: [Int] = []
+            for i in 0..<accuracies.count { counts.append(noteEnd(i) - noteStart[i]) }
             let r = RunBuilder.rolling(accuracies, noteCounts: counts, window: runSettings.windowCycles)
             rolling = r ?? accuracies.last
             if runSettings.kind == .endurance {
@@ -400,23 +408,35 @@ final class PlayAlong: ObservableObject {
         let r = Scoring.score(notes: counted, played: played, window: window, rule: runExercise.scoring)
         score = r
         let tol = runSettings.toleranceMs
-        let within = r.errors.filter { e in e.map { abs($0) <= tol } ?? false }.count
-        let playedSeconds = judged > 0 ? slots[min(judged, slots.count) - 1].end - countInEnd : 0
+        var within = 0
+        for e in r.errors { if let e, abs(e) <= tol { within += 1 } }
+        var playedSeconds = 0.0
+        if judged > 0 { playedSeconds = slots[min(judged, slots.count) - 1].end - countInEnd }
+        let startBPM: Int = slots.first.map { Int($0.bpm) } ?? bpm
+        let accuracyPercent: Int = r.expected > 0 ? Int((100 * Double(within) / Double(r.expected)).rounded()) : 0
+        var accentsPercent: Int?
+        if let b = r.accentBeats, b > 0 {
+            let landed = Double(r.accentsLanded ?? 0)
+            accentsPercent = Int((100 * landed / Double(b)).rounded())
+        }
+        let isEndurance = runSettings.kind == .endurance
+        let held: Double? = isEndurance ? sustained : nil
+        let passed: Bool = isEndurance ? sustained > 0 : r.passed
+        let offsetMs: Double? = offset.map { $0 * 1000 }
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let result = SessionResult(
             id: UUID(), date: Date(), exerciseID: runExercise.id, exerciseVersion: runExercise.version,
             exerciseName: runExercise.name, mode: runSettings.kind.rawValue, ladderStep: runSettings.ladderStep,
-            guided: runGuided, startBPM: slots.first.map { Int($0.bpm) } ?? bpm, topBPM: topBPM,
+            guided: runGuided, startBPM: startBPM, topBPM: topBPM,
             seconds: playedSeconds, cycles: judged, notes: r.expected, hits: r.hits, missed: r.missed, extra: r.extra,
             pct20: r.pct20, pct40: r.pct40, tightMs: runExercise.scoring.tightMs, closeMs: runExercise.scoring.closeMs,
             meanErrorMs: r.meanError, spreadMs: r.spread, toleranceMs: tol, targetPercent: runSettings.targetPercent,
-            accuracyPercent: r.expected > 0 ? Int((100 * Double(within) / Double(r.expected)).rounded()) : 0,
-            sustainedSeconds: runSettings.kind == .endurance ? sustained : nil, score: r.score,
-            passed: runSettings.kind == .endurance ? sustained > 0 : r.passed,
-            accentsPercent: r.accentBeats.flatMap { b in b > 0 ? Int((100 * Double(r.accentsLanded ?? 0) / Double(b)).rounded()) : nil },
-            offsetMs: offset.map { $0 * 1000 },
-            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0")
-        let previous = runGuided ? nil : Stats.best(history.results, exerciseID: result.exerciseID, mode: result.mode, bpm: result.startBPM)
-        newBest = !runGuided && previous != nil && result.bestValue > previous!
+            accuracyPercent: accuracyPercent, sustainedSeconds: held, score: r.score, passed: passed,
+            accentsPercent: accentsPercent, offsetMs: offsetMs, appVersion: appVersion)
+        newBest = false
+        if !runGuided, let previous = Stats.best(history.results, exerciseID: result.exerciseID, mode: result.mode, bpm: result.startBPM) {
+            newBest = result.bestValue > previous
+        }
         if r.expected > 0 { history.add(result) }
         saved = result
         phase = .result
