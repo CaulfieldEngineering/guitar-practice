@@ -61,6 +61,7 @@ enum L {
     static let notesPerBeat = "notes per beat"
     static let columnMax = "Max"
     static let columnLast = "Last"
+    static func lastPlayed(_ ago: String) -> String { ago == "now" ? "just now" : "\(ago) ago" }
     static let columnBest = "Best"
     static let noDrills = "No drills. Pull to refresh."
     static let noResults = "No results"

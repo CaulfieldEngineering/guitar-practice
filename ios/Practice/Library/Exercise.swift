@@ -229,16 +229,16 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
         session = SessionSettings.routine(rounds: r.rounds, step: r.stepBPM)
     }
 
-    /// The pattern in a few characters, for the Drills table: "16th" for four a beat, "3→4" for triplets then
-    /// sixteenths, "16th·rest" for a bar on and a bar off, "mixed" when the notes of a beat are not evenly spaced.
+    /// The pattern in a few characters, for the Drills table: "16" for four a beat, "3→4" for triplets then
+    /// sixteenths, "16·rest" for a bar on and a bar off, "mix" when the notes of a beat are not evenly spaced.
     var glyph: String {
         let sizes = RunBuilder.groupSizes(self)
-        for n in notes where n.at.of != sizes[Swift.min(sizes.count - 1, Swift.max(0, n.at.beat))] { return "mixed" }
+        for n in notes where n.at.of != sizes[Swift.min(sizes.count - 1, Swift.max(0, n.at.beat))] { return "mix" }
         var runs: [Int] = []
         for s in sizes where runs.last != s { runs.append(s) }
         if runs.count > 1 && runs.first == runs.last { runs.removeLast() }
         func word(_ n: Int) -> String {
-            switch n { case 0: return "rest"; case 1: return "4th"; case 2: return "8th"; case 3: return "trip"; case 4: return "16th"; case 6: return "6s"; default: return "\(n)s" }
+            switch n { case 0: return "rest"; case 1: return "4"; case 2: return "8"; case 3: return "3"; case 4: return "16"; default: return "\(n)" }
         }
         if runs.count == 1 { return word(runs[0]) }
         if runs.contains(0) { return runs.map(word).joined(separator: "·") }

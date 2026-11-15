@@ -15,10 +15,11 @@ struct DrillsView: View {
     @AppStorage("drills.sort") private var sort = "catalog"
 
     private static let sectionOrder = ["Picking", "Speed", "Accents"]
-    private let patternWidth: CGFloat = 70
-    private let maxWidth: CGFloat = 40
-    private let lastWidth: CGFloat = 40
-    private let bestWidth: CGFloat = 46
+    // The name takes what is left (Joe, on 0.1.9: "We can allocate more room to the title"): the pattern is a
+    // narrow fixed column, the two numbers are compact, and when it was last played is a small line under the name.
+    private let patternWidth: CGFloat = 54
+    private let maxWidth: CGFloat = 34
+    private let bestWidth: CGFloat = 42
 
     /// What the table shows for one drill.
     private struct Line: Identifiable {
@@ -127,7 +128,6 @@ struct DrillsView: View {
             Text(L.columnDrill).frame(maxWidth: .infinity, alignment: .leading)
             Text(L.columnPattern).frame(width: patternWidth, alignment: .leading)
             Text(L.columnMax).frame(width: maxWidth, alignment: .trailing)
-            Text(L.columnLast).frame(width: lastWidth, alignment: .trailing)
             Text(L.columnBest).frame(width: bestWidth, alignment: .trailing)
         }
         .font(Typo.caption)
@@ -140,25 +140,26 @@ struct DrillsView: View {
     private func row(_ l: Line) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: Space.xs) {
-                Text(l.name).font(Typo.body).foregroundStyle(Theme.text)
-                    .lineLimit(1).minimumScaleFactor(0.8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(l.name).font(Typo.body).foregroundStyle(Theme.text)
+                        .lineLimit(1).minimumScaleFactor(0.85)
+                    if let d = l.last {
+                        Text(L.lastPlayed(ago(d))).font(Typo.caption).foregroundStyle(Theme.faint).lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Text(l.glyph).font(Typo.figure(.subheadline)).foregroundStyle(Theme.muted)
                     .lineLimit(1).minimumScaleFactor(0.7)
                     .frame(width: patternWidth, alignment: .leading)
                 Text(l.max.map { "\($0)" } ?? L.none).font(Typo.figure(.subheadline, weight: .medium))
                     .foregroundStyle(l.max == nil ? Theme.faint : Theme.text)
                     .frame(width: maxWidth, alignment: .trailing)
-                Text(l.last.map(ago) ?? L.none).font(Typo.figure(.subheadline))
-                    .foregroundStyle(l.last == nil ? Theme.faint : Theme.muted)
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                    .frame(width: lastWidth, alignment: .trailing)
                 Text(l.best.map { L.percent($0) } ?? L.none).font(Typo.figure(.subheadline))
                     .foregroundStyle(l.best == nil ? Theme.faint : Theme.muted)
                     .lineLimit(1).minimumScaleFactor(0.7)
                     .frame(width: bestWidth, alignment: .trailing)
             }
-            .frame(minHeight: Control.row)
+            .frame(minHeight: 40)
             .contentShape(Rectangle())
             Hairline()
         }
