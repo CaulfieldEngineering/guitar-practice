@@ -50,6 +50,9 @@ struct TimedEvent: Equatable {
     var time: Double
     var kind: ClickKind
     var beat: Int = -1
+    /// A note of the guide: its pitch (a MIDI note, from the drill's string and fret) and whether it is an up stroke.
+    var pitch: Int = -1
+    var up: Bool = false
 }
 
 /// One pass through an exercise's pattern within a run.
@@ -104,7 +107,8 @@ enum RunBuilder {
                 let prev = sizes[(local - 1 + sizes.count) % sizes.count]
                 let first = n.time - start - Double(local) * beat < 1e-6
                 let changed = first && sizes[local % sizes.count] != prev && prev > 0
-                events.append(TimedEvent(time: n.time, kind: n.accent || changed ? .pluckAccent : .pluck))
+                events.append(TimedEvent(time: n.time, kind: n.accent || changed ? .pluckAccent : .pluck,
+                                         pitch: GuitarBank.pitch(string: n.string, fret: n.fret), up: n.pick == .up))
             }
         }
         events.sort { $0.time < $1.time }

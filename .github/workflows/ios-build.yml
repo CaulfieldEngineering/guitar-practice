@@ -24,6 +24,7 @@ on:
     paths:
       - 'ios/**'
       - 'catalog/**'
+      - 'voice/**'
       - '.github/workflows/ios-build.yml'
 
 concurrency:

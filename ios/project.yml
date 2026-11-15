@@ -24,6 +24,10 @@ targets:
       - path: ../catalog
         type: folder
         buildPhase: resources
+      # The recorded voice (scripts/make-voice.mjs), the same folder the drill server serves, as a folder.
+      - path: ../voice
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.caulfieldengineering.practice

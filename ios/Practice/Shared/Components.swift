@@ -277,7 +277,7 @@ struct BigStat: View {
     let value: String
     let label: String
     var colour: Color = Theme.text
-    var size: CGFloat = 44
+    var size: CGFloat = 40
     var body: some View {
         VStack(spacing: 2) {
             Text(value)

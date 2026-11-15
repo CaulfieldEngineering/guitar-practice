@@ -337,6 +337,7 @@ struct ExerciseView: View {
             countingIn: counting,
             calibrating: false,
             notes: pa.notes, played: pa.played, states: pa.states, now: pa.laneNow, beat: 60 / max(1, pa.currentBPM),
+            beatsPerBar: pa.exercise.beatsPerBar,
             recentErrors: pa.recentErrors, spanMs: pa.timingSpanMs, inputLevel: pa.level)
     }
 

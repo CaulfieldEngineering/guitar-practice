@@ -200,12 +200,12 @@ final class TapThroughTests: XCTestCase {
     /// The screens that need a guitar and an interface, drawn from made-up values (debug builds, -screen).
     func testRunAndResultScreens() {
         for appearance in ["dark", "light"] {
-            for screen in ["run", "runUnscored", "runPaused", "result", "resultEndurance", "unscored"] {
+            for screen in ["run", "runUnscored", "runFretted", "runPaused", "result", "resultEndurance", "unscored"] {
                 let app = launch(appearance, ["-screen", screen])
                 XCTAssertEqual(app.state, .runningForeground)
                 sleep(2)
                 switch screen {
-                case "run", "runUnscored":
+                case "run", "runUnscored", "runFretted":
                     XCTAssertTrue(app.buttons["run.stop"].waitForExistence(timeout: 10), "\(screen) shows")
                 case "runPaused":
                     XCTAssertTrue(app.buttons["run.resume"].waitForExistence(timeout: 10), "\(screen) shows")

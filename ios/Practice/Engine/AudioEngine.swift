@@ -72,8 +72,23 @@ final class RenderState {
     private var lastBeat = -1
     private var lastBeatFrame: Int64 = 0
 
-    init(sampleRate: Double, params: Locked<EngineParams>, report: Locked<EngineReport>, sounds: SoundBank = SynthSounds()) {
+    // The guide guitar: recorded notes, each played at its own speed to be in tune. One string's worth: a new note
+    // damps the one before it.
+    private let guitar: GuitarBank?
+    private let guitarRatio: Double
+    private static let strings = 8
+    private var gSample = [Int](repeating: -1, count: strings)
+    private var gPos = [Double](repeating: 0, count: strings)
+    private var gStep = [Double](repeating: 1, count: strings)
+    private var gDelay = [Int](repeating: 0, count: strings)
+    private var gGain = [Float](repeating: 1, count: strings)
+    private var gFade = [Bool](repeating: false, count: strings)
+
+    init(sampleRate: Double, params: Locked<EngineParams>, report: Locked<EngineReport>, sounds: SoundBank = SynthSounds(),
+         guitar: GuitarBank? = GuitarBank.shared) {
         self.sampleRate = sampleRate
+        self.guitar = guitar
+        guitarRatio = (guitar?.sampleRate ?? sampleRate) / max(1, sampleRate)
         paramsBox = params
         reportBox = report
         self.params = params.current
@@ -107,7 +122,21 @@ final class RenderState {
             start(.change, delay: delay)
             if params.gridClicks { start(.accent, delay: delay) }
         default:
-            start(e.kind, delay: delay)
+            if e.sample >= 0, let g = guitar, e.sample < g.ptrs.count {
+                pluck(e, delay: delay)
+            } else {
+                start(e.kind, delay: delay)
+            }
+        }
+    }
+
+    /// A note of the guide guitar. The note still sounding is damped, as it is when one string is picked again.
+    private func pluck(_ e: ClickEvent, delay: Int) {
+        for v in 0..<RenderState.strings where gSample[v] >= 0 { gFade[v] = true }
+        for v in 0..<RenderState.strings where gSample[v] < 0 {
+            gSample[v] = e.sample; gPos[v] = 0; gStep[v] = max(0.25, min(4, e.step)) * guitarRatio
+            gDelay[v] = delay; gGain[v] = 0.9; gFade[v] = false
+            return
         }
     }
 
@@ -132,6 +161,25 @@ final class RenderState {
             while i < n && pos < len { out[i] += p[pos]; i += 1; pos += 1 }
             vDelay[v] = 0; vPos[v] = pos
             if pos >= len { vSound[v] = -1 }
+        }
+        if let g = guitar {
+            for v in 0..<RenderState.strings where gSample[v] >= 0 {
+                let p = g.ptrs[gSample[v]], len = g.lengths[gSample[v]]
+                let step = gStep[v], fade = gFade[v]
+                var pos = gPos[v], gain = gGain[v], i = gDelay[v]
+                var ended = false
+                while i < n {
+                    let k = Int(pos)
+                    if k + 1 >= len || gain < 0.0005 { ended = true; break }
+                    let f = Float(pos - Double(k))
+                    out[i] += (p[k] + (p[k + 1] - p[k]) * f) * gain
+                    if fade { gain *= 0.995 }
+                    pos += step
+                    i += 1
+                }
+                gDelay[v] = 0; gPos[v] = pos; gGain[v] = gain
+                if ended { gSample[v] = -1 }
+            }
         }
         if bufs.count > 1 {
             for b in 1..<bufs.count {

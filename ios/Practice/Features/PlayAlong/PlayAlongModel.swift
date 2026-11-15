@@ -279,6 +279,7 @@ final class PlayAlong: ObservableObject {
         zones = lib.zones ?? .standard
         scoring = lib.scoring ?? .standard
         rebuildExercises()
+        await VoiceClips.shared.refresh()
         await history.sync()
         await refreshLevels()
     }
@@ -473,8 +474,8 @@ final class PlayAlong: ObservableObject {
         if scored && !inputReady(calibrating: calibrating) { return }
         if !calibrating && intro {
             phase = .intro
-            let words = IntroText.exercise(exercise, bpm: startTempo, session: session, guided: guided, scored: scored)
-            player.voice.speak(words, always: true) { [weak self] in
+            let words = IntroText.parts(exercise, bpm: startTempo, session: session, scored: scored)
+            player.voice.speak(parts: words, always: true) { [weak self] in
                 guard let self, self.phase == .intro else { return }
                 self.launch(calibrating: false)
             }
@@ -568,7 +569,7 @@ final class PlayAlong: ObservableObject {
     }
 
     func repeatIntro() {
-        player.voice.speak(IntroText.exercise(exercise, bpm: startTempo, session: session, guided: guided, scored: audioInput), always: true)
+        player.voice.speak(parts: IntroText.parts(exercise, bpm: startTempo, session: session, scored: audioInput), always: true)
     }
 
     private var lastCueBeat = -1
@@ -579,7 +580,7 @@ final class PlayAlong: ObservableObject {
     private func speakCues() {
         guard player.voice.cuesOn, !route.phoneSpeakerAndMic, phase == .running, let s = currentSlot else { return }
         if s.bpm != lastCueBPM {
-            if lastCueBPM > 0 { player.voice.speak("\(Int(s.bpm))", cue: true) }
+            if lastCueBPM > 0 { player.voice.speak(parts: [IntroText.cue(bpm: Int(s.bpm))], cue: true) }
             lastCueBPM = s.bpm
             return
         }
@@ -587,8 +588,7 @@ final class PlayAlong: ObservableObject {
         let beatIndex = Int((now - countInEnd) / (60 / s.bpm))
         guard beatIndex != lastCueBeat else { return }
         lastCueBeat = beatIndex
-        let word = cue.next == 3 ? "Triplets" : (cue.next == 4 ? "Sixteenths" : (cue.next == 2 ? "Eighths" : (cue.next == 0 ? "Rest" : "\(cue.next)")))
-        player.voice.speak(word, cue: true)
+        player.voice.speak(parts: [IntroText.cue(group: cue.next)], cue: true)
     }
 
     private func launch(calibrating: Bool) {
@@ -681,7 +681,14 @@ final class PlayAlong: ObservableObject {
     }
 
     private func frameEvent(_ e: TimedEvent, sampleRate: Double) -> ClickEvent {
-        ClickEvent(frame: Int64((origin + e.time * sampleRate).rounded()), kind: e.kind, beat: e.beat)
+        var c = ClickEvent(frame: Int64((origin + e.time * sampleRate).rounded()), kind: e.kind, beat: e.beat)
+        // A note of the guide: the recorded guitar, at the note's own pitch.
+        if e.pitch >= 0, let bank = GuitarBank.shared {
+            let s = bank.lookup(pitch: e.pitch, accent: e.kind == .pluckAccent, up: e.up)
+            c.sample = s.sample
+            c.step = s.step
+        }
+        return c
     }
 
     /// Keeps at least 1.5 seconds of the run queued.

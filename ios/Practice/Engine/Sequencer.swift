@@ -10,6 +10,9 @@ struct ClickEvent: Equatable {
     var kind: ClickKind
     /// Beat within the bar for the beat display (-1 when the event is not on a beat).
     var beat: Int = -1
+    /// A note of the guide guitar: which recording (GuitarBank), and how fast it runs to be in tune. -1: not one.
+    var sample: Int = -1
+    var step: Double = 1
 }
 
 /// Ticks for one beat grid: which kind of click tick `k` (0-based, counted from a bar line) is.

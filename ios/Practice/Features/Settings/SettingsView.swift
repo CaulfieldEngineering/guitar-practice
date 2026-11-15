@@ -37,7 +37,7 @@ struct SettingsView: View {
                             ForEach(voice.voices) { v in Text("\(v.name), \(v.quality)").tag(v.id) }
                         }
                     }
-                    Button(L.preview) { voice.speak(L.previewText, always: true) }
+                    Button(L.preview) { voice.speak(parts: L.previewParts, always: true) }
                 } header: { Text(L.voice) } footer: { Text(L.voiceFooter) }
 
                 Section {

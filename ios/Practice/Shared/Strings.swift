@@ -247,8 +247,9 @@ enum L {
     static let voice = "Voice"
     static let voiceCues = "Voice Cues"
     static let preview = "Preview"
-    static let previewText = "Triplets to sixteenths. 80."
-    static let voiceFooter = "For a better voice, download a Premium English voice in Settings > Accessibility > Spoken Content > Voices."
+    static let previewParts = [IntroText.Part(key: "say.trip16x4", text: "Triplets to sixteenths. Four and four."),
+                               IntroText.Part(key: "bpm.120", text: "120."), IntroText.Part(key: "cycles.8", text: "8 cycles.")]
+    static let voiceFooter = "Intros and cues use a recorded voice. The voice chosen here speaks anything it has no recording for."
     static let timingFooter = "Calibrate once for each audio setup."
     static let sync = "Sync"
     static let updateDrills = "Update Drills"

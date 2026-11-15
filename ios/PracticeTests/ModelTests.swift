@@ -124,6 +124,79 @@ final class ModelTests: XCTestCase {
         pa.intro = true
     }
 
+    /// The intro is short and plain: the name and the pattern, the tempo, the goal. Nothing about how to play.
+    func testIntroIsShortAndEveryPartIsRecorded() throws {
+        let pa = PlayAlong(player: Player(), history: History(inMemory: true))
+        let ex = try XCTUnwrap(pa.exercises.first { $0.id == "trip16x4" })
+        var s = SessionSettings()
+        s.kind = .cycles
+        s.cycles = 8
+        XCTAssertEqual(IntroText.exercise(ex, bpm: 120, session: s), "Triplets to sixteenths. Four and four. 120. 8 cycles.")
+        s.kind = .duration
+        s.seconds = 90
+        XCTAssertEqual(IntroText.parts(ex, bpm: 96, session: s).map(\.key), ["say.trip16x4", "bpm.96", "time.90"])
+        s.kind = .endurance
+        XCTAssertEqual(IntroText.parts(ex, bpm: 96, session: s, scored: true).last?.text, "Endurance.")
+        XCTAssertEqual(IntroText.parts(ex, bpm: 96, session: s, scored: false).last?.text, "Open.")
+        // The app carries the recorded voice, and it says these words.
+        let clips = VoiceClips.shared
+        XCTAssertGreaterThanOrEqual(clips.version, 1)
+        for drill in pa.exercises {
+            s.kind = .cycles
+            s.cycles = 4
+            for part in IntroText.parts(drill, bpm: drill.tempo.start, session: s) {
+                XCTAssertNotNil(clips.clip(part.key, text: part.text), "\(part.key) is recorded as \"\(part.text)\"")
+            }
+            XCTAssertFalse(drill.say.isEmpty, "\(drill.id) has a spoken line")
+        }
+        XCTAssertNotNil(clips.clip(IntroText.cue(group: 3).key, text: IntroText.cue(group: 3).text))
+        XCTAssertNil(clips.clip("say.trip16x4", text: "Different words."), "a clip is not used for other words")
+        let data = try XCTUnwrap(clips.clip("bpm.120", text: "120."))
+        XCTAssertNoThrow(try AVAudioPlayer(data: data), "a clip is audio the phone can play")
+    }
+
+    /// The guide guitar: recorded notes for every pitch a drill can ask for, and the engine plays them.
+    func testGuideGuitar() throws {
+        let bank = try XCTUnwrap(GuitarBank.shared, "the recorded notes are in the app")
+        XCTAssertEqual(bank.ptrs.count, GuitarBank.pitches.count * 4)
+        XCTAssertEqual(bank.sampleRate, 24000)
+        XCTAssertEqual(GuitarBank.pitch(string: nil, fret: nil), 55)
+        XCTAssertEqual(GuitarBank.pitch(string: 6, fret: 0), 40)
+        XCTAssertEqual(GuitarBank.pitch(string: 1, fret: 12), 76)
+        let open = bank.lookup(pitch: 55, accent: false, up: false)
+        XCTAssertEqual(open.step, 1, accuracy: 1e-12)
+        XCTAssertEqual(bank.lookup(pitch: 55, accent: true, up: true).sample, open.sample + 3)
+        let sharp = bank.lookup(pitch: 56, accent: false, up: false)
+        XCTAssertEqual(sharp.sample, open.sample)
+        XCTAssertEqual(sharp.step, pow(2, 1.0 / 12), accuracy: 1e-12)
+        // A guided cycle carries the pitch and the stroke of every note.
+        let ex = Exercise(id: "t", name: "t", cycleBeats: 1, notes: Exercise.expand(groups: [2], accentFirst: false), tempo: TempoRule(start: 100))
+        let plucks = RunBuilder.cycle(ex, index: 0, start: 0, bpm: 120, guided: true).events.filter { $0.kind == .pluck }
+        XCTAssertEqual(plucks.map(\.pitch), [55, 55])
+        XCTAssertEqual(plucks.map(\.up), [false, true])
+        // The engine renders a recorded note: sound comes out, and it ends.
+        let state = RenderState(sampleRate: 48000, params: Locked(EngineParams()), report: Locked(EngineReport()))
+        let queue = EventQueue()
+        queue.append([ClickEvent(frame: 10, kind: .pluck, beat: -1, sample: open.sample, step: open.step)])
+        state.track = queue
+        let frames = 4096
+        let buffer = UnsafeMutablePointer<Float>.allocate(capacity: frames)
+        defer { buffer.deallocate() }
+        var list = AudioBufferList(mNumberBuffers: 1, mBuffers: AudioBuffer(mNumberChannels: 1, mDataByteSize: UInt32(frames * 4), mData: buffer))
+        var stamp = AudioTimeStamp()
+        var loudest: Float = 0
+        var quietAtEnd = false
+        for block in 0..<12 {
+            state.render(frames, &stamp, &list)
+            let peak = (0..<frames).map { abs(buffer[$0]) }.max() ?? 0
+            loudest = max(loudest, peak)
+            if block == 11 { quietAtEnd = peak == 0 }
+        }
+        XCTAssertGreaterThan(loudest, 0.1, "the note sounds")
+        XCTAssertLessThanOrEqual(loudest, 1)
+        XCTAssertTrue(quietAtEnd, "and it ends")
+    }
+
     func testPatternGlyphsAndShortNames() throws {
         let pa = PlayAlong(player: Player(), history: History(inMemory: true))
         func glyph(_ id: String) -> String? { pa.exercises.first { $0.id == id }?.glyph }

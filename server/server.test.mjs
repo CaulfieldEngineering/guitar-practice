@@ -58,6 +58,20 @@ test('serves the catalog and refuses paths outside it', async (t) => {
   assert.equal(h.ok, true);
 });
 
+test('serves the recorded voice, whole', async (t) => {
+  const { base } = await run(t);
+  const idx = await (await fetch(`${base}/voice/index.json`)).json();
+  assert.ok(idx.version >= 1);
+  assert.ok(idx.clips['say.trip16x4'] && idx.clips['bpm.120'] && idx.clips['cycles.8'] && idx.clips.endurance && idx.clips['cue.3']);
+  const pack = Buffer.from(await (await fetch(`${base}/voice/pack.bin`)).arrayBuffer());
+  const needed = Math.max(...Object.values(idx.clips).map((c) => c.o + c.n));
+  assert.equal(pack.length, needed);
+  // Every drill in the catalog has its line recorded, in the words the catalog has now.
+  const drills = JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog', 'exercises', 'right-hand.json'), 'utf8')).exercises;
+  for (const d of drills) assert.equal(idx.clips[`say.${d.id}`]?.text, d.say || `${d.name}.`, d.id);
+  assert.equal((await fetch(`${base}/voice/other.bin`)).status, 404);
+});
+
 test('keeps each run once and acknowledges it', async (t) => {
   const { base, data } = await run(t);
   const post = (sessions) => fetch(`${base}/api/sessions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessions }) }).then((r) => r.json());

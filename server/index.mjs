@@ -7,6 +7,7 @@
 //   GET  /api/sessions[?exercise=id]  {sessions: [...]}, newest first
 //   GET  /api/stats[?exercise=id]     {bests: [{exerciseID, mode, bpm, best, runs, last}], progress: [...]}
 //   GET  /api/levels                  {levels: {<exercise id>: {max, basedOn, passes, rule}}}: his max per drill (zones are % of it)
+//   GET  /voice/index.json, /voice/pack.bin   the recorded voice (scripts/make-voice.mjs)
 //   GET  /                            a small page: the drills and the latest runs
 //
 // Runs are kept in one place, data/sessions.jsonl (one JSON object a line, never rewritten, only appended).
@@ -21,10 +22,11 @@ import { createStore, bests, progress, levels } from './store.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CATALOG = process.env.PRACTICE_CATALOG || path.join(ROOT, 'catalog');
 const DATA = process.env.PRACTICE_DATA || path.join(ROOT, 'data');
+const VOICE = process.env.PRACTICE_VOICE || path.join(ROOT, 'voice');
 const PORT = Number(process.env.PRACTICE_PORT || 4700);
 const HOSTS = (process.env.PRACTICE_HOSTS || '127.0.0.1,DRILL_SERVER_HOST').split(',').map((h) => h.trim()).filter(Boolean);
 
-export function createApp({ catalog = CATALOG, data = DATA } = {}) {
+export function createApp({ catalog = CATALOG, data = DATA, voice = VOICE } = {}) {
   const store = createStore(path.join(data, 'sessions.jsonl'));
 
   const send = (res, status, body, type = 'application/json; charset=utf-8') => {
@@ -59,6 +61,12 @@ export function createApp({ catalog = CATALOG, data = DATA } = {}) {
         const file = path.resolve(catalog, rel);
         if (!file.startsWith(path.resolve(catalog) + path.sep) || !rel.endsWith('.json') || !fs.existsSync(file)) return send(res, 404, { error: 'not found' });
         return send(res, 200, fs.readFileSync(file));
+      }
+      // The recorded voice (scripts/make-voice.mjs): the index and the pack of clips, as they are on disk.
+      if (req.method === 'GET' && (p === '/voice/index.json' || p === '/voice/pack.bin')) {
+        const file = path.join(voice, p.slice('/voice/'.length));
+        if (!fs.existsSync(file)) return send(res, 404, { error: 'not found' });
+        return send(res, 200, fs.readFileSync(file), p.endsWith('.json') ? 'application/json; charset=utf-8' : 'application/octet-stream');
       }
       if (req.method === 'POST' && p === '/api/sessions') {
         let body;

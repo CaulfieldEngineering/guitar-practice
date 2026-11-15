@@ -26,6 +26,7 @@ struct RunDisplay {
     var states: [PlayAlong.NoteState]
     var now: Double
     var beat: Double
+    var beatsPerBar: Int = 4
     /// The latest notes' timing errors (ms, positive late), and how far off earns nothing.
     var recentErrors: [Double]
     var spanMs: Double
@@ -76,7 +77,7 @@ struct RunView: View {
             Spacer(minLength: Space.sm)
 
             Text(d.cue)
-                .font(Typo.number(60))
+                .font(Typo.number(52))
                 .foregroundStyle(d.cueWarn ? Theme.warn : Theme.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.4)
@@ -101,14 +102,14 @@ struct RunView: View {
                 BigStat(value: d.clock, label: d.clockLabel, colour: d.countingIn ? Theme.warn : Theme.text)
             }
 
-            LaneView(notes: d.notes, played: d.played, states: d.states, now: d.now, beat: d.beat)
-                .frame(height: 132)
-                .padding(.top, Space.lg)
+            TabLane(notes: d.notes, played: d.played, states: d.states, now: d.now, beatsPerBar: d.beatsPerBar)
+                .frame(height: 206)
+                .padding(.top, Space.md)
 
             if d.scored {
                 TimingMeter(errors: d.recentErrors, spanMs: d.spanMs)
-                    .frame(height: 44)
-                    .padding(.top, Space.sm)
+                    .frame(height: 40)
+                    .padding(.top, Space.xs)
                 HStack(spacing: Space.xs) {
                     Text(L.input).font(Typo.caption).foregroundStyle(Theme.faint)
                     ProgressLine(fraction: Double(meterFraction(d.inputLevel)), height: 3)

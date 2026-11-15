@@ -101,8 +101,11 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
     var detail: String = ""
     /// A shorter name for the Drills table ("Alt 16ths"); the full name when the data gives none.
     var short: String = ""
-    /// What the voice says before the count-in (the tempo and the goal are added to it).
+    /// Before 0.1.8, what the voice said before the count-in; still read, for 0.1.7 and earlier.
     var intro: String = ""
+    /// What the voice says first: the name and the pattern, short ("Triplets to sixteenths. Four and four."). The
+    /// tempo and the goal are added. Without one, the name.
+    var say: String = ""
     var category: String = "Right hand"
     var beatsPerBar: Int = 4
     /// Length of one cycle of the pattern, in beats.
@@ -128,7 +131,7 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
 
     private enum CodingKeys: String, CodingKey {
         case schema, version, id, name, detail, intro, category, beatsPerBar, cycleBeats, notes, groups, accent, tempo, scoring, session, levels
-        case segments, rounds, stepBPM, subdivision, countInBeats, pattern, short
+        case segments, rounds, stepBPM, subdivision, countInBeats, pattern, short, say
     }
 
     init(id: String, name: String, detail: String = "", category: String = "Right hand", beatsPerBar: Int = 4,
@@ -160,6 +163,7 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
         name = try c.decode(String.self, forKey: .name)
         detail = try c.decodeIfPresent(String.self, forKey: .detail) ?? ""
         short = try c.decodeIfPresent(String.self, forKey: .short) ?? ""
+        say = try c.decodeIfPresent(String.self, forKey: .say) ?? ""
         intro = try c.decodeIfPresent(String.self, forKey: .intro) ?? ""
         category = try c.decodeIfPresent(String.self, forKey: .category) ?? (blocks.isEmpty ? "Right hand" : "Timed routines")
         beatsPerBar = try c.decodeIfPresent(Int.self, forKey: .beatsPerBar) ?? 4
@@ -202,6 +206,7 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
         try c.encode(schema, forKey: .schema); try c.encode(version, forKey: .version)
         try c.encode(session, forKey: .session); try c.encode(levels, forKey: .levels)
         if !short.isEmpty { try c.encode(short, forKey: .short) }
+        if !say.isEmpty { try c.encode(say, forKey: .say) }
         if !segments.isEmpty {
             try c.encode(segments, forKey: .segments); try c.encode(rounds, forKey: .rounds); try c.encode(stepBPM, forKey: .stepBPM)
             try c.encode(subdivision, forKey: .subdivision); try c.encode(countInBeats, forKey: .countInBeats)
