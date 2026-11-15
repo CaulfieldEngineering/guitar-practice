@@ -63,7 +63,7 @@ jobs:
           xcodebuild test -project ios/Practice.xcodeproj -scheme Practice -configuration Debug \
             -destination "platform=iOS Simulator,id=$DEVICE" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO > "$RUNNER_TEMP/test.log" 2>&1 || true
-          grep -E "error:|Test Case .* failed|XCTAssert|Executed|TEST (SUCCEEDED|FAILED)|BUILD FAILED" "$RUNNER_TEMP/test.log" | head -150 || true
+          grep -E "error:|Test Case .* failed|Test Suite .*(passed|failed)|XCTAssert|Executed|TEST (SUCCEEDED|FAILED)|BUILD FAILED" "$RUNNER_TEMP/test.log" | head -150 || true
           grep -q "TEST SUCCEEDED" "$RUNNER_TEMP/test.log"
 
       - name: Compile for the device (unsigned)
