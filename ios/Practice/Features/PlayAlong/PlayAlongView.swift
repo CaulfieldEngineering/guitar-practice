@@ -88,7 +88,18 @@ struct PlayAlongView: View {
                 Text(modeLine).font(.system(size: 13)).foregroundStyle(Theme.muted).frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("In: \(pa.route.input). Out: \(pa.route.output).").font(.system(size: 13)).foregroundStyle(Theme.muted)
+                    HStack(spacing: 8) {
+                        Text("In: \(pa.route.input). Out: \(pa.route.output).").font(.system(size: 13)).foregroundStyle(Theme.muted)
+                        Spacer()
+                        RoutePicker().frame(width: 32, height: 32)
+                    }
+                    if pa.interfacePresent && pa.route.outputIsInterface {
+                        Text("Hearing it through the interface: the lowest delay. For your Bluetooth headphones, pick them with the speaker button.")
+                            .font(.system(size: 12)).foregroundStyle(Theme.faint)
+                    } else if pa.route.bluetoothOutput {
+                        Text("Hearing it on Bluetooth: the delay is measured and taken out. Calibrate once for this setup.")
+                            .font(.system(size: 12)).foregroundStyle(Theme.faint)
+                    }
                     if pa.route.phoneSpeakerAndMic {
                         Text("On the speaker the phone hears its own sound. Headphones or an interface work best.")
                             .font(.system(size: 13)).foregroundStyle(Theme.warn)

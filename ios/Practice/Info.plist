@@ -42,7 +42,7 @@
 		<true/>
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Play along: your guitar comes in through the microphone or an audio interface so each note can be timed against the click.</string>
+	<string>Play along: your guitar comes in through your audio interface so each note can be timed against the click.</string>
 	<!-- The click keeps going with the screen locked. -->
 	<key>UIBackgroundModes</key>
 	<array>

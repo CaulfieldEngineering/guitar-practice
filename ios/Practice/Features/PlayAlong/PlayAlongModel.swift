@@ -21,6 +21,10 @@ final class PlayAlong: ObservableObject {
     @Published var session: SessionSettings { didSet { saveSettings() } }
     @Published var guided: Bool { didSet { UserDefaults.standard.set(guided, forKey: "pa.guided") } }
     @Published var gridClicks: Bool { didSet { UserDefaults.standard.set(gridClicks, forKey: "pa.click") } }
+    /// Testing only, off unless switched on in Settings: the phone's microphone instead of the interface.
+    @Published var allowPhoneMic: Bool { didSet { UserDefaults.standard.set(allowPhoneMic, forKey: "pa.allowMic"); player.audio.allowPhoneMic = allowPhoneMic; routeChanged() } }
+    /// Whether an interface is plugged in (its input is available).
+    @Published private(set) var interfacePresent = false
     /// This route's calibration (Engine/Latency.swift), if it has one.
     @Published private(set) var calibration: Calibration?
     /// The route changed during a run, or this route has never been calibrated.
@@ -76,6 +80,8 @@ final class PlayAlong: ObservableObject {
         session = PlayAlong.storedSession(id) ?? ex.session
         guided = d.object(forKey: "pa.guided") as? Bool ?? true
         gridClicks = d.object(forKey: "pa.click") as? Bool ?? true
+        allowPhoneMic = d.object(forKey: "pa.allowMic") as? Bool ?? false
+        player.audio.allowPhoneMic = allowPhoneMic
         NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.routeChanged() }
         }
@@ -157,6 +163,11 @@ final class PlayAlong: ObservableObject {
             return
         default:
             message = "Allow the microphone in Settings, Practice, to be scored."
+            return
+        }
+        routeChanged()
+        if !interfacePresent && !allowPhoneMic {
+            message = "Plug in your audio interface: the guitar comes in through it."
             return
         }
         if !calibrating && player.voice.introOn {
@@ -321,7 +332,10 @@ final class PlayAlong: ObservableObject {
         let changed = r.key != route.key
         route = r
         calibration = CalibrationStore.get(r.key)
-        if r.handsFree {
+        interfacePresent = AudioEngine.interfaceInput() != nil
+        if !interfacePresent && !allowPhoneMic {
+            routeNote = "Plug in your audio interface: the guitar comes in through it."
+        } else if r.handsFree {
             routeNote = "The headphones are in call mode, which sounds poor and lags. Turn off their microphone for this app, or reconnect them."
         } else if calibration == nil {
             routeNote = "New audio setup (\(r.name)): calibrate once so the timing is right."

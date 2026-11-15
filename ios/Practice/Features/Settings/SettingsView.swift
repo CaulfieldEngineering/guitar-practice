@@ -66,6 +66,7 @@ struct SettingsView: View {
                     }
                     Button("Send runs now") { Task { await history.sync() } }
                     Button("Put back the starter routines") { store.restoreStarters() }
+                    Toggle("Use the phone's microphone (testing)", isOn: $pa.allowPhoneMic).tint(Theme.accent)
                 } header: { Text("Drills and runs") } footer: {
                     Text("Drills come from the mini PC over Tailscale and are kept on the phone for when it is out of reach. Every run is sent back to it.")
                 }

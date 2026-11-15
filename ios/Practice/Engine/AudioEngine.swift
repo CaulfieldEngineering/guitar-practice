@@ -177,9 +177,16 @@ final class AudioEngine {
     var leadIn: Double { 0.12 * sampleRate }
 
     enum Failure: LocalizedError {
-        case noInput
-        var errorDescription: String? { "No input is available. Plug in an interface or allow the microphone." }
+        case noInput, noInterface
+        var errorDescription: String? {
+            switch self {
+            case .noInput: return "No input is available. Plug in your interface."
+            case .noInterface: return "Plug in your audio interface: the guitar comes in through it."
+            }
+        }
     }
+    /// The testing switch: let the phone's microphone stand in for the interface.
+    var allowPhoneMic = false
 
     init() {
         let nc = NotificationCenter.default
@@ -202,7 +209,7 @@ final class AudioEngine {
             // mode, and the input is the interface or the phone's microphone, never the headphones' own.
             try session.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
             try? session.setActive(true)
-            AudioEngine.preferWiredInput(session)
+            try AudioEngine.preferInterface(session, allowPhoneMic: allowPhoneMic)
         } else {
             try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         }
@@ -265,16 +272,25 @@ final class AudioEngine {
         return r.anchorHost + (f - Double(r.anchorFrame)) / sampleRate
     }
 
-    /// The interface (USB or a wired headset input) when there is one, otherwise the phone's microphone.
-    static func preferWiredInput(_ session: AVAudioSession) {
+    /// The guitar comes in through an audio interface (Joe, 2026-11-14: "Won't be using the mic"). The phone's
+    /// microphone only when the testing switch allows it.
+    static let interfacePorts: [AVAudioSession.Port] = [.usbAudio, .lineIn, .headsetMic]
+
+    static func interfaceInput(_ session: AVAudioSession = .sharedInstance()) -> AVAudioSessionPortDescription? {
         let inputs = session.availableInputs ?? []
-        let order: [AVAudioSession.Port] = [.usbAudio, .lineIn, .headsetMic, .builtInMic]
-        for type in order {
-            if let port = inputs.first(where: { $0.portType == type }) {
-                if session.preferredInput?.uid != port.uid { try? session.setPreferredInput(port) }
-                return
-            }
+        for type in interfacePorts { if let p = inputs.first(where: { $0.portType == type }) { return p } }
+        return nil
+    }
+
+    static func preferInterface(_ session: AVAudioSession, allowPhoneMic: Bool) throws {
+        if let port = interfaceInput(session) {
+            if session.preferredInput?.uid != port.uid { try? session.setPreferredInput(port) }
+            return
         }
+        guard allowPhoneMic, let mic = (session.availableInputs ?? []).first(where: { $0.portType == .builtInMic }) else {
+            throw Failure.noInterface
+        }
+        try? session.setPreferredInput(mic)
     }
 
     /// Before speaking with nothing running: the playback session, mixing with other apps. Leaves a running one alone.

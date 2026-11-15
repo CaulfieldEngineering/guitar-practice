@@ -15,6 +15,8 @@ struct RouteInfo: Equatable {
     var input: String             // port names, for the screen
     var output: String
     var inputIsBuiltInMic: Bool
+    var inputIsInterface: Bool     // USB, line in or a wired headset input
+    var outputIsInterface: Bool    // the interface's own outputs (or wired headphones)
     var outputIsPhoneSpeaker: Bool
     var bluetoothOutput: Bool     // A2DP or LE: has a big output delay, fine for listening
     var handsFree: Bool           // HFP: the headphones are in call mode (low quality, their own mic)
@@ -59,6 +61,8 @@ enum Latency {
             input: ins.first?.portName ?? "No input",
             output: outs.first?.portName ?? "No output",
             inputIsBuiltInMic: ins.first?.portType == .builtInMic,
+            inputIsInterface: ins.contains { AudioEngine.interfacePorts.contains($0.portType) },
+            outputIsInterface: outs.contains { ([.usbAudio, .lineOut, .headphones] as [AVAudioSession.Port]).contains($0.portType) },
             outputIsPhoneSpeaker: outs.contains { $0.portType == .builtInSpeaker || $0.portType == .builtInReceiver },
             bluetoothOutput: outs.contains { bt.contains($0.portType) },
             handsFree: outs.contains { $0.portType == .bluetoothHFP } || ins.contains { $0.portType == .bluetoothHFP })
