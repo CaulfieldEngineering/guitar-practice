@@ -90,10 +90,66 @@ final class ScoringTests: XCTestCase {
     func testEnduranceRollingAndLadder() {
         XCTAssertNil(RunBuilder.rolling([0.9], noteCounts: [10], window: 2))
         XCTAssertEqual(RunBuilder.rolling([0.9, 0.7], noteCounts: [10, 30], window: 2)!, 0.75, accuracy: 1e-9)
-        XCTAssertEqual(RunBuilder.accuracy(errors: [10, -25, 40, nil], toleranceMs: 30), 0.5, accuracy: 1e-9)
+        let errors: [Double?] = [5, -5, nil, 200]
+        let gaps: [Double] = [0.25, 0.25, 0.25, 0.25]
+        XCTAssertEqual(Scoring.accuracy(errors: errors[...], gaps: gaps[...]), 0.5, accuracy: 1e-9)
         XCTAssertEqual(RunBuilder.nextBPM(current: 100, lastPassed: true, step: 4, maxBPM: 200), 104)
         XCTAssertEqual(RunBuilder.nextBPM(current: 100, lastPassed: false, step: 4, maxBPM: 200), 100)
         XCTAssertEqual(RunBuilder.nextBPM(current: 198, lastPassed: true, step: 4, maxBPM: 200), 200)
+    }
+
+    /// The windows follow the note spacing: sixteenths at 160 are judged tighter than eighths at 80.
+    func testGradedCreditScalesWithTheSpacing() {
+        let c = ScoringConfig.standard
+        let fast = 60.0 / 160 / 4      // sixteenths at 160: 93.75 ms apart
+        let slow = 60.0 / 80 / 2       // eighths at 80: 375 ms apart
+        XCTAssertEqual(c.windows(gap: fast).full, 12, accuracy: 1e-9)
+        XCTAssertEqual(c.windows(gap: fast).zero, 0.45 * 93.75, accuracy: 1e-9)
+        XCTAssertEqual(c.windows(gap: slow).full, 25, accuracy: 1e-9)
+        XCTAssertEqual(c.windows(gap: slow).zero, 90, accuracy: 1e-9)
+        XCTAssertEqual(c.credit(errorMs: 10, gap: fast), 1)
+        XCTAssertEqual(c.credit(errorMs: -10, gap: fast), 1)
+        XCTAssertEqual(c.credit(errorMs: 45, gap: fast), 0)
+        XCTAssertLessThan(c.credit(errorMs: 30, gap: fast), 0.5)
+        XCTAssertGreaterThan(c.credit(errorMs: 30, gap: slow), 0.95)
+        XCTAssertEqual(c.credit(errorMs: -50, gap: slow), c.credit(errorMs: 50, gap: slow), accuracy: 1e-12)
+        // It only ever falls as the error grows.
+        var last = 1.0
+        for ms in stride(from: 0.0, through: 120, by: 2) {
+            let v = c.credit(errorMs: ms, gap: slow)
+            XCTAssertLessThanOrEqual(v, last + 1e-12)
+            last = v
+        }
+        XCTAssertEqual(last, 0)
+    }
+
+    func testMissedAndExtraNotesEarnNothing() {
+        let gaps: [Double] = [0.25, 0.25]
+        let clean: [Double?] = [0, 0]
+        XCTAssertEqual(Scoring.accuracy(errors: clean[...], gaps: gaps[...]), 1, accuracy: 1e-9)
+        XCTAssertEqual(Scoring.accuracy(errors: clean[...], gaps: gaps[...], extras: 2), 0.5, accuracy: 1e-9)
+        let oneMissed: [Double?] = [0, nil]
+        XCTAssertEqual(Scoring.accuracy(errors: oneMissed[...], gaps: gaps[...]), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(Scoring.gaps([0, 0.25, 1]), [0.25, 0.25, 0.75], "the nearest neighbour")
+        // The run's score is the same accuracy as a percentage.
+        let notes = ex([4]).notes(bpm: 120, start: 0, seconds: 2)         // 16 notes, 125 ms apart
+        var played = notes.map { Onset(time: $0.time, strength: 1) }
+        played.removeLast(4)                                               // four missed
+        let r = Scoring.score(notes: notes, played: played, window: 0.05)
+        XCTAssertEqual(r.score, 75)
+        XCTAssertEqual(r.full, 12)
+        XCTAssertEqual(r.fullMs, 15, accuracy: 1e-9)
+    }
+
+    func testScoringConfigFromTheCatalog() throws {
+        let partial = try Library.decodeScoring(Data(#"{"schema": 1, "fullMaxMs": 20, "extraWeight": 0.5}"#.utf8))
+        XCTAssertEqual(partial.fullMaxMs, 20)
+        XCTAssertEqual(partial.extraWeight, 0.5)
+        XCTAssertEqual(partial.zeroFraction, ScoringConfig.standard.zeroFraction)
+        XCTAssertThrowsError(try Library.decodeScoring(Data(#"{"schema": 1, "zeroFraction": 0.05}"#.utf8)))
+        XCTAssertThrowsError(try Library.decodeScoring(Data(#"{"schema": 9}"#.utf8)))
+        let bundled = try XCTUnwrap(Library.read(folder: XCTUnwrap(Library.bundledFolder)))
+        XCTAssertNotNil(bundled.scoring, "catalog/scoring.json is bundled and reads")
     }
 
     func testStatsBestsIgnoreGuided() {

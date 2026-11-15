@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct PracticeApp: App {
@@ -10,11 +11,22 @@ struct PracticeApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        #if DEBUG
+        // The UI tests start from a clean slate (the unit tests share this app's settings on the simulator).
+        if UserDefaults.standard.bool(forKey: "resetState"), let id = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: id)
+        }
+        #endif
         let p = Player()
         let h = History()
+        let pa = PlayAlong(player: p, history: h)
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "seedMax") { pa.seedMaxForScreenshots() }
+        #endif
         _player = StateObject(wrappedValue: p)
         _history = StateObject(wrappedValue: h)
-        _playAlong = StateObject(wrappedValue: PlayAlong(player: p, history: h))
+        _playAlong = StateObject(wrappedValue: pa)
+        PracticeApp.styleBars()
     }
 
     var body: some Scene {
@@ -32,6 +44,30 @@ struct PracticeApp: App {
                 }
         }
     }
+
+    /// The tab bar and the sheets' title bars in the house colours: the content's own background, a hairline, no blur.
+    private static func styleBars() {
+        let tab = UITabBarAppearance()
+        tab.configureWithOpaqueBackground()
+        tab.backgroundColor = Theme.uiBg
+        tab.shadowColor = Theme.uiLine
+        for item in [tab.stackedLayoutAppearance, tab.inlineLayoutAppearance, tab.compactInlineLayoutAppearance] {
+            item.normal.iconColor = Theme.uiMuted
+            item.normal.titleTextAttributes = [.foregroundColor: Theme.uiMuted]
+            item.selected.iconColor = Theme.uiAccentText
+            item.selected.titleTextAttributes = [.foregroundColor: Theme.uiAccentText]
+        }
+        UITabBar.appearance().standardAppearance = tab
+        UITabBar.appearance().scrollEdgeAppearance = tab
+
+        let nav = UINavigationBarAppearance()
+        nav.configureWithOpaqueBackground()
+        nav.backgroundColor = Theme.uiBg
+        nav.shadowColor = Theme.uiLine
+        UINavigationBar.appearance().standardAppearance = nav
+        UINavigationBar.appearance().scrollEdgeAppearance = nav
+        UINavigationBar.appearance().compactAppearance = nav
+    }
 }
 
 struct RootView: View {
@@ -40,58 +76,56 @@ struct RootView: View {
     @State private var tab = 0
 
     var body: some View {
+        content
+            .tint(Theme.accentText)
+            .preferredColorScheme(forcedScheme)
+            .alert("Sound could not start", isPresented: Binding(get: { player.errorText != nil }, set: { if !$0 { player.errorText = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: { Text(player.errorText ?? "") }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        #if DEBUG
+        if let screen = UserDefaults.standard.string(forKey: "screen"), !screen.isEmpty {
+            Gallery(screen: screen)
+        } else {
+            tabs
+        }
+        #else
+        tabs
+        #endif
+    }
+
+    /// Two tabs, each a line icon of the same weight (the tab bar would otherwise swap in filled ones). Drills holds
+    /// the picking drills and the timed routines; Progress and Settings are icons at the top.
+    private var tabs: some View {
         TabView(selection: $tab) {
             MetronomeView()
-                .tabItem { Label("Metronome", systemImage: "metronome") }.tag(0)
-            RoutinesView()
-                .tabItem { Label("Intervals", systemImage: "timer") }.tag(1)
-            PlayAlongView()
-                .tabItem { Label("Play along", systemImage: "waveform") }.tag(2)
+                .tabItem { tabLabel("Metronome", "metronome") }.tag(0)
+            DrillsView()
+                .tabItem { tabLabel("Drills", "waveform") }.tag(1)
         }
-        .tint(Theme.accent)
-        .alert("Sound could not start", isPresented: Binding(get: { player.errorText != nil }, set: { if !$0 { player.errorText = nil } })) {
-            Button("OK", role: .cancel) {}
-        } message: { Text(player.errorText ?? "") }
-    }
-}
-
-/// The top of each screen: a small title, the Update capsule when there is one, and Settings.
-struct ScreenHeader<Trailing: View>: View {
-    let title: String
-    let trailing: Trailing
-    @EnvironmentObject var updater: Updater
-    @State private var settings = false
-
-    init(title: String, @ViewBuilder trailing: () -> Trailing) {
-        self.title = title
-        self.trailing = trailing()
     }
 
-    var body: some View {
-        HStack(spacing: 12) {
-            Text(title).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.text)
-            Spacer()
-            if updater.available != nil {
-                Button { updater.install() } label: {
-                    Text("Update").font(.system(size: 13, weight: .semibold))
-                        .padding(.horizontal, 12).frame(height: 28)
-                        .background(Theme.accent, in: Capsule()).foregroundStyle(Theme.onAccent)
-                }.buttonStyle(.plain)
-            }
-            trailing
-            Button { settings = true } label: {
-                Image(systemName: "gearshape").font(.system(size: 17)).foregroundStyle(Theme.muted)
-                    .frame(width: 36, height: 36)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Settings")
+    private func tabLabel(_ title: String, _ systemImage: String) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: systemImage).environment(\.symbolVariants, .none)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 48)
-        .sheet(isPresented: $settings) { SettingsView() }
     }
-}
 
-extension ScreenHeader where Trailing == EmptyView {
-    init(title: String) { self.init(title: title) { EmptyView() } }
+    /// The system's appearance, unless a UI test asks for one (-appearance dark).
+    private var forcedScheme: ColorScheme? {
+        #if DEBUG
+        switch UserDefaults.standard.string(forKey: "appearance") {
+        case "dark": return .dark
+        case "light": return .light
+        default: return nil
+        }
+        #else
+        return nil
+        #endif
+    }
 }

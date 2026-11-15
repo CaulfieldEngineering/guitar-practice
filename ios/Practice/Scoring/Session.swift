@@ -8,8 +8,10 @@ struct SessionSettings: Codable, Equatable, Hashable {
     var cycles: Int = 4
     /// Duration mode: total length in seconds.
     var seconds: Int = 60
-    /// Endurance (and the ladder): a cycle passes at this share of notes within the tolerance.
+    /// Endurance (and the ladder): a cycle passes at this accuracy (Scoring.accuracy, as a percentage).
     var targetPercent: Int = 85
+    /// Not used since 0.1.6: the timing windows belong to the scoring algorithm (ScoringConfig), not to a setting.
+    /// Kept so catalogs and stored settings that carry it still read, and 0.1.5 still finds it.
     var toleranceMs: Double = 30
     /// Endurance: the accuracy is taken over this many cycles in a row.
     var windowCycles: Int = 2
@@ -95,13 +97,6 @@ enum RunBuilder {
         var sizes = [Int](repeating: 0, count: max(1, ex.cycleBeats))
         for n in ex.notes where n.at.beat < sizes.count { sizes[n.at.beat] += 1 }
         return sizes
-    }
-
-    /// Share of a cycle's notes played within `toleranceMs` (0 to 1). `errors` lines up with `notes`.
-    static func accuracy(errors: ArraySlice<Double?>, toleranceMs: Double) -> Double {
-        guard !errors.isEmpty else { return 1 }
-        let ok = errors.filter { e in e.map { abs($0) <= toleranceMs } ?? false }.count
-        return Double(ok) / Double(errors.count)
     }
 
     /// The rolling accuracy over the last `window` cycles (nil until there are that many).

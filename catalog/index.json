@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 2,
+  "version": 3,
   "updated": "2026-11-14",
   "files": [
     {
@@ -14,6 +14,10 @@
     {
       "path": "zones.json",
       "kind": "zones"
+    },
+    {
+      "path": "scoring.json",
+      "kind": "scoring"
     }
   ]
 }

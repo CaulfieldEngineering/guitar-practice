@@ -35,6 +35,19 @@ test('the repo catalog is valid', () => {
   assert.equal(c.list[0].id, 'trip16x4');
 });
 
+test('the scoring numbers are in the catalog, and nonsense is refused', () => {
+  const idx = JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog', 'index.json'), 'utf8'));
+  assert.ok(idx.files.some((f) => f.kind === 'scoring' && f.path === 'scoring.json'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'practice-cat-'));
+  try {
+    fs.writeFileSync(path.join(tmp, 'index.json'), JSON.stringify({ schema: 1, version: 1, files: [{ path: 'scoring.json', kind: 'scoring' }] }));
+    fs.writeFileSync(path.join(tmp, 'scoring.json'), JSON.stringify({ schema: 1, fullFraction: 0.5, zeroFraction: 0.2 }));
+    assert.ok(checkCatalog(tmp).errors.some((e) => e.includes('zeroFraction')));
+    fs.writeFileSync(path.join(tmp, 'scoring.json'), JSON.stringify({ schema: 1, fullMaxMs: 20 }));
+    assert.deepEqual(checkCatalog(tmp).errors, []);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('serves the catalog and refuses paths outside it', async (t) => {
   const { base } = await run(t);
   const idx = await (await fetch(`${base}/catalog/index.json`)).json();

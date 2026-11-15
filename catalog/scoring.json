@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "about": "How timing becomes accuracy. Each note earns full credit when it lands within `fullFraction` of the gap to its nearest neighbouring note, falling smoothly to nothing at `zeroFraction` of that gap; both windows are kept between their Min and Max in milliseconds, so sixteenths at 160 are not judged like eighths at 80. A missed note earns nothing; each extra note counts as `extraWeight` of a note that earned nothing. Accuracy is the credit over the notes asked for plus the extras. Tune here; bump index.json version. The app has the same numbers as its default.",
+  "fullFraction": 0.12,
+  "zeroFraction": 0.45,
+  "fullMinMs": 12,
+  "fullMaxMs": 25,
+  "zeroMinMs": 35,
+  "zeroMaxMs": 90,
+  "extraWeight": 1
+}

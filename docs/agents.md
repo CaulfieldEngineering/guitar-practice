@@ -11,6 +11,12 @@ Joe, 2026-11-14: "Let new drills and levels be added without an iOS update. Let 
 5. `npm run check` and `npm test` in this repo; both must pass. Commit and push.
 6. The drill server serves the folder as it is on disk (no restart). Check with `curl http://127.0.0.1:4700/health` (`ok: true`, the new `catalogVersion`).
 
+## Tune how accuracy is judged (no app build needed)
+
+The timing windows are not a setting in the app (Joe, 2026-11-14: "The ms accuracy should be part of the algorithm determining percentage accuracy, not a user feature"). They are numbers in `catalog/scoring.json`, explained in README.md, "Accuracy": full credit within `fullFraction` of the gap between notes, none from `zeroFraction`, each kept between its Min and Max in ms; `extraWeight` is what an extra note costs. To tune: change the numbers, raise `version` in `catalog/index.json`, `npm run check` and `npm test`, commit and push. After changing `server/catalog.mjs` itself, restart the scheduled task "Practice Drill Server" so `/health` checks with the new code.
+
+Runs with the audio input off are not runs: nothing about them reaches the server, and they never count toward his max. Only the minutes are kept, on the phone.
+
 ## Read his runs
 
 - `GET http://127.0.0.1:4700/api/stats` (`?exercise=<id>`): bests per drill, mode and starting tempo, and every run in time order. `GET /api/sessions` gives the full results. The file is `data/sessions.jsonl` in this repo folder on the mini PC (one run a line; never edit it by hand).

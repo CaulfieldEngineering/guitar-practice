@@ -103,6 +103,14 @@ enum Library {
         return z
     }
 
+    /// The scoring numbers (catalog/scoring.json). Refused when the numbers do not make sense.
+    static func decodeScoring(_ data: Data) throws -> ScoringConfig {
+        let s = try JSONDecoder().decode(ScoringConfig.self, from: data)
+        guard s.schema <= supportedSchema else { throw LibraryError.newerSchema(s.schema) }
+        guard s.isValid else { throw LibraryError.badPath("scoring") }
+        return s
+    }
+
     static func decodeIndex(_ data: Data) throws -> CatalogIndex {
         let i = try JSONDecoder().decode(CatalogIndex.self, from: data)
         guard i.schema <= supportedSchema else { throw LibraryError.newerSchema(i.schema) }
@@ -118,7 +126,7 @@ enum Library {
         return order.compactMap { byID[$0] }
     }
 
-    struct Contents { var exercises: [Exercise]; var routines: [Routine]; var zones: TempoZones? = nil }
+    struct Contents { var exercises: [Exercise]; var routines: [Routine]; var zones: TempoZones? = nil; var scoring: ScoringConfig? = nil }
 
     /// Reads one catalog folder (index.json and the files it names).
     static func read(folder: URL) -> Contents? {
@@ -126,13 +134,15 @@ enum Library {
               let index = try? decodeIndex(data) else { return nil }
         var ex: [Exercise] = [], ro: [Routine] = []
         var zones: TempoZones?
+        var scoring: ScoringConfig?
         for f in index.files {
             guard let d = try? Data(contentsOf: folder.appendingPathComponent(f.path)) else { continue }
+            if f.kind == "scoring", let s = try? decodeScoring(d) { scoring = s }
             if f.kind == "exercises", let list = try? decodeExercises(d) { ex += list }
             if f.kind == "routines", let list = try? decodeRoutines(d) { ro += list }
             if f.kind == "zones", let z = try? decodeZones(d) { zones = z }
         }
-        return Contents(exercises: ex, routines: ro, zones: zones)
+        return Contents(exercises: ex, routines: ro, zones: zones, scoring: scoring)
     }
 
     static var bundledFolder: URL? { Bundle.main.url(forResource: "catalog", withExtension: nil) }
@@ -148,8 +158,11 @@ enum Library {
     static func load() -> Contents {
         var exLists: [[Exercise]] = [], roLists: [[Routine]] = []
         var zones: TempoZones?
+        var scoring: ScoringConfig?
         for folder in [bundledFolder, cacheFolder].compactMap({ $0 }) {
-            if let c = read(folder: folder) { exLists.append(c.exercises); roLists.append(c.routines); zones = c.zones ?? zones }
+            if let c = read(folder: folder) {
+                exLists.append(c.exercises); roLists.append(c.routines); zones = c.zones ?? zones; scoring = c.scoring ?? scoring
+            }
         }
         let files = (try? FileManager.default.contentsOfDirectory(at: userFolder, includingPropertiesForKeys: nil)) ?? []
         for f in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where f.pathExtension == "json" {
@@ -157,7 +170,8 @@ enum Library {
         }
         let ex = merge(exLists, id: \.id)
         let ro = merge(roLists, id: \.name)
-        return Contents(exercises: ex.isEmpty ? [Exercise.fallback] : ex, routines: ro, zones: zones ?? .standard)
+        return Contents(exercises: ex.isEmpty ? [Exercise.fallback] : ex, routines: ro, zones: zones ?? .standard,
+                        scoring: scoring ?? .standard)
     }
 
     static func loadStarterRoutines() -> [Routine] { load().routines }
@@ -204,6 +218,7 @@ enum DrillServer {
                 if f.kind == "exercises" { _ = try Library.decodeExercises(d) }
                 if f.kind == "routines" { _ = try Library.decodeRoutines(d) }
                 if f.kind == "zones" { _ = try Library.decodeZones(d) }
+                if f.kind == "scoring" { _ = try Library.decodeScoring(d) }
                 let dest = tmp.appendingPathComponent(f.path)
                 try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try d.write(to: dest)

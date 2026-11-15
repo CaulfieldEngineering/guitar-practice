@@ -84,9 +84,19 @@ export function checkCatalog(folder) {
       for (const [mode, id] of Object.entries(doc.suggest ?? {})) {
         if (!zs.some((z) => z.id === id)) errors.push(`${f.path}: suggest.${mode} names ${id}, which is not a zone`);
       }
+    } else if (f.kind === 'scoring') {
+      // How timing becomes accuracy (the app's ScoringConfig): every number optional, but sensible when given.
+      const num = (k) => doc[k] == null || (Number.isFinite(doc[k]) && doc[k] >= 0);
+      for (const k of ['fullFraction', 'zeroFraction', 'fullMinMs', 'fullMaxMs', 'zeroMinMs', 'zeroMaxMs', 'extraWeight']) {
+        if (!num(k)) errors.push(`${f.path}: ${k} must be a number, 0 or more`);
+      }
+      const v = { fullFraction: 0.12, zeroFraction: 0.45, fullMinMs: 12, fullMaxMs: 25, zeroMinMs: 35, zeroMaxMs: 90, ...doc };
+      if (!(v.fullFraction > 0 && v.zeroFraction > v.fullFraction)) errors.push(`${f.path}: zeroFraction must be above fullFraction, both above 0`);
+      if (!(v.fullMinMs > 0 && v.fullMaxMs >= v.fullMinMs)) errors.push(`${f.path}: fullMinMs must be above 0 and no more than fullMaxMs`);
+      if (!(v.zeroMinMs > 0 && v.zeroMaxMs >= v.zeroMinMs)) errors.push(`${f.path}: zeroMinMs must be above 0 and no more than zeroMaxMs`);
     } else if (f.kind === 'routines') {
       for (const r of doc.routines ?? []) { checkRoutine(r, f.path, errors); routines += 1; }
-    } else errors.push(`index.json: ${f.path} has kind ${f.kind} (exercises, routines or zones)`);
+    } else errors.push(`index.json: ${f.path} has kind ${f.kind} (exercises, routines, zones or scoring)`);
   }
   // Every JSON file in the folder should be in the index, or the app never sees it.
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((x) => x.isDirectory() ? walk(path.join(d, x.name)) : [path.join(d, x.name)]);

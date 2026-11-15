@@ -1,3 +1,4 @@
+import AVFoundation
 import XCTest
 @testable import Practice
 
@@ -48,6 +49,52 @@ final class ModelTests: XCTestCase {
             XCTAssertEqual(pa.phase, .ready)
             XCTAssertEqual(pa.message, "Plug in your audio interface: the guitar comes in through it.")
         }
+    }
+
+    /// Audio input off: no interface is asked for, the input is never opened, and nothing is saved.
+    func testAudioInputOffNeverOpensTheInput() {
+        let history = History(inMemory: true)
+        let pa = PlayAlong(player: Player(), history: history)
+        pa.allowPhoneMic = false
+        let first = pa.exercises[0].id, second = pa.exercises[1].id
+        pa.select(first)
+        pa.intro = false
+        pa.audioInput = false
+        pa.start()
+        XCTAssertNotEqual(pa.message, "Plug in your audio interface: the guitar comes in through it.")
+        if pa.phase == .running {
+            XCTAssertFalse(pa.player.audio.recording)
+            XCTAssertEqual(AVAudioSession.sharedInstance().category, .playback)
+            XCTAssertFalse(pa.lastRunWasScored)
+        }
+        pa.stop()
+        XCTAssertNil(pa.saved)
+        XCTAssertNil(pa.score)
+        XCTAssertTrue(history.results.isEmpty)
+        pa.clearResult()
+        // Remembered per drill.
+        pa.select(second); pa.audioInput = true
+        pa.select(first)
+        XCTAssertFalse(pa.audioInput)
+        pa.audioInput = true
+        pa.intro = true
+    }
+
+    /// Changing the tempo by hand leaves the zones; picking a zone comes back to them. Neither loops.
+    func testTempoByHandAndByZone() {
+        let pa = PlayAlong(player: Player(), history: History(inMemory: true))
+        pa.select(pa.exercises[0].id)
+        pa.chooseZone("z4")
+        XCTAssertTrue(pa.resume)
+        XCTAssertEqual(pa.zoneChoice, "z4")
+        pa.nudgeTempo(to: 10_000)
+        XCTAssertFalse(pa.resume)
+        XCTAssertEqual(pa.bpm, pa.exercise.tempo.max)
+        XCTAssertEqual(pa.startTempo, pa.exercise.tempo.max)
+        pa.nudgeTempo(to: -3)
+        XCTAssertEqual(pa.bpm, pa.exercise.tempo.min)
+        pa.chooseZone("z2")
+        XCTAssertTrue(pa.resume)
     }
 
     func testZones() {

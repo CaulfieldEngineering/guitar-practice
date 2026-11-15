@@ -1,0 +1,87 @@
+#if DEBUG
+import SwiftUI
+
+/// Debug builds only, for the UI tests' screenshots: the screens that otherwise need a guitar and an interface (a
+/// run going on, a result), drawn from made-up values. Opened with the launch argument `-screen <name>`.
+struct Gallery: View {
+    let screen: String
+
+    var body: some View {
+        Group {
+            switch screen {
+            case "run": RunView(d: Gallery.run(scored: true)) {}
+            case "runUnscored": RunView(d: Gallery.run(scored: false)) {}
+            case "result": result(endurance: false)
+            case "resultEndurance": result(endurance: true)
+            case "unscored":
+                UnscoredResultView(run: PlayAlong.UnscoredRun(seconds: 184, startBPM: 120, topBPM: 132, cycles: 23), total: 1260,
+                                   againTitle: "Again at 120", onAgain: {}, onDone: {})
+            default: Text("No such screen: \(screen)").foregroundStyle(Theme.text)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.bg.ignoresSafeArea())
+    }
+
+    static let drill = Exercise(id: "demo", name: "Triplets to sixteenths, 4 and 4", cycleBeats: 8,
+                                notes: Exercise.expand(groups: [3, 3, 3, 3, 4, 4, 4, 4], accentFirst: false),
+                                tempo: TempoRule(start: 128))
+
+    /// Notes of two cycles at 128, and picks a little off each, the same every time.
+    static func sample() -> (notes: [Exercise.Note], played: [Onset]) {
+        let notes = drill.notes(bpm: 128, start: 0, seconds: 7.5)
+        var played: [Onset] = []
+        for (i, n) in notes.enumerated() {
+            if i % 17 == 11 { continue }                                  // a missed note now and then
+            let wobble = sin(Double(i) * 1.7) * 0.014 + (i % 9 == 4 ? 0.034 : 0.004)
+            played.append(Onset(time: n.time + wobble, strength: 1))
+        }
+        return (notes, played)
+    }
+
+    static func run(scored: Bool) -> RunDisplay {
+        let s = sample()
+        let now = 2.62
+        let config = ScoringConfig.standard
+        let gaps = Scoring.gaps(s.notes.map(\.time))
+        let m = Scoring.match(expected: s.notes.map(\.time), played: s.played.map(\.time), window: 0.05)
+        var states: [PlayAlong.NoteState] = []
+        var errors: [Double] = []
+        for (i, n) in s.notes.enumerated() {
+            guard scored, n.time < now else { states.append(.waiting); continue }
+            if let j = m[i] {
+                let e = (s.played[j].time - n.time) * 1000
+                let c = config.credit(errorMs: e, gap: gaps[i])
+                states.append(c >= 0.999 ? .tight : (c >= 0.5 ? .close : .loose))
+                errors.append(e)
+            } else {
+                states.append(.missed)
+            }
+        }
+        return RunDisplay(
+            chip: scored ? "Solo · Z3 Tempo · 85% of max" : "Guided · Z3 Tempo · 85% of max · not scored",
+            cue: "Sixteenths", cueDetail: "Triplets in 3", cueWarn: false, bpm: 128,
+            scored: scored, accuracy: 91, accuracyGood: true, cycle: "3 of 8", clock: "1:12", clockLabel: scored ? "held" : "left",
+            countingIn: false, calibrating: false,
+            notes: s.notes, played: scored ? s.played.filter { $0.time < now } : [], states: states, now: now, beat: 60.0 / 128,
+            recentErrors: Array(errors.suffix(12)), spanMs: config.windows(gap: gaps.last ?? 0.1).zero, inputLevel: 0.2)
+    }
+
+    @ViewBuilder
+    private func result(endurance: Bool) -> some View {
+        let s = Gallery.sample()
+        let r = Scoring.score(notes: s.notes, played: s.played, window: 0.05)
+        let saved = SessionResult(
+            id: UUID(), date: Date(), exerciseID: "demo", exerciseVersion: 1, exerciseName: Gallery.drill.name,
+            mode: endurance ? "endurance" : "cycles", ladderStep: endurance ? 0 : 4, guided: false,
+            startBPM: 128, topBPM: endurance ? 128 : 136,
+            seconds: 96, cycles: 8, notes: r.expected, hits: r.hits, missed: r.missed, extra: r.extra,
+            pct20: r.pct20, pct40: r.pct40, tightMs: 20, closeMs: 40, meanErrorMs: r.meanError, spreadMs: r.spread,
+            toleranceMs: r.fullMs, targetPercent: 85, accuracyPercent: r.score, sustainedSeconds: endurance ? 96 : nil,
+            score: r.score, passed: true, accentsPercent: nil, offsetMs: 12, appVersion: "0",
+            scoringVersion: 2, fullMs: r.fullMs, zeroMs: r.zeroMs)
+        ResultView(score: r, saved: saved, guided: false, newBest: !endurance, maxUp: endurance ? nil : (132, 136),
+                   primaryTitle: "Again at 128", primaryImage: "arrow.clockwise", onPrimary: {}, onDone: {})
+    }
+}
+#endif

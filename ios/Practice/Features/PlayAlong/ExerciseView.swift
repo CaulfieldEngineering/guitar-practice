@@ -1,38 +1,35 @@
 import SwiftUI
 
-/// One drill: what it is, how the run is set up (guide, mode, tempo, ladder, intro), one Start. While it runs, the
-/// same screen shows the live numbers and the lane; after, the result.
+/// One drill. Ready: what it is and how the run is set up, with one Start. Running: the run screen (RunView).
+/// After: the result (ResultView).
 struct ExerciseView: View {
     @EnvironmentObject var pa: PlayAlong
     @Environment(\.dismiss) private var dismiss
+    @State private var optionsOpen = false
+
+    private var live: Bool { pa.phase == .running || pa.phase == .calibrating || pa.phase == .syncing }
+    private var busy: Bool { live || pa.phase == .intro }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                Button {
-                    if pa.phase == .ready || pa.phase == .result { pa.clearResult(); dismiss() }
-                } label: {
-                    Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.muted)
-                        .frame(width: 36, height: 36)
+            if !live {
+                NavBar(title: pa.exercise.name, backEnabled: !busy, onBack: { pa.clearResult(); dismiss() }) {
+                    if pa.phase == .ready {
+                        BarIcon(systemImage: "speaker.wave.2", label: "Hear the intro") { pa.repeatIntro() }
+                    }
                 }
-                .buttonStyle(.plain)
-                .opacity(pa.phase == .ready || pa.phase == .result ? 1 : 0.3)
-                .accessibilityLabel("Back")
-                Text(pa.exercise.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
-                Spacer()
             }
-            .padding(.horizontal, 12)
-            .frame(height: 48)
-
             switch pa.phase {
             case .ready: setup
             case .intro: introView
-            case .running, .calibrating: live
+            case .syncing, .calibrating: CalibrationView()
+            case .running: RunView(d: runDisplay) { pa.stop() }
             case .result: resultView
             }
         }
         .background(Theme.bg.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(busy ? .hidden : .visible, for: .tabBar)
     }
 
     // MARK: Setup
@@ -40,215 +37,288 @@ struct ExerciseView: View {
     private var setup: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text(pa.exercise.intro.isEmpty ? pa.exercise.detail : pa.exercise.intro)
-                        .font(.system(size: 15)).foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if !pa.exercise.levels.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(pa.exercise.levels, id: \.self) { lv in
-                                    Button { pa.apply(lv) } label: {
-                                        Text(lv.name).font(.system(size: 13, weight: .medium))
-                                            .padding(.horizontal, 12).frame(height: 30)
-                                            .background(lv.bpm == pa.bpm ? Theme.accentSoft : Theme.hover, in: Capsule())
-                                            .foregroundStyle(lv.bpm == pa.bpm ? Theme.accent : Theme.text)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
+                VStack(alignment: .leading, spacing: Space.xl) {
+                    about
+                    tempoBlock
+                    guideBlock
+                    runBlock
+                    VStack(spacing: 0) {
+                        inputBlock
+                        optionsBlock
                     }
-
-                    tempo
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionLabel("Guide")
-                        Segmented(options: [(true, "Guided"), (false, "Solo")], selection: $pa.guided)
-                        Text(pa.guided ? "The drill plays with the click; play along with it." : "Just the click. Same scoring.")
-                            .font(.system(size: 13)).foregroundStyle(Theme.faint)
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionLabel("Run")
-                        Segmented(options: [(SessionSettings.Kind.cycles, "Cycles"), (SessionSettings.Kind.duration, "Time"),
-                                            (SessionSettings.Kind.endurance, "Endurance")], selection: $pa.session.kind)
-                        VStack(spacing: 0) {
-                            switch pa.session.kind {
-                            case .cycles:
-                                Row(label: "Cycles") { Stepper("\(pa.session.cycles)", value: $pa.session.cycles, in: 1...100).fixedSize() }
-                            case .duration:
-                                Row(label: "Length") { Stepper(formatClock(Double(pa.session.seconds)), value: $pa.session.seconds, in: 30...1800, step: 30).fixedSize() }
-                            case .endurance:
-                                Row(label: "Hold") { Stepper("\(pa.session.targetPercent)%", value: $pa.session.targetPercent, in: 50...100, step: 5).fixedSize() }
-                                Row(label: "Over the last") { Stepper("\(pa.session.windowCycles) cycles", value: $pa.session.windowCycles, in: 1...8).fixedSize() }
-                            }
-                            Row(label: "Within") { Stepper("\(Int(pa.session.toleranceMs)) ms", value: $pa.session.toleranceMs, in: 10...80, step: 5).fixedSize() }
-                            Row(label: "Faster each passed cycle") {
-                                Stepper(pa.session.ladderStep == 0 ? "Off" : "+\(pa.session.ladderStep)", value: $pa.session.ladderStep, in: 0...20, step: 2).fixedSize()
-                            }
-                            Row(label: "Click while playing") { Toggle("", isOn: $pa.gridClicks).labelsHidden().tint(Theme.accent) }
-                            Row(label: "Spoken intro") { Toggle("", isOn: $pa.intro).labelsHidden().tint(Theme.accent) }
-                        }
-                        Text(modeLine).font(.system(size: 13)).foregroundStyle(Theme.faint)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    audioSection
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Space.page)
+                .padding(.top, Space.xxs)
+                .padding(.bottom, Space.xl)
             }
-            PrimaryButton(title: "Start", systemImage: "play.fill") { pa.start() }
-                .accessibilityIdentifier("start")
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+            VStack(spacing: Space.xs) {
+                if let m = pa.message {
+                    Text(m).font(Typo.sub).foregroundStyle(Theme.text)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("message")
+                }
+                PrimaryButton(title: "Start", systemImage: "play.fill") { pa.start() }
+                    .accessibilityIdentifier("start")
+            }
+            .padding(.horizontal, Space.page)
+            .padding(.top, Space.sm)
+            .padding(.bottom, Space.sm)
+            .background(alignment: .top) { Hairline() }
+        }
+    }
+
+    /// What the drill is, without saying its name again, and its pattern.
+    private var about: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            if !aboutText.isEmpty {
+                Text(aboutText).font(Typo.callout).foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            PatternStrip(exercise: pa.exercise)
+        }
+    }
+
+    private var aboutText: String {
+        let ex = pa.exercise
+        if !ex.detail.isEmpty { return ex.detail }
+        // The spoken intro opens with the drill's name; the screen already shows it.
+        let parts = ex.intro.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: true)
+        if parts.count == 2 { return parts[1].trimmingCharacters(in: .whitespaces) }
+        return ex.intro
+    }
+
+    // MARK: Tempo
+
+    private var tempoBlock: some View {
+        VStack(spacing: Space.sm) {
+            if let max = pa.level() {
+                ZoneBar(zones: pa.zones.zones, max: max,
+                        chosen: pa.resume ? pa.activeZone?.id : nil,
+                        holding: pa.zones.zone(forBPM: Double(pa.startTempo), max: max)?.id) { pa.chooseZone($0) }
+            }
+            TempoDial(value: pa.startTempo, caption: tempoCaption, size: 88, vertical: false) { pa.nudgeTempo(to: $0) }
+            if !pa.exercise.levels.isEmpty { levelMenu }
+        }
+    }
+
+    /// Under the tempo: what the zone means ("Z3 Tempo · 120–135 bpm"), or where a tempo set by hand sits.
+    private var tempoCaption: String {
+        if let max = pa.level() {
+            if pa.resume, let z = pa.activeZone {
+                let r = TempoZones.range(z, max: max)
+                return "\(z.name) \(z.title) · \(r.lowerBound)–\(r.upperBound) bpm\n\(Int(z.low))–\(Int(z.high))% of your max, \(max)"
+            }
+            let pct = Int((Double(pa.startTempo) / Double(max) * 100).rounded())
+            return "bpm, set by hand\n\(pct)% of your max, \(max)"
+        }
+        guard let b = pa.best() else { return "bpm" }
+        return pa.session.kind == .endurance ? "bpm · held \(formatClock(b)) here" : "bpm · best \(Int(b))% here"
+    }
+
+    /// The drill's own levels, in one menu (they ran off the edge as a row of chips).
+    private var levelMenu: some View {
+        Menu {
+            ForEach(pa.exercise.levels, id: \.self) { lv in
+                Button("\(lv.name) · \(lv.bpm) bpm") { pa.apply(lv) }
+            }
+        } label: {
+            HStack(spacing: Space.xxs) {
+                Text(currentLevel ?? "Levels")
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .semibold))
+            }
+            .font(Typo.subStrong)
+            .foregroundStyle(Theme.accentText)
+            .frame(minHeight: Space.touch)
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Levels")
+        .accessibilityValue(currentLevel ?? "None chosen")
+        .accessibilityIdentifier("levels")
+    }
+
+    private var currentLevel: String? {
+        guard !pa.resume || pa.level() == nil else { return nil }
+        return pa.exercise.levels.first { $0.bpm == pa.bpm }?.name
+    }
+
+    // MARK: Guide and run
+
+    private var guideBlock: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            SectionLabel("Guide")
+            Segmented(options: [(true, "Guided"), (false, "Solo")], selection: $pa.guided)
+            Text(pa.guided ? "The drill plays with the click; play along with it." : "Just the click.")
+                .font(Typo.foot).foregroundStyle(Theme.muted)
+        }
+    }
+
+    private var runBlock: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            SectionLabel("Run")
+            Segmented(options: [(SessionSettings.Kind.cycles, "Cycles"), (SessionSettings.Kind.duration, "Time"),
+                                (SessionSettings.Kind.endurance, pa.audioInput ? "Endurance" : "Open")],
+                      selection: $pa.session.kind)
+            amountRow
+            Text(modeLine).font(Typo.foot).foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, Space.xxs)
         }
     }
 
     @ViewBuilder
-    private var tempo: some View {
-        if pa.level() != nil {
-            Segmented(options: [(true, "Zones"), (false, "Manual")], selection: $pa.resume)
-            if pa.resume {
-                HStack(spacing: 6) {
-                    ForEach(pa.zones.zones) { z in
-                        let on = pa.activeZone?.id == z.id
-                        Button { pa.zoneChoice = z.id } label: {
-                            Text(z.name).font(.system(size: 13, weight: on ? .semibold : .regular))
-                                .frame(maxWidth: .infinity, minHeight: 30)
-                                .background(on ? Theme.accentSoft : Theme.hover, in: Capsule())
-                                .foregroundStyle(on ? Theme.accent : Theme.muted)
-                        }
-                        .buttonStyle(.plain)
-                    }
+    private var amountRow: some View {
+        let s = pa.session
+        switch s.kind {
+        case .cycles:
+            StepperRow(label: "Cycles", value: "\(s.cycles)", canDecrement: s.cycles > 1, canIncrement: s.cycles < 100) {
+                pa.session.cycles = min(100, max(1, s.cycles + $0))
+            }
+        case .duration:
+            StepperRow(label: "Length", value: formatClock(Double(s.seconds)), canDecrement: s.seconds > 30, canIncrement: s.seconds < 1800) {
+                pa.session.seconds = min(1800, max(30, s.seconds + $0 * 30))
+            }
+        case .endurance:
+            if pa.audioInput {
+                StepperRow(label: "Hold your accuracy at", value: "\(s.targetPercent)%", canDecrement: s.targetPercent > 50, canIncrement: s.targetPercent < 100) {
+                    pa.session.targetPercent = min(100, max(50, s.targetPercent + $0 * 5))
                 }
-                VStack(spacing: 2) {
-                    Text("\(pa.startTempo)").font(.system(size: 72, weight: .semibold, design: .rounded)).monospacedDigit()
-                        .foregroundStyle(Theme.text)
-                    Text(pa.zoneLine ?? "").font(.system(size: 13)).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                manualTempo
-            }
-        } else {
-            manualTempo
-        }
-    }
-
-    private var manualTempo: some View {
-        HStack(spacing: 20) {
-            IconButton(systemImage: "minus", size: 48) { pa.setBPM(pa.bpm - 2) }
-            VStack(spacing: 2) {
-                Text("\(pa.bpm)").font(.system(size: 72, weight: .semibold, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(Theme.text).contentTransition(.numericText())
-                Text(bestLine).font(.system(size: 13)).foregroundStyle(Theme.muted)
-            }
-            .frame(maxWidth: .infinity)
-            IconButton(systemImage: "plus", size: 48) { pa.setBPM(pa.bpm + 2) }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var audioSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            SectionLabel("Sound")
-            HStack(spacing: 8) {
-                Text("In: \(pa.route.input). Out: \(pa.route.output).").font(.system(size: 13)).foregroundStyle(Theme.muted)
-                Spacer()
-                RoutePicker().frame(width: 32, height: 32)
-            }
-            if let note = pa.routeNote { Text(note).font(.system(size: 13)).foregroundStyle(Theme.warn) }
-            HStack {
-                Text(offsetLine).font(.system(size: 13)).foregroundStyle(Theme.muted)
-                Spacer()
-                Button("Calibrate") { pa.calibrate() }.font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.accent)
-            }
-            if let m = pa.message {
-                Text(m).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text).accessibilityIdentifier("message")
             }
         }
-    }
-
-    private var offsetLine: String {
-        let ms = Int((pa.currentOffset * 1000).rounded())
-        return pa.calibration != nil ? "Timing offset \(ms) ms, calibrated." : "Timing offset about \(ms) ms; calibrate once."
-    }
-
-    private var bestLine: String {
-        guard let b = pa.best() else { return "bpm" }
-        return pa.session.kind == .endurance ? "bpm, held \(formatClock(b)) here" : "bpm, best \(Int(b)) here"
     }
 
     private var modeLine: String {
         let s = pa.session
         switch s.kind {
-        case .cycles: return "\(s.cycles) times through the pattern. A cycle passes at \(s.targetPercent)% within \(Int(s.toleranceMs)) ms."
+        case .cycles: return "\(s.cycles) time\(s.cycles == 1 ? "" : "s") through the pattern."
         case .duration: return "\(formatClock(Double(s.seconds))) in all."
-        case .endurance: return "Keep going until fewer than \(s.targetPercent)% of notes land within \(Int(s.toleranceMs)) ms over \(s.windowCycles) cycles. Your score is the time you held it."
+        case .endurance:
+            return pa.audioInput
+                ? "Keeps going until your accuracy drops under \(s.targetPercent)%. The score is how long you held it."
+                : "Keeps going until you stop it."
         }
+    }
+
+    // MARK: Audio input and options
+
+    /// Audio input on: the guitar comes in and the run is scored. Off: the input is never opened and nothing is scored.
+    private var inputBlock: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Hairline()
+            ToggleRow(label: "Audio input", detail: pa.audioInput ? "Scored" : "Not scored. Only the minutes are kept.",
+                      isOn: $pa.audioInput)
+            if pa.audioInput, let note = pa.routeNote {
+                HStack(alignment: .firstTextBaseline, spacing: Space.sm) {
+                    Text(note).font(Typo.foot).foregroundStyle(Theme.warn)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    if pa.calibration == nil && (pa.interfacePresent || pa.allowPhoneMic) {
+                        TextButton(title: "Calibrate", colour: Theme.accentText) { pa.startCalibration() }
+                    }
+                }
+                .padding(.vertical, Space.xs)
+                Hairline()
+            }
+        }
+    }
+
+    private var optionsBlock: some View {
+        Disclosure(title: "Options", summary: optionsSummary, open: $optionsOpen) {
+            let s = pa.session
+            if pa.audioInput {
+                if s.kind == .endurance {
+                    StepperRow(label: "Judged over the last", value: "\(s.windowCycles) cycle\(s.windowCycles == 1 ? "" : "s")",
+                               canDecrement: s.windowCycles > 1, canIncrement: s.windowCycles < 8) {
+                        pa.session.windowCycles = min(8, max(1, s.windowCycles + $0))
+                    }
+                } else {
+                    StepperRow(label: "A cycle passes at", value: "\(s.targetPercent)%", canDecrement: s.targetPercent > 50, canIncrement: s.targetPercent < 100) {
+                        pa.session.targetPercent = min(100, max(50, s.targetPercent + $0 * 5))
+                    }
+                }
+            }
+            StepperRow(label: "Ladder", detail: pa.audioInput ? "Faster after each passed cycle" : "Faster after each cycle",
+                       value: s.ladderStep == 0 ? "Off" : "+\(s.ladderStep) bpm", canDecrement: s.ladderStep > 0, canIncrement: s.ladderStep < 20) {
+                pa.session.ladderStep = min(20, max(0, s.ladderStep + $0 * 2))
+            }
+            ToggleRow(label: "Click while playing", isOn: $pa.gridClicks)
+            ToggleRow(label: "Spoken intro", isOn: $pa.intro)
+            if pa.audioInput {
+                Row(label: "Sound", detail: "In: \(pa.route.input). Out: \(pa.route.output).") {
+                    RoutePicker().frame(width: 36, height: 36)
+                        .accessibilityLabel("Choose where the sound goes")
+                }
+            }
+            Row(label: "Timing", detail: offsetLine) {
+                TextButton(title: "Calibrate", colour: Theme.accentText) { pa.startCalibration() }
+                    .accessibilityIdentifier("calibrate")
+            }
+        }
+    }
+
+    private var optionsSummary: String {
+        var parts: [String] = []
+        parts.append(pa.session.ladderStep > 0 ? "Ladder +\(pa.session.ladderStep)" : "Ladder off")
+        if !pa.gridClicks { parts.append("no click") }
+        if !pa.intro { parts.append("no intro") }
+        return parts.joined(separator: ", ")
+    }
+
+    private var offsetLine: String {
+        let sight = Int((pa.displayOffset * 1000).rounded())
+        let picture = "Picture \(sight >= 0 ? "+" : "")\(sight) ms."
+        guard pa.audioInput else { return picture }
+        let ms = Int((pa.currentOffset * 1000).rounded())
+        if let c = pa.calibration {
+            let steady = c.spreadMs.map { ", steady to \(Int($0.rounded())) ms" } ?? ""
+            return "\(picture) Guitar \(ms) ms, calibrated for this setup\(steady)."
+        }
+        return "\(picture) Guitar about \(ms) ms; calibrate once for this setup."
     }
 
     // MARK: Intro
 
     private var introView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Space.md) {
             Spacer()
-            Image(systemName: "speaker.wave.2").font(.system(size: 34, weight: .light)).foregroundStyle(Theme.accent)
-            Text("\(pa.startTempo) bpm, \(pa.guided ? "guided" : "solo")").font(.system(size: 17)).foregroundStyle(Theme.muted)
+            Image(systemName: "speaker.wave.2").font(.system(size: 40, weight: .light)).foregroundStyle(Theme.accentText)
+                .accessibilityHidden(true)
+            Text("\(pa.startTempo)").font(Typo.number(72)).foregroundStyle(Theme.text)
+            Text("bpm, \(pa.guided ? "guided" : "solo")\(pa.audioInput ? "" : ", not scored")")
+                .font(Typo.body).foregroundStyle(Theme.muted)
             Spacer()
-            HStack(spacing: 12) {
+            HStack(spacing: Space.sm) {
                 QuietButton(title: "Stop", systemImage: "stop.fill") { pa.stop() }
-                PrimaryButton(title: "Skip intro", systemImage: "forward.fill") { pa.skipIntro() }
+                    .frame(maxWidth: 128)
+                PrimaryButton(title: "Skip the intro", systemImage: "forward.fill") { pa.skipIntro() }
             }
-            .padding(.horizontal, 20).padding(.bottom, 12)
+            .padding(.horizontal, Space.page).padding(.bottom, Space.sm)
         }
     }
 
     // MARK: Running
 
-    private var live: some View {
-        VStack(spacing: 18) {
-            Text(pa.phase == .calibrating ? "Calibrating: one note on each of the twelve clicks" : runChip)
-                .font(.system(size: 13, weight: .semibold))
-                .padding(.horizontal, 12).frame(height: 26)
-                .background(Theme.accentSoft, in: Capsule()).foregroundStyle(Theme.accent)
-
-            Text(cueText)
-                .font(.system(size: 40, weight: .semibold, design: .rounded))
-                .foregroundStyle(cueWarn ? Theme.warn : Theme.text)
-                .contentTransition(.opacity)
-                .frame(height: 48)
-            Text(cueDetail).font(.system(size: 15)).monospacedDigit().foregroundStyle(Theme.muted).frame(height: 18)
-
-            HStack(spacing: 0) {
-                bigStat("\(Int(pa.currentBPM))", "bpm", Theme.text)
-                bigStat(pa.rolling.map { "\(Int(($0 * 100).rounded()))%" } ?? "--", "within \(Int(pa.session.toleranceMs)) ms", accuracyColour)
-                bigStat(clockText, pa.plannedEnd == nil && pa.now >= pa.countInEnd ? "held" : "left", pa.now < pa.countInEnd ? Theme.warn : Theme.text)
-            }
-
-            LaneView(notes: pa.notes, played: pa.played, states: pa.states, now: pa.now, beat: 60 / max(1, pa.currentBPM))
-                .frame(height: 150)
-
-            HStack(spacing: 8) {
-                Text("Input").font(.system(size: 12)).foregroundStyle(Theme.faint)
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Theme.line)
-                        Capsule().fill(Theme.accent).frame(width: g.size.width * meterFraction(pa.level))
-                    }
-                }
-                .frame(height: 3)
-            }
-
-            Spacer()
-            QuietButton(title: "Stop", systemImage: "stop.fill") { pa.stop() }
-                .padding(.bottom, 12)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
+    private var runDisplay: RunDisplay {
+        let counting = pa.now < pa.countInEnd
+        let calibrating = pa.phase == .calibrating
+        let scored = pa.lastRunWasScored
+        let accuracy = pa.rolling.map { Int(($0 * 100).rounded()) }
+        return RunDisplay(
+            chip: calibrating ? "Calibrating" : runChip,
+            cue: cueText(counting: counting, calibrating: calibrating),
+            cueDetail: cueDetail(counting: counting, calibrating: calibrating),
+            cueWarn: counting || pa.groupCue?.beatsUntil == 1,
+            bpm: Int(pa.currentBPM),
+            scored: scored,
+            accuracy: accuracy,
+            accuracyGood: (accuracy ?? 0) >= pa.runTarget,
+            cycle: cycleText(counting: counting),
+            clock: clockText(counting: counting),
+            clockLabel: clockLabel(counting: counting, scored: scored),
+            countingIn: counting,
+            calibrating: calibrating,
+            notes: pa.notes, played: pa.played, states: pa.states, now: pa.laneNow, beat: 60 / max(1, pa.currentBPM),
+            recentErrors: pa.recentErrors, spanMs: pa.timingSpanMs, inputLevel: pa.level)
     }
 
     /// "Solo · Z3 Tempo · 88% of max"
@@ -258,28 +328,20 @@ struct ExerciseView: View {
             parts.append("\(z.name) \(z.title)")
             parts.append("\(Int((pa.currentBPM / Double(m) * 100).rounded()))% of max")
         }
+        if !pa.lastRunWasScored { parts.append("not scored") }
         return parts.joined(separator: " · ")
     }
 
-    private func bigStat(_ value: String, _ label: String, _ colour: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
-                .foregroundStyle(colour).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label).font(.system(size: 12)).foregroundStyle(Theme.muted)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var cueText: String {
-        if pa.now < pa.countInEnd { return "Count-in" }
-        guard let cue = pa.groupCue else { return pa.phase == .calibrating ? "Play on the click" : pa.exercise.name }
+    private func cueText(counting: Bool, calibrating: Bool) -> String {
+        if counting { return "Count-in" }
+        if calibrating { return "One note a click" }
+        guard let cue = pa.groupCue else { return pa.exercise.name }
         return groupName(cue.now)
     }
 
-    private var cueWarn: Bool { pa.now < pa.countInEnd || (pa.groupCue?.beatsUntil == 1) }
-
-    private var cueDetail: String {
-        guard pa.now >= pa.countInEnd, let cue = pa.groupCue else { return " " }
+    private func cueDetail(counting: Bool, calibrating: Bool) -> String {
+        if calibrating { return "Twelve clicks, one note on each" }
+        guard !counting, let cue = pa.groupCue else { return " " }
         return cue.beatsUntil == 1 ? "\(groupName(cue.next)) next beat" : "\(groupName(cue.next)) in \(cue.beatsUntil)"
     }
 
@@ -287,109 +349,83 @@ struct ExerciseView: View {
         switch n { case 0: return "Rest"; case 2: return "Eighths"; case 3: return "Triplets"; case 4: return "Sixteenths"; default: return "\(n) a beat" }
     }
 
-    private var clockText: String {
-        if pa.now < pa.countInEnd { return "--" }
+    private func cycleText(counting: Bool) -> String {
+        guard !counting, let n = pa.cycleNumber else { return "--" }
+        return pa.runKind == .cycles ? "\(n) of \(max(1, pa.runCycles))" : "\(n)"
+    }
+
+    private func clockText(counting: Bool) -> String {
+        if counting { return "--" }
         if let end = pa.plannedEnd { return formatClock(max(0, end - pa.now)) }
         return formatClock(max(0, pa.now - pa.countInEnd))
     }
 
-    private var accuracyColour: Color {
-        guard let r = pa.rolling else { return Theme.muted }
-        return r * 100 >= Double(pa.session.targetPercent) ? Theme.accent : Theme.warn
-    }
-
-    /// The input level as a fraction of a 60 dB scale.
-    private func meterFraction(_ level: Float) -> CGFloat {
-        let db = 20 * log10(Double(max(level, 1e-5)))
-        let f = (db + 60) / 60
-        return CGFloat(min(1, max(0, f)))
+    private func clockLabel(counting: Bool, scored: Bool) -> String {
+        if pa.plannedEnd != nil || counting { return "left" }
+        return scored && pa.runKind == .endurance ? "held" : "played"
     }
 
     // MARK: Result
 
+    @ViewBuilder
     private var resultView: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                if let r = pa.score, let s = pa.saved {
-                    VStack(spacing: 12) {
-                        Text(pa.lastRunWasGuided ? "Guided" : "Solo")
-                            .font(.system(size: 13, weight: .semibold))
-                            .padding(.horizontal, 12).frame(height: 26)
-                            .background(Theme.accentSoft, in: Capsule()).foregroundStyle(Theme.accent)
-                            .padding(.top, 8)
-                        if s.mode == "endurance" {
-                            Text(formatClock(s.sustainedSeconds ?? 0))
-                                .font(.system(size: 88, weight: .semibold, design: .rounded)).monospacedDigit().foregroundStyle(Theme.accent)
-                            Text("held at \(s.targetPercent)% within \(Int(s.toleranceMs)) ms").font(.system(size: 14)).foregroundStyle(Theme.muted)
-                        } else {
-                            Text("\(r.score)")
-                                .font(.system(size: 96, weight: .semibold, design: .rounded)).monospacedDigit()
-                                .foregroundStyle(r.passed ? Theme.accent : Theme.text)
-                        }
-                        if pa.newBest { Text("A new best at this tempo.").font(.system(size: 14)).foregroundStyle(Theme.accent) }
-                        if let up = pa.levelUp {
-                            Text(up.from > 0 ? "Your max is now \(up.to), up from \(up.from)." : "Your max is now \(up.to).")
-                                .font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.accent)
-                        }
-
-                        VStack(spacing: 0) {
-                            if s.topBPM > s.startBPM { Row(label: "Tempo") { stat("\(s.startBPM) to \(s.topBPM) bpm") } }
-                            Row(label: "Within \(Int(s.toleranceMs)) ms") { stat("\(s.accuracyPercent)%") }
-                            Row(label: "Within \(Int(s.tightMs)) ms") { stat("\(r.pct20)%") }
-                            Row(label: "Within \(Int(s.closeMs)) ms") { stat("\(r.pct40)%") }
-                            Row(label: "Missed") { stat("\(r.missed) of \(r.expected)") }
-                            Row(label: "Extra notes") { stat("\(r.extra)") }
-                            Row(label: "On average") { stat(averageText(r.meanError)) }
-                            Row(label: "Spread") { stat("\(Int(r.spread.rounded())) ms") }
-                            if let a = s.accentsPercent { Row(label: "Accents that stood out") { stat("\(a)%") } }
-                        }
-                        ErrorStrip(errors: r.errors).frame(height: 56)
-                    }
-                    .padding(.horizontal, 20)
-                } else {
-                    Text("No notes were counted.").font(.system(size: 15)).foregroundStyle(Theme.muted).padding(.top, 40)
-                }
+        if let r = pa.score, let s = pa.saved {
+            ResultView(score: r, saved: s, guided: pa.lastRunWasGuided, newBest: pa.newBest,
+                       maxUp: pa.levelUp.map { ($0.from, $0.to) },
+                       primaryTitle: pa.lastRunWasGuided ? "Now solo" : "Again at \(pa.startTempo)",
+                       primaryImage: pa.lastRunWasGuided ? "play.fill" : "arrow.clockwise",
+                       onPrimary: { if pa.lastRunWasGuided { pa.nowSolo() } else { pa.start() } },
+                       onDone: { pa.clearResult() })
+        } else if let u = pa.unscored {
+            UnscoredResultView(run: u, total: pa.unscoredSeconds[pa.exercise.id] ?? u.seconds,
+                               againTitle: "Again at \(pa.startTempo)", onAgain: { pa.start() }, onDone: { pa.clearResult() })
+        } else {
+            VStack(spacing: Space.md) {
+                Spacer()
+                Text("No notes were counted.").font(Typo.body).foregroundStyle(Theme.muted)
+                Spacer()
+                QuietButton(title: "Done") { pa.clearResult() }
+                    .padding(.horizontal, Space.page).padding(.bottom, Space.sm)
             }
-            VStack(spacing: 8) {
-                if pa.lastRunWasGuided {
-                    PrimaryButton(title: "Now solo", systemImage: "play.fill") { pa.nowSolo() }
-                } else {
-                    PrimaryButton(title: "Again at \(pa.startTempo)", systemImage: "arrow.clockwise") { pa.start() }
-                }
-                Button("Done") { pa.clearResult() }.font(.system(size: 15)).foregroundStyle(Theme.muted).frame(height: 36)
-            }
-            .padding(.horizontal, 20).padding(.vertical, 8)
         }
-    }
-
-    private func averageText(_ e: Double) -> String {
-        abs(e) < 3 ? "right on the click" : "\(Int(abs(e).rounded())) ms \(e > 0 ? "behind" : "ahead")"
-    }
-
-    private func stat(_ s: String) -> some View {
-        Text(s).font(.system(size: 15).monospacedDigit()).foregroundStyle(Theme.muted)
     }
 }
 
-/// Every note of the run, early above the line and late below, so a drift shows at a glance.
-struct ErrorStrip: View {
-    let errors: [Double?]
+/// The zones of his max, like heart-rate zones: five that always fit, each with the tempos it means. The chosen one
+/// is filled; with the tempo set by hand, the zone that tempo sits in is outlined.
+struct ZoneBar: View {
+    let zones: [TempoZones.Zone]
+    let max: Int
+    let chosen: String?
+    let holding: String?
+    let onChoose: (String) -> Void
+
     var body: some View {
-        Canvas { ctx, size in
-            let mid = size.height / 2
-            ctx.fill(Path(CGRect(x: 0, y: mid - 0.5, width: size.width, height: 1)), with: .color(Theme.lineStrong))
-            guard !errors.isEmpty else { return }
-            let step = size.width / CGFloat(errors.count)
-            for (i, e) in errors.enumerated() {
-                let x = (CGFloat(i) + 0.5) * step
-                guard let e else {
-                    ctx.fill(Path(ellipseIn: CGRect(x: x - 1.5, y: mid - 1.5, width: 3, height: 3)), with: .color(Theme.danger))
-                    continue
+        HStack(spacing: Space.xxs) {
+            ForEach(zones) { z in
+                let on = chosen == z.id
+                let range = TempoZones.range(z, max: max)
+                Button { onChoose(z.id) } label: {
+                    VStack(spacing: 1) {
+                        Text(z.name).font(on ? Typo.subStrong : Typo.sub)
+                        Text("\(range.lowerBound)–\(range.upperBound)").font(Typo.figure(.caption2))
+                            .foregroundStyle(on ? Theme.accentText : Theme.faint)
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(on ? Theme.accentSoft : Theme.hover, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .stroke(!on && chosen == nil && holding == z.id ? Theme.lineStrong : Color.clear, lineWidth: 1))
+                    .foregroundStyle(on ? Theme.accentText : Theme.muted)
+                    .contentShape(Rectangle())
                 }
-                let y = mid + CGFloat(max(-60, min(60, e)) / 60) * (mid - 2)
-                let c = abs(e) <= 20 ? Theme.accent : (abs(e) <= 40 ? Theme.accent.opacity(0.55) : Theme.warn)
-                ctx.fill(Path(ellipseIn: CGRect(x: x - 2, y: y - 2, width: 4, height: 4)), with: .color(c))
+                .buttonStyle(PressStyle())
+                .accessibilityLabel("\(z.name), \(z.title), \(range.lowerBound) to \(range.upperBound) beats per minute")
+                .accessibilityAddTraits(on ? [.isSelected] : [])
+                .accessibilityIdentifier("zone.\(z.id)")
             }
         }
+        .sensoryFeedback(.selection, trigger: chosen)
     }
 }

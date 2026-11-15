@@ -27,8 +27,8 @@ struct RoutineEditor: View {
                         Button("Play") { routine.intervals.append(Interval(.play, 60, bpm: routine.intervals.last(where: { $0.kind == .play })?.bpm ?? 100)) }
                         Button("Rest") { routine.intervals.append(Interval(.rest, 30)) }
                         Button("No click") { routine.intervals.append(Interval(.motion, 120)) }
-                    } label: { Label("Add interval", systemImage: "plus") }
-                } header: { Text("Intervals") } footer: {
+                    } label: { Label("Add a block", systemImage: "plus") }
+                } header: { Text("Blocks") } footer: {
                     Text("A bell starts each play interval, a lower one each rest, and the last bar of a rest counts you in.")
                 }
 
@@ -60,7 +60,7 @@ struct RoutineEditor: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.side.ignoresSafeArea())
-            .tint(Theme.accent)
+            .tint(Theme.accentText)
             .navigationTitle("Routine")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

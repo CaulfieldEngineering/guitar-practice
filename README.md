@@ -6,13 +6,16 @@ Install: Safari (or the Browser) on the iPhone, https://caulfieldengineering.git
 
 ## What is in it
 
-Three tabs, in the house style (HQ/agent/app-design.md): dark and light from the same tokens, the studio accent `#6FB7A0`, one primary button per screen.
+Two tabs, Metronome and Drills (Joe, 2026-11-14: "intervals and play along can just be combined into Drills since we're covering both audio and no-audio settings"), in the house style (HQ/agent/app-design.md): dark first and light from the same tokens, the studio accent `#6FB7A0`, one primary button per screen. Progress and Settings are line icons at the top of the screen.
 
-- **Metronome.** Big tempo; drag on it, the minus and plus, the slider, or Tap. Time signature (2/4 to 7/4), accent on the one, clicks per beat (quarter, eighth, triplet, sixteenth). The beats of the bar light as they play.
-- **Intervals** (HIIT routines). A routine is a list of intervals (Play at a tempo, Rest, or a timed block with no click), repeated N rounds, every play interval X bpm faster each round, with a count-in. A bell starts each play interval, a lower bell each rest, and the last bar of a rest counts in the next tempo. The running screen shows what to do now, the time left (huge), the tempo, the round, and what is next; skip back and forward; pause and resume; start over. Routines are saved on the phone. Starters from his Perfect Picking Course page (vault, Training Vault): Starting Protocol, 3's to 4's (sets up 6 bpm, breaking point, prior max), Speed ladder, Bursts, Cruise speed.
-- **Play along.** A plain list of drills; tapping one opens its own screen: what it is, then the setup (tempo by zone or by hand, Guided or Solo, the kind of run and its amount, the ladder, the click, the spoken intro; all remembered per drill), then one Start. The guitar comes in through an audio interface (USB-C or Lightning; Joe, 2026-11-14: "Won't be using the mic"), each pick attack is found and scored against the note the drill asks for. Guided plays the drill as a muted guitar pluck over the click (the switch from triplets to sixteenths is accented so it is heard); Solo is the click only; after a guided run the main button is "Now solo". Runs by **cycles**, by **time**, or **endurance** (keep going until fewer than the target share of notes land within the tolerance over the last N cycles; the score is the time held). Any of them can **ladder**: faster after each passed cycle. Live: the lane (notes scroll to the hit line and light teal, soft teal, amber or red; the pick direction under each), the rolling accuracy, a big "Triplets / Sixteenths" cue that turns amber the beat before a change, the input level. After: the score or time held, within 20, 40 and the set tolerance, missed, extra, on average ahead or behind, spread, accents, and every note's error as a strip. **Calibrate** once per setup: play one note on each of eight clicks; the median offset is kept.
+- **Metronome.** Big tempo; drag on the number to scrub it (each step ticks), hold the minus or the plus, the slider, or Tap. Time signature (2/4 to 7/4), accent on the one, clicks per beat (quarter, eighth, triplet, sixteenth). The beats of the bar light as they play.
+- **Drills.** One list: the picking drills, then the timed routines.
+  - **Timed routines** (HIIT style). A routine is a list of blocks (Play at a tempo, Rest, or a timed block with no click), repeated N rounds, every play block X bpm faster each round, with a count-in. A bell starts each play block, a lower bell each rest, and the last bar of a rest counts in the next tempo. The running screen shows what to do now, the time left (huge), the tempo, the round, and what is next; tap anywhere on it to pause and resume; skip back and forward; start over. Routines are saved on the phone (`Documents/routines.json`, unchanged since 0.1.1); the `...` on a row edits, copies or deletes one. Starters from his Perfect Picking Course page (vault, Training Vault): Starting Protocol, 3's to 4's (sets up 6 bpm, breaking point, prior max), Speed ladder, Bursts, Cruise speed. A routine still runs on its own screen: it has no zones, guide or scoring. Folding it into the drill schema (a drill with several timed segments, each of which can be scored) is the next step; see Next.
+  - **Picking drills.** Tapping one opens its own screen: what it is and its pattern, then the setup, then one Start. The setup, top to bottom: the **tempo** (the zones of his max once he has one, each showing its tempos, "Z3 Tempo · 120–135 bpm"; or by hand: drag on the number or hold the minus and plus; the drill's own levels are one menu under it), **Guided or Solo**, the **run** (Cycles, Time or Endurance, and its one amount), the **Audio input** switch, and **Options**, folded until asked for (the ladder, the pass mark, the click, the spoken intro, where the sound goes and the calibration). All of it is remembered per drill.
+  - **Audio input** (Joe, 2026-11-14: "Just some kind of toggle for 'audio input', if it's selected, it'll be scored"). On: the guitar comes in through an audio interface (USB-C or Lightning; Joe: "Won't be using the mic"), each pick attack is found and scored against the note the drill asks for, the run is saved, sent to the mini PC and counts toward his max. Off: the input is never opened (no interface needed, no microphone permission asked, Bluetooth headphones stay in their listening mode), nothing is scored, saved or counted; the click, the guide, the kind of run, the spoken intro and the zone tempo all still work, Endurance becomes Open (it runs until he stops it), the ladder climbs every cycle, and the run screen shows only the pattern, the tempo, the cycle and the time. Only the minutes played that way are kept, per drill, on the phone (`UnscoredLog`, shown on Progress), apart from the scores.
+  - **Runs.** Guided plays the drill as a muted guitar pluck over the click (the switch from triplets to sixteenths is accented so it is heard); Solo is the click only; after a guided run the main button is "Now solo". Runs by **cycles**, by **time**, or **endurance** (keep going until the accuracy over the last N cycles drops under the target; the score is the time held). Any of them can **ladder**: faster after each passed cycle. Live, made to be glanced at: the pattern now ("Triplets", amber the beat before a change), the tempo, the accuracy, the time, the lane (notes scroll to the hit line and light teal, soft teal, amber or red; the pick direction under each), an early/late line of the latest picks, the input level; tap anywhere to stop. After: the accuracy or the time held, every note's timing as a strip, then on the click, on average early or late, spread, missed, extra, accents. **Calibrate** once per setup: play one note on each of twelve clicks; the median offset is kept.
 - **Voice.** Before a drill or routine, the phone's own best voice (Premium, then Enhanced, then standard; pick another in Settings) says what it is, the tempo and the goal, then the count starts. Skip it, or hear it again with the speaker button. Optional short cues: "Rest. Next, 140." in routines; the coming switch and a new ladder tempo in the play-along (only with headphones or an interface, never on the phone's own speaker and microphone, where it would hear itself). Better voices: iPhone Settings, Accessibility, Spoken Content, Voices, English.
-- **Progress** (the chart icon on Play along): the best solo run at each tempo, per drill and kind of run, and the latest runs; from the mini PC when it is reachable (every run from every device), otherwise the phone's own copy.
+- **Progress** (the chart icon on Drills): per drill, his max, the tempo reached run by run as a small line, the best solo run at each tempo and kind of run, the minutes played with the audio input off; then the latest runs. From the mini PC when it is reachable (every run from every device), otherwise the phone's own copy.
 
 Timing: the click is rendered sample by sample inside the audio engine from a sequencer working in audio frames (never a UI timer), so it is exact to the frame and does not drift. It plays alongside other apps (mixWithOthers) and keeps going with the screen locked (the audio background mode).
 
@@ -26,8 +29,10 @@ ios/Practice/
   Scoring/     Scoring (match, score, calibrate), Session (session modes, RunBuilder: a run a cycle at a time)
   Library/     Exercise (the drill schema), Routine (routines and their timeline), Catalog (loading, the drill server)
   Persistence/ History (SwiftData: every run, the send queue, Stats), Stores (routines, the updater)
-  Features/    Metronome, Intervals, PlayAlong, Settings: the screens, one folder each
-  Shared/      Theme (the house style), TapTempo
+  Features/    Metronome, PlayAlong (the Drills list, a drill's setup, the run and result screens, Progress),
+               Intervals (a routine's run screen and editor), Settings, Debug (the screens drawn from made-up values
+               for the UI test's screenshots; debug builds only)
+  Shared/      Theme (the design system's tokens), Components (what the screens are built from), TapTempo
 catalog/       the drills and starter routines (data; bundled in the app and served by the drill server)
 server/        the drill server (Node, no dependencies) and its tests
 ```
@@ -39,7 +44,7 @@ server/        the drill server (Node, no dependencies) and its tests
 
 ### Session modes
 
-`SessionSettings`: `kind` (cycles, duration, endurance), `cycles`, `seconds`, `targetPercent`, `toleranceMs`, `windowCycles`, `ladderStep`. A drill gives the starting values (`session`) and its levels can set them; the player changes them on the screen (kept per drill). A run is built a cycle at a time (`RunBuilder.cycle`), so the next cycle's tempo can follow the last result. The ladder decides from the latest judged cycle, which with short cycles can be the one before last (a cycle is judged a moment after it ends, and the next is queued a second and a half ahead).
+`SessionSettings`: `kind` (cycles, duration, endurance), `cycles`, `seconds`, `targetPercent` (the accuracy a cycle passes at, and the one endurance holds to), `windowCycles`, `ladderStep`. (`toleranceMs` is still read, for catalogs and 0.1.5, and no longer used: see Accuracy.) A drill gives the starting values (`session`) and its levels can set them; the player changes them on the screen (kept per drill). A run is built a cycle at a time (`RunBuilder.cycle`), so the next cycle's tempo can follow the last result. The ladder decides from the latest judged cycle, which with short cycles can be the one before last (a cycle is judged a moment after it ends, and the next is queued a second and a half ahead).
 
 ## How to add a drill
 
@@ -93,9 +98,33 @@ A result (`SessionResult`, schema 1): id, date, exercise id, version and name, m
 
 Joe, 2026-11-14: "exercises can be chosen the tempo but can also choose to resume at whatever tempo the app has learned I've achieved", then: "I'm thinking like heart rates, there's maximum but then there's percentages of maximum based on what you're expected to sustain".
 
-- **His max on a drill** is learned from his runs: of his last 10 solo runs of it, the ones that passed (the drill's target, e.g. 85% within 30 ms) give the tempo they reached; the max is the second highest, so one lucky run does not count (with a single pass, that tempo less one ladder step). The drill server works it out (`GET /api/levels`, `learnedTempo` in `server/store.mjs`) so the rule can be tuned without an app update; the phone has the same rule (`Stats.learnedTempo`) for when the mini PC is out of reach. Guided runs never count.
+- **His max on a drill** is learned from his runs: of his last 10 solo runs of it, the ones that passed (the drill's target, e.g. 85% accuracy) give the tempo they reached; the max is the second highest, so one lucky run does not count (with a single pass, that tempo less one ladder step). The drill server works it out (`GET /api/levels`, `learnedTempo` in `server/store.mjs`) so the rule can be tuned without an app update; the phone has the same rule (`Stats.learnedTempo`) for when the mini PC is out of reach. Guided runs never count.
 - **Zones** are percentages of that max, in `catalog/zones.json` (tunable like any drill: change it, bump the index version): Z1 Warm-up 60 to 70%, Z2 Cruise 70 to 80%, Z3 Tempo 80 to 90%, Z4 Threshold 90 to 100%, Z5 Max 100 to 105%. Each kind of run suggests one (`suggest`): endurance Z2, cycles and time Z3, a laddered run Z4 (it climbs into Z5, which is where a new max comes from). A run starts at `startAt` within the zone (the middle).
 - On a drill's screen, once he has a max: **Zones** (default; the zone chips, and "Z3 Tempo · 80–90% of max 150 → 120–135 bpm") or **Manual** (the tempo by hand). The run screen shows the zone and the percent of max as the tempo climbs. After a run, a higher max is said plainly ("Your max is now 136, up from 132").
+
+## Accuracy
+
+Joe, 2026-11-14, on the "Within 30 ms" row: "The ms accuracy should be part of the algorithm determining percentage accuracy, not a user feature". So there is no timing window to set anywhere. The accuracy is worked out note by note (`ScoringConfig` in `ios/Practice/Scoring/Scoring.swift`):
+
+- A played note earns **credit** from its timing error: all of it inside a tight window, falling smoothly (a cosine) to nothing at a wider one.
+- Both windows are a **share of the gap to the nearest neighbouring note**, so they follow the subdivision and the tempo: sixteenths at 160 (94 ms apart) get full credit within 12 ms and nothing from 42 ms; eighths at 80 (375 ms apart) get full credit within 25 ms and nothing from 90 ms. Each window is kept between a floor and a ceiling in milliseconds.
+- A **missed** note earns nothing. Each **extra** note counts as one more note that earned nothing.
+- **Accuracy** is the credit over the notes asked for plus the extras, as a percentage. It is the run's score, what a cycle is judged on (the ladder, and his max), and what endurance holds to. The endurance target is still his to set, as a percentage.
+
+The numbers are in `catalog/scoring.json` (`fullFraction` 0.12, `zeroFraction` 0.45, `fullMinMs` 12, `fullMaxMs` 25, `zeroMinMs` 35, `zeroMaxMs` 90, `extraWeight` 1), served by the drill server like the zones: change them, bump `catalog/index.json`'s version, `npm run check`, and the phone has them on its next pull, with no app update. The app carries the same numbers as its default (`ScoringConfig.standard`) for before a catalog has been read. A result says how it was judged: `scoringVersion` 2, and `fullMs` and `zeroMs` (the windows, averaged over the run); `accuracyPercent` and `score` are the same number now, and `toleranceMs` carries the full-credit window. Runs from 0.1.5 and before have no `scoringVersion` (their accuracy was the share of notes within a fixed 30 ms).
+
+## The design system
+
+`ios/Practice/Shared/Theme.swift` holds the tokens and `Components.swift` what is built from them; every screen uses only these.
+
+- **Colour** (`Theme`): dark first, light from the same names. `bg`, `side`, `raised`, `text`, `muted`, `faint`, `line`, `lineStrong`, `hover`; one accent, as a fill (`accent`, `#6FB7A0`) and as text or a glyph (`accentText`, darker in light so it reads on white), `accentSoft` behind a chosen thing; `warn` and `danger` for states only.
+- **Space** (`Space`): 4, 8, 12, 16, 20, 24, 32, 40; the page margin is 20; nothing tapped is under 44.
+- **Radius** (`Radius`): 8, 12, 16, always continuous.
+- **Type** (`Typo`): SF Pro text styles, so everything follows Dynamic Type; numbers in SF Pro Rounded with fixed-width digits (`Typo.number` for the big ones, which shrink to fit, `Typo.figure` inside text).
+- **Haptics** (`Haptics`, and `.sensoryFeedback`): a tick for each step of a value, a tap for the primary button.
+- **Components**: `ScreenHeader` and `NavBar`, `SectionLabel`, `Row`, `StepperRow` (hold to keep stepping; one adjustable value to VoiceOver), `ToggleRow`, `Segmented`, `Disclosure`, `PrimaryButton` (one a screen), `QuietButton`, `TextButton`, `IconButton`, `BarIcon`, `Chip`, `BigStat`, `ProgressLine`, `BeatDots`, `TempoDial`, and in the drill screens `ZoneBar`, `PatternStrip`, `LaneView`, `TimingMeter`, `ErrorStrip`, `Sparkline`.
+- **The tempo is never set from inside its own change handler** (that recursion crashed 0.1.4): `TempoDial` only calls out, and `Player.setBPM` and `PlayAlong.setBPM` clamp and return early when nothing changes. Settings shows the voices `Voice` read once in the background; it never reads the list itself.
+- **Checking a change**: the UI test (`ios/PracticeUITests`) taps through every screen and photographs each one, dark and light, including a run and a result drawn from made-up values (`-screen run`, debug builds only). Look at the `screens` artifact of the run before shipping.
 
 ## Latency (Bluetooth headphones included)
 
@@ -107,6 +136,11 @@ Joe, 2026-11-14, on his Shokz open-ear headphones: "Is there a way to remove the
 - A route change in the middle of a run stops it (the engine restarts on the new route) and says why; the setup screen re-reads the route.
 - Spoken cues and the guide notes go to the headphones too.
 
+**The calibration is two steps**, the way a rhythm game does it (Joe, 2026-11-14: "there's a visual component that needs to line up with the audible component plus the guitar pluck. Like the line passing through the center of the screen"). It opens from a drill's Options (Timing, Calibrate), from the note under Audio input when a setup has never been calibrated, and from Settings (Timing).
+
+1. **Sight and sound** (`PlayAlong.startCalibration`, the audio input stays closed). A click plays and marks scroll across a line through the middle of the screen; a slider (5 ms steps, -100 to +300 ms) moves the marks until each crosses the line exactly on the click he hears. That is the **display offset**, kept per output (`DisplayOffsetStore`, keyed by the output half of the route): the lane of every run on that output is drawn that much later (`PlayAlong.laneNow`), so a note reaches the line when it is heard. It moves the picture only, never the scoring.
+2. **The guitar** (`PlayAlong.calibrateInput`, the audio input open). The same marks; he picks one note as each of twelve crosses the line. The median of played minus click is the offset every pick is scored with on this route (as before, kept as a residual over iOS's own estimate), and the spread of the notes says how steady it was: the result reads "Calibrated for ...: 182 ms from 12 notes, steady (they varied by 6 ms)", and both are kept on the calibration (`spreadMs`, `hits`).
+
 Two setups, each calibrated once:
 
 - **Interface in, interface out** (headphones on the interface): the lowest delay and the most accurate.
@@ -114,7 +148,7 @@ Two setups, each calibrated once:
 
 ## Building and installing
 
-The same route as the HQ and Browser iPhone apps. `.github/workflows/ios-build.yml` runs on a push touching `ios/`, `catalog/` or itself: XcodeGen makes the project from `ios/project.yml`, the unit tests run on the iPhone simulator and must pass, then on `main` it archives, exports ad hoc, and publishes `app.ipa`, `manifest.plist`, `version.json`, the icon and the install page to the public repo `CaulfieldEngineering/practice-install` (GitHub Pages). Versions are `0.1.<run number>`. Other branches build and test only.
+The same route as the HQ and Browser iPhone apps. `.github/workflows/ios-build.yml` runs on a push touching `ios/`, `catalog/` or itself: XcodeGen makes the project from `ios/project.yml`, the unit tests run on the iPhone simulator and must pass, then on `main` it archives, exports ad hoc, and publishes `app.ipa`, `manifest.plist`, `version.json`, the icon and the install page to the public repo `CaulfieldEngineering/practice-install` (GitHub Pages). The version is the one line in `ios/VERSION` (raise it for each release; on `main` the run stops before building if it is not newer than the published one, since the phone would see no update); the build number is the run number. Other branches build and test only. The UI test's screenshots of every screen, dark and light, are kept with each run as the `screens` artifact.
 
 Signing: Blocks' Apple team (`APPLE_TEAM_ID_REDACTED`), App Store Connect API key and Apple Distribution certificate, with Practice's own App ID `com.caulfieldengineering.practice` and ad-hoc profile `Practice AdHoc`. `node scripts/apple-provision.mjs` makes the App ID and the profile for every registered iPhone (into `C:\Users\Joe\.apple\practice`, never a new certificate); `npm i --no-save libsodium-wrappers && node scripts/apple-secrets.mjs` puts the certificate, its password, the profile, the team and the install repo's deploy key (`C:\Users\Joe\.apple\practice\install_key`) in this repo's Actions secrets. Every year, after Blocks' certificate is renewed, run both again, then the workflow, then reinstall. A new iPhone: register it, then run both again.
 
@@ -129,11 +163,11 @@ Tests: `ios/PracticeTests` (the sequencers to the frame, block size, drift over 
 - The guide sound is a synthesized muted pluck, not a sampled guitar (`SoundBank` is the place for one).
 - The ladder's tempo step can lag a cycle behind the result for short cycles (see Session modes).
 - Pitch is not checked: a note on the wrong string or fret still counts. Left-hand drills need pitch; the schema already carries string and fret.
-- Play-along runs on its own tab, not inside an Intervals routine yet.
+- A timed routine and a picking drill are in one list but are still two kinds of thing: a routine has no zones, guide or scoring, and a drill has no rest blocks.
+- Stopping a drill's run ends it (a scored run keeps the cycles already judged); it cannot be paused and picked up, because the notes are scored against one unbroken timeline. A routine can be paused.
 
 ## Next
 
 - A sampled guide guitar and a pitch check (string and fret), so left-hand drills and riffs can be scored.
-- Play-along inside a routine's play intervals.
-- A progress chart from `/api/stats` (the data is there).
+- One schema for both: a timed routine as a drill whose data has several segments (a pattern or a rest, a tempo, a length), so its play blocks can be guided and scored and use the zones. The routines in `catalog/routines/` and the ones saved on the phone map onto it one to one (each block becomes a segment); until then they are untouched.
 - Agents tuning levels from the runs on the mini PC: see `docs/agents.md`.

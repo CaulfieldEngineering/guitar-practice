@@ -29,6 +29,9 @@ struct Calibration: Codable, Equatable {
     var measured: Double          // seconds, the whole offset that day
     var routeName: String
     var date: Date
+    /// How steady the notes of the calibration were (their standard deviation, ms), and how many were heard.
+    var spreadMs: Double? = nil
+    var hits: Int? = nil
 }
 
 enum Latency {
@@ -45,6 +48,12 @@ enum Latency {
 
     /// A played time moved onto the clock of what was heard.
     static func corrected(_ playedTime: Double, offset: Double) -> Double { playedTime - offset }
+
+    /// The output half of a route key: what the sound comes out of, whatever the input is.
+    static func outputKey(_ routeKey: String) -> String {
+        guard let r = routeKey.range(of: "|out:") else { return routeKey }
+        return String(routeKey[r.upperBound...])
+    }
 
     static func routeKey(inputs: [String], outputs: [String]) -> String {
         "in:" + inputs.joined(separator: ",") + "|out:" + outputs.joined(separator: ",")
@@ -71,6 +80,26 @@ enum Latency {
     static func currentEstimate() -> Double {
         let s = AVAudioSession.sharedInstance()
         return estimate(output: s.outputLatency, input: s.inputLatency, ioBuffer: s.ioBufferDuration)
+    }
+}
+
+/// Sight against sound, per output: how much later than iOS says the click is heard, so the lane can be drawn that
+/// much later and a note crosses the line exactly when it is heard. Set by eye in the first step of the calibration.
+/// It moves the picture only; scoring uses the measured offset (Calibration).
+enum DisplayOffsetStore {
+    private static let key = "pa.displayOffsets"
+    static let range: ClosedRange<Double> = -0.1...0.3
+
+    static func all() -> [String: Double] {
+        UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
+    }
+
+    static func get(_ output: String) -> Double { all()[output] ?? 0 }
+
+    static func set(_ seconds: Double, for output: String) {
+        var a = all()
+        a[output] = min(range.upperBound, max(range.lowerBound, seconds))
+        UserDefaults.standard.set(a, forKey: key)
     }
 }
 

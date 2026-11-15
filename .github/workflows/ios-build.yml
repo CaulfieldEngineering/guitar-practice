@@ -2,7 +2,11 @@
 # simulator, and on main publishes the signed build for over-the-air install, the same route as the HQ and Browser
 # iPhone apps: no Mac, no cable.
 #
-# Flow: XcodeGen makes the Xcode project from ios/project.yml; the unit tests run on a simulator; then archive +
+# The version is the one line in ios/VERSION (raise it for each release; main refuses to publish a version that is
+# not newer than the one on the install page). The build number is the run number.
+#
+# Flow: XcodeGen makes the Xcode project from ios/project.yml; the unit tests and the UI tap-through run on a
+# simulator (its screenshots are kept as the "screens" artifact); then archive +
 # ad-hoc export, and app.ipa, manifest.plist, version.json, the icon and the install page are pushed to the public
 # repo CaulfieldEngineering/practice-install, served by GitHub Pages at
 # https://caulfieldengineering.github.io/practice-install/.
@@ -26,21 +30,36 @@ concurrency:
   group: ios-build-${{ github.ref }}
   cancel-in-progress: false
 
+# Write, only for the screenshots: they are pushed to the ci-screens branch of this repo (one commit, replaced each run).
 permissions:
-  contents: read
+  contents: write
 
 env:
   PAGES: https://caulfieldengineering.github.io/practice-install
   BUNDLE_ID: com.caulfieldengineering.practice
   PROFILE_NAME: Practice AdHoc
   APP_TITLE: Practice
-  VERSION: 0.1.${{ github.run_number }}
 
 jobs:
   build:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Read the version
+        run: |
+          VERSION=$(tr -d '[:space:]' < ios/VERSION)
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then echo "::error::ios/VERSION must be three numbers, like 0.1.6 (it says '$VERSION')"; exit 1; fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Version $VERSION, build ${{ github.run_number }}"
+
+      - name: Is the version newer than the published one?
+        if: github.ref == 'refs/heads/main'
+        run: |
+          PUBLISHED=$(curl -fsS "$PAGES/version.json?t=$(date +%s)" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version","0"))' || echo 0)
+          NEWER=$(python3 -c 'import sys; a=[int(x) for x in sys.argv[1].split(".")]; b=[int(x) for x in sys.argv[2].split(".")]; print("yes" if a>b else "no")' "$VERSION" "$PUBLISHED")
+          echo "Published $PUBLISHED, this is $VERSION: newer $NEWER"
+          if [ "$NEWER" != "yes" ]; then echo "::error::ios/VERSION ($VERSION) is not newer than the published $PUBLISHED. Raise it, or the phone will not see an update."; exit 1; fi
 
       - name: Make the Xcode project
         run: |
@@ -61,10 +80,59 @@ jobs:
         run: |
           DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=[x for g in json.load(sys.stdin)["devices"].values() for x in g if "iPhone" in x["name"]]; pick=[x for x in d if "Pro" in x["name"] and "Max" not in x["name"]] or d; print(pick[0]["udid"])')
           xcodebuild test -project ios/Practice.xcodeproj -scheme Practice -configuration Debug \
-            -destination "platform=iOS Simulator,id=$DEVICE" \
+            -destination "platform=iOS Simulator,id=$DEVICE" -resultBundlePath "$RUNNER_TEMP/tests.xcresult" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO > "$RUNNER_TEMP/test.log" 2>&1 || true
           grep -E "error:|Test Case .* failed|Test Suite .*(passed|failed)|XCTAssert|Executed|TEST (SUCCEEDED|FAILED)|BUILD FAILED" "$RUNNER_TEMP/test.log" | head -150 || true
           grep -q "TEST SUCCEEDED" "$RUNNER_TEMP/test.log"
+
+      # Every screen the UI test photographed, dark and light, named as in TapThroughTests (manifest.json has the names).
+      - name: Collect the screenshots
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/screens"
+          xcrun xcresulttool export attachments --path "$RUNNER_TEMP/tests.xcresult" --output-path "$RUNNER_TEMP/screens" || true
+          tail -c 20000 "$RUNNER_TEMP/test.log" > "$RUNNER_TEMP/screens/test-log-tail.txt" || true
+          grep -E "error:|warning: unre|failed|XCTAssert" "$RUNNER_TEMP/test.log" | head -300 > "$RUNNER_TEMP/screens/test-problems.txt" || true
+          ls "$RUNNER_TEMP/screens" | head -80
+
+      # The same screenshots on the ci-screens branch (named as in the test, as JPEGs), so they can be looked at with
+      # git alone and when the artifact store is full: git fetch origin ci-screens && git show origin/ci-screens --stat
+      - name: Put the screenshots on the ci-screens branch
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OUT="$RUNNER_TEMP/screens-branch"
+          mkdir -p "$OUT"
+          python3 - "$RUNNER_TEMP/screens" "$OUT" <<'PY'
+          import json, os, re, subprocess, sys
+          src, out = sys.argv[1], sys.argv[2]
+          man = os.path.join(src, 'manifest.json')
+          for test in (json.load(open(man)) if os.path.exists(man) else []):
+              for a in test.get('attachments', []):
+                  f = os.path.join(src, a['exportedFileName'])
+                  name = re.sub(r'_\d+_[0-9A-Fa-f-]{36}', '', a.get('suggestedHumanReadableName') or a['exportedFileName'])
+                  name = os.path.splitext(name)[0] + '.jpg'
+                  if os.path.exists(f):
+                      subprocess.run(['sips', '-s', 'format', 'jpeg', '-s', 'formatOptions', '70', '-Z', '1300', f, '--out', os.path.join(out, name)], capture_output=True)
+          PY
+          cp "$RUNNER_TEMP/screens/test-problems.txt" "$OUT/" 2>/dev/null || true
+          echo "$GITHUB_SHA $GITHUB_REF_NAME run $GITHUB_RUN_NUMBER" > "$OUT/README.txt"
+          cd "$OUT" && ls
+          git init -q && git checkout -q --orphan ci-screens && git add -A
+          git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" commit -q -m "Screens of $GITHUB_SHA ($GITHUB_REF_NAME)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:ci-screens
+
+      - name: Keep the screenshots
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: ${{ runner.temp }}/screens
+          retention-days: 14
 
       - name: Compile for the device (unsigned)
         if: steps.signing.outputs.signed != 'true'

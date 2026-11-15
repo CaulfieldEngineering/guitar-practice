@@ -118,17 +118,20 @@ struct VoiceChoice: Identifiable, Hashable { var id: String; var name: String; v
 
 /// The words of an intro: the drill's own text from its data, then the tempo and the goal.
 enum IntroText {
-    static func exercise(_ ex: Exercise, bpm: Int, session s: SessionSettings, guided: Bool) -> String {
+    static func exercise(_ ex: Exercise, bpm: Int, session s: SessionSettings, guided: Bool, scored: Bool = true) -> String {
         let what = ex.intro.isEmpty ? "\(ex.name). \(ex.detail)" : ex.intro
         let goal: String
         switch s.kind {
         case .cycles: goal = "\(s.cycles) times through."
         case .duration: goal = "For \(spokenTime(Double(s.seconds)))."
-        case .endurance: goal = "Endurance: keep \(s.targetPercent) percent of notes within \(Int(s.toleranceMs)) milliseconds for as long as you can."
+        case .endurance:
+            goal = scored ? "Endurance: keep your accuracy at \(s.targetPercent) percent or better for as long as you can."
+                : "Keep going until you stop it."
         }
-        let ladder = s.ladderStep > 0 ? " Up \(s.ladderStep) each time you pass a cycle." : ""
+        let ladder = s.ladderStep > 0 ? (scored ? " Up \(s.ladderStep) each time you pass a cycle." : " Up \(s.ladderStep) each cycle.") : ""
         let mode = guided ? "Guided: play along with the guitar." : "Solo: just the click."
-        return "\(what) \(bpm) beats per minute. \(goal)\(ladder) \(mode) Here is the count."
+        let unscored = scored ? "" : " The audio input is off, so nothing is scored."
+        return "\(what) \(bpm) beats per minute. \(goal)\(ladder) \(mode)\(unscored) Here is the count."
     }
 
     static func routine(_ r: Routine) -> String {

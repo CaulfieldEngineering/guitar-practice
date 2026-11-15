@@ -26,15 +26,20 @@ struct SessionResult: Codable, Identifiable, Equatable, Hashable {
     var closeMs: Double
     var meanErrorMs: Double       // positive is behind the click
     var spreadMs: Double
-    var toleranceMs: Double
+    var toleranceMs: Double       // since 0.1.6 (scoringVersion 2): the full-credit window, averaged over the run
     var targetPercent: Int
-    var accuracyPercent: Int      // within the tolerance
+    var accuracyPercent: Int      // the graded accuracy (scoringVersion 2); before that, the share within toleranceMs
     var sustainedSeconds: Double? // endurance: how long the accuracy held
     var score: Int
     var passed: Bool
     var accentsPercent: Int?
     var offsetMs: Double?
     var appVersion: String
+    /// 2: graded accuracy with windows scaled to the note spacing (ScoringConfig). Missing on runs before 0.1.6.
+    var scoringVersion: Int? = nil
+    /// The windows the notes were judged with, averaged over the run (ms).
+    var fullMs: Double? = nil
+    var zeroMs: Double? = nil
 
     /// What "best" means for this run: time held for endurance, the score otherwise.
     var bestValue: Double { mode == "endurance" ? (sustainedSeconds ?? 0) : Double(score) }

@@ -1,6 +1,52 @@
 import XCTest
 @testable import Practice
 
+/// The calibration's two steps: the picture against the sound (per output), and the guitar's measured offset.
+@MainActor
+final class CalibrationTests: XCTestCase {
+    func testMedianAndSpreadOfTheNotesHeard() throws {
+        let clicks = (0..<12).map { Double($0) * 0.75 }
+        let played = clicks.enumerated().map { $1 + 0.180 + ($0 % 2 == 0 ? 0.004 : -0.004) }
+        let c = try XCTUnwrap(Scoring.calibration(clicks: clicks, played: played))
+        XCTAssertEqual(c.hits, 12)
+        XCTAssertEqual(c.offset, 0.180, accuracy: 1e-9)
+        XCTAssertEqual(c.spread, 0.004 * (12.0 / 11).squareRoot(), accuracy: 1e-9)
+        XCTAssertNil(Scoring.calibration(clicks: clicks, played: [0.1, 0.9]))
+    }
+
+    func testDisplayOffsetIsKeptPerOutputAndClamped() {
+        XCTAssertEqual(Latency.outputKey("in:usb1|out:shokz"), "shokz")
+        XCTAssertEqual(Latency.outputKey("in:|out:speaker"), "speaker")
+        DisplayOffsetStore.set(0.06, for: "test-output-a")
+        DisplayOffsetStore.set(9, for: "test-output-b")
+        XCTAssertEqual(DisplayOffsetStore.get("test-output-a"), 0.06, accuracy: 1e-12)
+        XCTAssertEqual(DisplayOffsetStore.get("test-output-b"), DisplayOffsetStore.range.upperBound, accuracy: 1e-12)
+        XCTAssertEqual(DisplayOffsetStore.get("test-output-never-set"), 0)
+
+        let pa = PlayAlong(player: Player(), history: History(inMemory: true))
+        let before = pa.displayOffset
+        pa.setDisplayOffset(0.045)
+        XCTAssertEqual(pa.displayOffset, 0.045, accuracy: 1e-12)
+        XCTAssertEqual(pa.laneNow, pa.now - 0.045, accuracy: 1e-12)
+        pa.setDisplayOffset(-5)
+        XCTAssertEqual(pa.displayOffset, DisplayOffsetStore.range.lowerBound, accuracy: 1e-12)
+        pa.setDisplayOffset(before)
+    }
+
+    /// The first step runs with the audio input closed, and stopping it leaves everything as it was.
+    func testSightAndSoundStepNeverOpensTheInput() {
+        let pa = PlayAlong(player: Player(), history: History(inMemory: true))
+        pa.startCalibration()
+        if pa.phase == .syncing {
+            XCTAssertFalse(pa.player.audio.recording)
+            XCTAssertEqual(pa.notes.count, 400)
+        }
+        pa.stop()
+        XCTAssertEqual(pa.phase, .ready)
+        XCTAssertNil(pa.saved)
+    }
+}
+
 final class LatencyTests: XCTestCase {
     func testEstimateIsOutputPlusInputPlusBuffer() {
         // Shokz-like Bluetooth output, the phone's mic, a 5 ms buffer.

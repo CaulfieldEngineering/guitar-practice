@@ -186,10 +186,12 @@ final class Player: ObservableObject {
 
     // MARK: Play-along
 
-    func startPlayAlong(setup: (RenderState, Double) -> Void, params: EngineParams) throws {
+    /// `record` false is a run with the audio input off: the input is never opened (no permission asked, Bluetooth
+    /// headphones stay in their listening mode).
+    func startPlayAlong(record: Bool = true, setup: (RenderState, Double) -> Void, params: EngineParams) throws {
         stop()
         audio.params.with { $0 = params }
-        try audio.start(record: true, setup: setup)
+        try audio.start(record: record, setup: setup)
         audio.engine?.mainMixerNode.outputVolume = Float(volume)
         mode = .playAlong
         startTimer()
