@@ -47,7 +47,7 @@ struct CalibrationView: View {
     private var sightControls: some View {
         VStack(spacing: 0) {
             Text(L.signedMs(offsetMs))
-                .font(Typo.number(44)).foregroundStyle(Theme.text)
+                .font(Typo.number(28)).foregroundStyle(Theme.text)
                 .contentTransition(.numericText())
                 .accessibilityHidden(true)
             HStack(spacing: Space.sm) {
@@ -97,7 +97,7 @@ struct CalibrationView: View {
 
             Spacer(minLength: Space.md)
 
-            QuietButton(title: L.stop, systemImage: "stop.fill", height: 52) { pa.stop() }
+            QuietButton(title: L.stop, systemImage: "stop.fill") { pa.stop() }
                 .accessibilityIdentifier("calibration.stop")
                 .padding(.bottom, Space.md)
         }

@@ -41,7 +41,7 @@ struct ExerciseView: View {
     private var setup: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: Space.xl) {
+                VStack(alignment: .leading, spacing: Space.lg) {
                     about
                     tempoBlock
                     guideBlock
@@ -102,7 +102,7 @@ struct ExerciseView: View {
                         chosen: pa.resume ? pa.activeZone?.id : nil,
                         holding: pa.zones.zone(forBPM: Double(pa.startTempo), max: max)?.id) { pa.chooseZone($0) }
             }
-            TempoDial(value: pa.startTempo, caption: tempoCaption, size: 88, vertical: false) { pa.nudgeTempo(to: $0) }
+            TempoDial(value: pa.startTempo, caption: tempoCaption, size: 72, vertical: false) { pa.nudgeTempo(to: $0) }
             if !pa.exercise.levels.isEmpty { levelMenu }
         }
     }
@@ -297,9 +297,9 @@ struct ExerciseView: View {
     private var introView: some View {
         VStack(spacing: Space.md) {
             Spacer()
-            Image(systemName: "speaker.wave.2").font(.system(size: 40, weight: .light)).foregroundStyle(Theme.accentText)
+            Image(systemName: "speaker.wave.2").font(.system(size: 24, weight: .regular)).foregroundStyle(Theme.accentText)
                 .accessibilityHidden(true)
-            Text("\(pa.startTempo)").font(Typo.number(72)).foregroundStyle(Theme.text)
+            Text("\(pa.startTempo)").font(Typo.number(56)).foregroundStyle(Theme.text)
             Text(L.introLine(guided: pa.guided, scored: pa.audioInput))
                 .font(Typo.body).foregroundStyle(Theme.muted)
             Spacer()
@@ -438,7 +438,7 @@ struct ZoneBar: View {
                     }
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .frame(maxWidth: .infinity, minHeight: 40)
                     .background(on ? Theme.accentSoft : Theme.hover, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .stroke(!on && chosen == nil && holding == z.id ? Theme.lineStrong : Color.clear, lineWidth: 1))

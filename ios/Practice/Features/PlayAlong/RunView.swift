@@ -77,13 +77,13 @@ struct RunView: View {
             Spacer(minLength: Space.sm)
 
             Text(d.cue)
-                .font(Typo.number(52))
+                .font(Typo.number(34))
                 .foregroundStyle(d.cueWarn ? Theme.warn : Theme.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.4)
                 .contentTransition(.opacity)
             Text(d.cueDetail)
-                .font(Typo.figure(.title3))
+                .font(Typo.figure(.body))
                 .foregroundStyle(Theme.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -91,8 +91,8 @@ struct RunView: View {
 
             Spacer(minLength: Space.sm)
 
-            HStack(alignment: .top, spacing: 0) {
-                BigStat(value: "\(d.bpm)", label: L.bpm)
+            HStack(alignment: .lastTextBaseline, spacing: 0) {
+                BigStat(value: "\(d.bpm)", label: L.bpm, size: 56)
                 if d.scored {
                     BigStat(value: d.accuracy.map { L.percent($0) } ?? "--", label: L.accuracy,
                             colour: d.accuracy == nil ? Theme.muted : (d.accuracyGood ? Theme.accentText : Theme.warn))
@@ -120,9 +120,9 @@ struct RunView: View {
             Spacer(minLength: Space.sm)
 
             HStack(spacing: Space.sm) {
-                QuietButton(title: L.pause, systemImage: "pause.fill", height: 52) { onPause() }
+                QuietButton(title: L.pause, systemImage: "pause.fill") { onPause() }
                     .accessibilityIdentifier("run.pause")
-                QuietButton(title: L.stop, systemImage: "stop.fill", height: 52) { onEnd() }
+                QuietButton(title: L.stop, systemImage: "stop.fill") { onEnd() }
                     .accessibilityIdentifier("run.stop")
             }
             Text(L.tapToPause)
@@ -137,10 +137,7 @@ struct RunView: View {
     private var pausedCard: some View {
         VStack(spacing: 0) {
             Spacer()
-            Image(systemName: "pause.fill").font(.system(size: 34, weight: .regular)).foregroundStyle(Theme.muted)
-                .accessibilityHidden(true)
-            Text(L.paused).font(Typo.number(44)).foregroundStyle(Theme.text)
-                .padding(.top, Space.sm)
+            Text(L.paused).font(Typo.screen).foregroundStyle(Theme.text)
             Text(L.pausedHelp)
                 .font(Typo.callout).foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
@@ -161,7 +158,7 @@ struct RunView: View {
             Spacer()
             PrimaryButton(title: L.resume, systemImage: "play.fill") { onResume() }
                 .accessibilityIdentifier("run.resume")
-            QuietButton(title: L.end, systemImage: "stop.fill", height: 52) { onEnd() }
+            QuietButton(title: L.end, systemImage: "stop.fill") { onEnd() }
                 .accessibilityIdentifier("run.end")
                 .padding(.top, Space.sm)
                 .padding(.bottom, Space.md)
@@ -255,14 +252,14 @@ struct RunningBar: View {
                         .font(Typo.subStrong)
                         .foregroundStyle(Theme.text)
                         .padding(.horizontal, Space.sm)
-                        .frame(minHeight: 36)
-                        .background(Theme.hover, in: Capsule())
+                        .frame(minHeight: 30)
+                        .background(Theme.hover, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                 }
                 .buttonStyle(PressStyle())
                 .accessibilityIdentifier("running.stop")
             }
             .padding(.horizontal, Space.page)
-            .frame(minHeight: Space.touch + Space.xs)
+            .frame(minHeight: Space.touch)
             .background(Theme.accentSoft)
             .accessibilityElement(children: .contain)
         }

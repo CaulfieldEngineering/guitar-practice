@@ -37,11 +37,11 @@ struct PrimaryButton: View {
                 Text(title).lineLimit(1).minimumScaleFactor(0.8)
             }
             .font(Typo.button)
-            .frame(maxWidth: .infinity, minHeight: 54)
+            .frame(maxWidth: .infinity, minHeight: Control.height)
             .padding(.horizontal, Space.md)
-            .background(Theme.accent, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+            .background(Theme.accent, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .foregroundStyle(Theme.onAccent)
-            .contentShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
     }
@@ -51,7 +51,7 @@ struct PrimaryButton: View {
 struct QuietButton: View {
     let title: String
     var systemImage: String?
-    var height: CGFloat = 54
+    var height: CGFloat = Control.height
     let action: () -> Void
     var body: some View {
         Button(action: action) {
@@ -62,9 +62,9 @@ struct QuietButton: View {
             .font(Typo.bodyStrong)
             .frame(maxWidth: .infinity, minHeight: height)
             .padding(.horizontal, Space.sm)
-            .background(Theme.hover, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+            .background(Theme.hover, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .foregroundStyle(Theme.text)
-            .contentShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
     }
@@ -95,21 +95,23 @@ struct PressStyle: ButtonStyle {
     }
 }
 
-/// A round icon button with a soft fill. `repeats` keeps stepping while it is held.
+/// A compact square icon button with a soft fill (what is touched is 44 points whatever its size). `repeats` keeps
+/// stepping while it is held.
 struct IconButton: View {
     let systemImage: String
-    var size: CGFloat = Space.touch
+    var size: CGFloat = Control.square
     var label: String = ""
     var repeats = false
     let action: () -> Void
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: size * 0.38, weight: .medium))
+                .font(.system(size: 14, weight: .semibold))
                 .frame(width: size, height: size)
-                .background(Theme.hover, in: Circle())
+                .background(Theme.hover, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                 .foregroundStyle(Theme.text)
-                .contentShape(Circle())
+                .frame(minWidth: Space.touch, minHeight: Space.touch)
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
         .buttonRepeatBehavior(repeats ? .enabled : .disabled)
@@ -153,8 +155,8 @@ struct Row<Content: View>: View {
                 Spacer(minLength: Space.sm)
                 content
             }
-            .padding(.vertical, Space.xs)
-            .frame(minHeight: 52)
+            .padding(.vertical, Space.xxs)
+            .frame(minHeight: Control.row)
             if divider { Hairline() }
         }
     }
@@ -173,14 +175,18 @@ struct StepperRow: View {
 
     var body: some View {
         Row(label: label, detail: detail, divider: divider) {
-            HStack(spacing: Space.xxs) {
-                step("minus", -1, enabled: canDecrement)
+            HStack(spacing: Space.xs) {
                 Text(value)
-                    .font(Typo.figure(.body, weight: .medium))
-                    .foregroundStyle(Theme.text)
+                    .font(Typo.figure(.body))
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
-                    .frame(minWidth: 64)
-                step("plus", 1, enabled: canIncrement)
+                // A compact stepper: minus and plus as one small control, a hairline between them.
+                HStack(spacing: 0) {
+                    step("minus", -1, enabled: canDecrement)
+                    Rectangle().fill(Theme.lineStrong).frame(width: 1, height: 16)
+                    step("plus", 1, enabled: canIncrement)
+                }
+                .background(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).fill(Theme.hover).frame(height: Control.square))
             }
         }
         .sensoryFeedback(.selection, trigger: value)
@@ -199,11 +205,10 @@ struct StepperRow: View {
     private func step(_ image: String, _ by: Int, enabled: Bool) -> some View {
         Button { onStep(by) } label: {
             Image(systemName: image)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: 36, height: 36)
-                .background(Theme.hover, in: Circle())
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 40, height: Space.touch)
                 .foregroundStyle(enabled ? Theme.text : Theme.faint)
-                .contentShape(Circle())
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
         .buttonRepeatBehavior(.enabled)
@@ -241,7 +246,7 @@ struct Segmented<T: Hashable>: View {
                         .font(on ? Typo.subStrong : Typo.sub)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .frame(maxWidth: .infinity, minHeight: 30)
                         .background(on ? Theme.raised : Color.clear, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).stroke(on ? Theme.lineStrong : Color.clear, lineWidth: 1))
                         .foregroundStyle(on ? Theme.text : Theme.muted)
@@ -251,13 +256,13 @@ struct Segmented<T: Hashable>: View {
                 .accessibilityAddTraits(on ? [.isSelected] : [])
             }
         }
-        .padding(3)
+        .padding(2)
         .background(Theme.hover, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .sensoryFeedback(.selection, trigger: selection)
     }
 }
 
-/// A small capsule that names a state ("Solo · Z3 Tempo").
+/// A line that names a state ("Solo · Z3 Tempo"): plain text in the accent, no pill around it.
 struct Chip: View {
     let text: String
     var body: some View {
@@ -265,9 +270,7 @@ struct Chip: View {
             .font(Typo.subStrong)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-            .padding(.horizontal, Space.sm)
-            .frame(minHeight: 28)
-            .background(Theme.accentSoft, in: Capsule())
+            .frame(minHeight: 24)
             .foregroundStyle(Theme.accentText)
     }
 }
@@ -277,7 +280,7 @@ struct BigStat: View {
     let value: String
     let label: String
     var colour: Color = Theme.text
-    var size: CGFloat = 40
+    var size: CGFloat = 28
     var body: some View {
         VStack(spacing: 2) {
             Text(value)
@@ -345,7 +348,7 @@ struct TempoDial: View {
 
     var body: some View {
         HStack(spacing: Space.md) {
-            IconButton(systemImage: "minus", size: 52, label: L.slower, repeats: true) { onChange(value - step) }
+            IconButton(systemImage: "minus", size: 40, label: L.slower, repeats: true) { onChange(value - step) }
             VStack(spacing: 0) {
                 Text("\(value)")
                     .font(Typo.number(size))
@@ -363,7 +366,7 @@ struct TempoDial: View {
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
             .gesture(scrub)
-            IconButton(systemImage: "plus", size: 52, label: L.faster, repeats: true) { onChange(value + step) }
+            IconButton(systemImage: "plus", size: 40, label: L.faster, repeats: true) { onChange(value + step) }
         }
         .sensoryFeedback(.selection, trigger: value)
         .accessibilityElement(children: .ignore)
@@ -410,8 +413,8 @@ struct ScreenHeader<Trailing: View>: View {
             if updater.available != nil {
                 Button { updater.install() } label: {
                     Text(L.update).font(Typo.subStrong)
-                        .padding(.horizontal, Space.sm).frame(height: 30)
-                        .background(Theme.accent, in: Capsule()).foregroundStyle(Theme.onAccent)
+                        .padding(.horizontal, Space.sm).frame(height: 28)
+                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)).foregroundStyle(Theme.onAccent)
                 }
                 .buttonStyle(PressStyle())
                 .padding(.trailing, Space.xxs)
@@ -420,8 +423,8 @@ struct ScreenHeader<Trailing: View>: View {
             BarIcon(systemImage: "gearshape", label: L.settings) { settings = true }
         }
         .padding(.leading, Space.page)
-        .padding(.trailing, Space.xs)
-        .frame(minHeight: 56)
+        .padding(.trailing, Space.xxs)
+        .frame(minHeight: 48)
         .sheet(isPresented: $settings) { SettingsView() }
     }
 }
@@ -462,8 +465,8 @@ struct NavBar<Trailing: View>: View {
             Spacer(minLength: Space.xs)
             trailing
         }
-        .padding(.horizontal, Space.xs)
-        .frame(minHeight: 52)
+        .padding(.horizontal, Space.xxs)
+        .frame(minHeight: 44)
     }
 }
 
@@ -496,7 +499,7 @@ struct Disclosure<Content: View>: View {
                         .foregroundStyle(Theme.faint)
                         .rotationEffect(.degrees(open ? 180 : 0))
                 }
-                .frame(minHeight: 52)
+                .frame(minHeight: Control.row)
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressStyle())

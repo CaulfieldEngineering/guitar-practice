@@ -59,22 +59,34 @@ enum Space {
     static let xxl: CGFloat = 32
     static let xxxl: CGFloat = 40
     /// The side margin of every screen.
-    static let page: CGFloat = 20
+    static let page: CGFloat = 16
     /// The smallest height of anything tapped.
     static let touch: CGFloat = 44
 }
 
-/// One family of corner radii, always continuous.
+/// One small family of corner radii, always continuous (Joe, on 0.1.8: "Still not a fan of how big and rounded many
+/// elements are"): 6 for a button's inner parts and small controls, 8 for buttons and fields, 10 at most, for a
+/// panel. Nothing is a capsule.
 enum Radius {
-    static let sm: CGFloat = 8
-    static let md: CGFloat = 12
-    static let lg: CGFloat = 16
+    static let sm: CGFloat = 6
+    static let md: CGFloat = 8
+    static let lg: CGFloat = 10
+}
+
+/// The sizes of controls: what is seen is compact, what is touched is still 44.
+enum Control {
+    /// A filled or quiet button, a field.
+    static let height: CGFloat = 44
+    /// A row of a list or a setting.
+    static let row: CGFloat = 44
+    /// A small square button: a stepper's minus and plus, an icon in a bar.
+    static let square: CGFloat = 32
 }
 
 /// The type ramp: SF Pro for words, following Dynamic Type; SF Pro Rounded with fixed-width digits for numbers.
 enum Typo {
     /// The name of a tab's screen.
-    static let screen = Font.system(.title2, design: .default, weight: .bold)
+    static let screen = Font.system(.title3, design: .default, weight: .semibold)
     /// The name of a pushed screen, a row's name.
     static let title = Font.system(.headline, design: .default, weight: .semibold)
     static let body = Font.system(.body)

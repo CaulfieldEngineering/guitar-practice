@@ -117,7 +117,7 @@ struct DrillsView: View {
                 .autocorrectionDisabled()
         }
         .padding(.horizontal, Space.sm)
-        .frame(minHeight: 40)
+        .frame(minHeight: 36)
         .background(Theme.hover, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .padding(.top, Space.xxs)
     }
@@ -158,7 +158,7 @@ struct DrillsView: View {
                     .lineLimit(1).minimumScaleFactor(0.7)
                     .frame(width: bestWidth, alignment: .trailing)
             }
-            .frame(minHeight: Space.touch + Space.xxs)
+            .frame(minHeight: Control.row)
             .contentShape(Rectangle())
             Hairline()
         }

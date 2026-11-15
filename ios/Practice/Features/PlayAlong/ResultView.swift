@@ -25,12 +25,12 @@ struct ResultView: View {
                     VStack(spacing: Space.xxs) {
                         if endurance {
                             Text(formatClock(saved.sustainedSeconds ?? 0))
-                                .font(Typo.number(96)).foregroundStyle(Theme.accentText)
+                                .font(Typo.number(44)).foregroundStyle(Theme.accentText)
                                 .lineLimit(1).minimumScaleFactor(0.5)
                             Text(L.heldAt(saved.targetPercent)).font(Typo.callout).foregroundStyle(Theme.muted)
                         } else {
                             Text(L.percent(score.score))
-                                .font(Typo.number(96)).foregroundStyle(score.passed ? Theme.accentText : Theme.text)
+                                .font(Typo.number(44)).foregroundStyle(score.passed ? Theme.accentText : Theme.text)
                                 .lineLimit(1).minimumScaleFactor(0.5)
                             Text(score.passed ? L.accuracyPassed : L.accuracyPassMark(score.passMark))
                                 .font(Typo.callout).foregroundStyle(Theme.muted)
@@ -120,7 +120,7 @@ struct UnscoredResultView: View {
             Spacer()
             VStack(spacing: Space.xxs) {
                 Text(formatClock(run.seconds))
-                    .font(Typo.number(96)).foregroundStyle(Theme.text)
+                    .font(Typo.number(44)).foregroundStyle(Theme.text)
                     .lineLimit(1).minimumScaleFactor(0.5)
                 Text(L.durationAndCycles(L.tempoRange(run.startBPM, run.topBPM), run.cycles))
                     .font(Typo.callout).foregroundStyle(Theme.muted)

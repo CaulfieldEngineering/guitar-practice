@@ -15,7 +15,7 @@ struct MetronomeView: View {
             BeatDots(beats: player.beatsPerBar, current: running ? player.currentBeat : -1)
             Spacer(minLength: Space.sm)
 
-            TempoDial(value: player.bpm, caption: L.bpm, size: 104) { player.setBPM($0) }
+            TempoDial(value: player.bpm, caption: L.bpm, size: 88) { player.setBPM($0) }
                 .padding(.horizontal, Space.page)
 
             Slider(value: Binding(get: { Double(player.bpm) }, set: { player.setBPM(Int($0.rounded())) }), in: 30...300)
@@ -60,7 +60,7 @@ struct MetronomeView: View {
                     Haptics.tick()
                     player.tap()
                 }
-                .frame(maxWidth: 112)
+                .frame(maxWidth: 96)
                 .accessibilityLabel(L.tapTempo)
                 PrimaryButton(title: running ? L.stop : L.start, systemImage: running ? "stop.fill" : "play.fill") {
                     player.toggleMetronome()
