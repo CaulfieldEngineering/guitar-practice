@@ -60,3 +60,18 @@ test('keeps each run once and acknowledges it', async (t) => {
   assert.deepEqual(stats.bests.map((x) => [x.mode, x.best]), [['cycles', 92], ['endurance', 56]]);
   assert.equal(stats.progress.length, 2);
 });
+
+test('his level: the second best pass of the last ten solo runs', async (t) => {
+  const { base } = await run(t);
+  const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const day = (n) => `2026-11-${String(n).padStart(2, '0')}T20:00:00Z`;
+  const runs = [
+    result({ id: id(1), date: day(1), mode: 'cycles', topBPM: 140, passed: true }),   // old: outside the last ten
+    ...Array.from({ length: 9 }, (_, i) => result({ id: id(10 + i), date: day(2 + i), mode: 'cycles', topBPM: 100 + i, passed: i % 2 === 0 })),
+    result({ id: id(30), date: day(20), mode: 'cycles', topBPM: 130, passed: true }),  // one lucky run
+    result({ id: id(31), date: day(21), mode: 'cycles', topBPM: 150, passed: true, guided: true }), // guided: not counted
+  ];
+  await fetch(`${base}/api/sessions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessions: runs }) });
+  const { levels } = await (await fetch(`${base}/api/levels`)).json();
+  assert.equal(levels.trip16x4.max, 108);
+});

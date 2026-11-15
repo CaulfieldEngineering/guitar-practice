@@ -46,7 +46,7 @@ struct RootView: View {
             RoutinesView()
                 .tabItem { Label("Intervals", systemImage: "timer") }.tag(1)
             PlayAlongView()
-                .tabItem { Label("Play along", systemImage: "guitars") }.tag(2)
+                .tabItem { Label("Play along", systemImage: "waveform") }.tag(2)
         }
         .tint(Theme.accent)
         .alert("Sound could not start", isPresented: Binding(get: { player.errorText != nil }, set: { if !$0 { player.errorText = nil } })) {
@@ -82,7 +82,9 @@ struct ScreenHeader<Trailing: View>: View {
             Button { settings = true } label: {
                 Image(systemName: "gearshape").font(.system(size: 17)).foregroundStyle(Theme.muted)
                     .frame(width: 36, height: 36)
-            }.buttonStyle(.plain)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Settings")
         }
         .padding(.horizontal, 16)
         .frame(height: 48)

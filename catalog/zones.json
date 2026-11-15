@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "about": "Tempo zones, like heart-rate zones: percentages of his max on a drill (the fastest he has passed at the target accuracy, robust over recent runs). Each kind of run suggests a zone. Tune here; bump index.json version.",
+  "zones": [
+    { "id": "z1", "name": "Z1", "title": "Warm-up", "low": 60, "high": 70 },
+    { "id": "z2", "name": "Z2", "title": "Cruise", "low": 70, "high": 80 },
+    { "id": "z3", "name": "Z3", "title": "Tempo", "low": 80, "high": 90 },
+    { "id": "z4", "name": "Z4", "title": "Threshold", "low": 90, "high": 100 },
+    { "id": "z5", "name": "Z5", "title": "Max", "low": 100, "high": 105 }
+  ],
+  "suggest": { "endurance": "z2", "duration": "z3", "cycles": "z3", "ladder": "z4" },
+  "startAt": 0.5
+}

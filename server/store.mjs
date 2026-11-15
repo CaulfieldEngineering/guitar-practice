@@ -54,6 +54,31 @@ export function bests(list) {
   return [...map.values()].sort((a, b) => a.exerciseID.localeCompare(b.exerciseID) || a.mode.localeCompare(b.mode) || a.bpm - b.bpm);
 }
 
+/**
+ * His max on a drill, as in heart-rate zones (rule 1; the app has the same rule as a fallback, Stats.learnedTempo): the
+ * fastest he passes at the target accuracy, robust over recent runs. The last 10 solo runs
+ * of the drill; those that passed give the tempo they reached; the level is the second highest, so one lucky run does
+ * not count. With a single pass, that tempo less one ladder step (4). Tune it here; the app takes the server's answer.
+ */
+export function learnedTempo(list, exerciseID, { recent = 10, step = 4 } = {}) {
+  const solo = list.filter((s) => s.exerciseID === exerciseID && !s.guided)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, recent);
+  const passed = solo.filter((s) => s.passed).map((s) => s.topBPM).sort((a, b) => b - a);
+  const max = passed.length >= 2 ? passed[1] : passed.length === 1 ? Math.max(20, passed[0] - step) : null;
+  if (max == null) return null;
+  return { max, bpm: max, basedOn: solo.length, passes: passed.length, rule: 1 };
+  return null;
+}
+
+export function levels(list) {
+  const out = {};
+  for (const id of new Set(list.map((s) => s.exerciseID))) {
+    const l = learnedTempo(list, id);
+    if (l) out[id] = l;
+  }
+  return out;
+}
+
 /** Every run in time order, trimmed to what a progress chart needs. */
 export function progress(list) {
   return [...list].sort((a, b) => String(a.date).localeCompare(String(b.date))).map((s) => ({

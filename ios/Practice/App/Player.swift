@@ -15,7 +15,9 @@ final class Player: ObservableObject {
     @Published var errorText: String?
 
     // The metronome's settings, kept between launches.
-    @Published var bpm: Int { didSet { bpm = min(max(bpm, Routine.bpmRange.lowerBound), Routine.bpmRange.upperBound); pushParams(); save() } }
+    /// The metronome's tempo. Set it with setBPM, which keeps it in range (assigning a property inside its own
+    /// didSet recursed until the stack ran out on the iPhone, 0.1.4).
+    @Published private(set) var bpm: Int
     @Published var beatsPerBar: Int { didSet { pushParams(); save() } }
     @Published var subdivision: Int { didSet { pushParams(); save() } }
     @Published var accent: Bool { didSet { pushParams(); save() } }
@@ -83,7 +85,15 @@ final class Player: ObservableObject {
     }
 
     func tap() {
-        if let t = tapper.tap(at: CACurrentMediaTime()) { bpm = Int(t.rounded()) }
+        if let t = tapper.tap(at: CACurrentMediaTime()) { setBPM(Int(t.rounded())) }
+    }
+
+    func setBPM(_ value: Int) {
+        let v = min(max(value, Routine.bpmRange.lowerBound), Routine.bpmRange.upperBound)
+        guard v != bpm else { return }
+        bpm = v
+        pushParams()
+        save()
     }
 
     // MARK: Routines

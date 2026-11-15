@@ -51,15 +51,30 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.caulfieldengineering.practice.tests
         CODE_SIGNING_ALLOWED: NO
+  PracticeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: PracticeUITests
+    dependencies:
+      - target: Practice
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.caulfieldengineering.practice.uitests
+        TEST_TARGET_NAME: Practice
+        CODE_SIGNING_ALLOWED: NO
 schemes:
   Practice:
     build:
       targets:
         Practice: all
         PracticeTests: [test]
+        PracticeUITests: [test]
     test:
       config: Debug
       targets:
         - PracticeTests
+        - PracticeUITests
     archive:
       config: Release

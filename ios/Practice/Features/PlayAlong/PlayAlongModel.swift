@@ -17,9 +17,23 @@ final class PlayAlong: ObservableObject {
     @Published private(set) var exercises: [Exercise] = []
     @Published private(set) var catalogNote: String?
     @Published var exerciseID: String { didSet { UserDefaults.standard.set(exerciseID, forKey: "pa.exercise"); loadSettings() } }
-    @Published var bpm: Int { didSet { let t = exercise.tempo; bpm = min(max(bpm, t.min), t.max); saveSettings() } }
+    /// Set with setBPM (kept in the drill's range); never assigned inside its own didSet (that recursed, 0.1.4).
+    @Published private(set) var bpm: Int
     @Published var session: SessionSettings { didSet { saveSettings() } }
-    @Published var guided: Bool { didSet { UserDefaults.standard.set(guided, forKey: "pa.guided") } }
+    /// Guided or solo, and the spoken intro: remembered per drill.
+    @Published var guided: Bool { didSet { saveSettings() } }
+    @Published var intro: Bool { didSet { saveSettings() } }
+    /// Tempo by zone of his max (default once there is a max) or by hand; per drill.
+    @Published var resume: Bool { didSet { saveSettings() } }
+    /// The zone picked on this drill, or "" for the one the kind of run suggests.
+    @Published var zoneChoice: String { didSet { saveSettings() } }
+    @Published private(set) var zones: TempoZones = .standard
+    /// The zone and max of the run going on, for the run screen.
+    @Published private(set) var runZoneMax: Int?
+    /// Levels from the server, kept for when it is out of reach.
+    @Published private(set) var serverLevels: [String: Int] = [:]
+    /// After a run: the level before and after, when it went up.
+    @Published private(set) var levelUp: (from: Int, to: Int)?
     @Published var gridClicks: Bool { didSet { UserDefaults.standard.set(gridClicks, forKey: "pa.click") } }
     /// Testing only, off unless switched on in Settings: the phone's microphone instead of the interface.
     @Published var allowPhoneMic: Bool { didSet { UserDefaults.standard.set(allowPhoneMic, forKey: "pa.allowMic"); player.audio.allowPhoneMic = allowPhoneMic; routeChanged() } }
@@ -78,7 +92,12 @@ final class PlayAlong: ObservableObject {
         let ex = lib.first { $0.id == id } ?? lib[0]
         bpm = d.object(forKey: "pa.bpm.\(id)") as? Int ?? ex.tempo.start
         session = PlayAlong.storedSession(id) ?? ex.session
-        guided = d.object(forKey: "pa.guided") as? Bool ?? true
+        guided = d.object(forKey: "pa.guided.\(id)") as? Bool ?? true
+        intro = d.object(forKey: "pa.intro.\(id)") as? Bool ?? true
+        resume = d.object(forKey: "pa.resume.\(id)") as? Bool ?? true
+        zoneChoice = d.string(forKey: "pa.zone.\(id)") ?? ""
+        zones = Library.load().zones ?? .standard
+        serverLevels = d.dictionary(forKey: "pa.levels") as? [String: Int] ?? [:]
         gridClicks = d.object(forKey: "pa.click") as? Bool ?? true
         allowPhoneMic = d.object(forKey: "pa.allowMic") as? Bool ?? false
         player.audio.allowPhoneMic = allowPhoneMic
@@ -97,19 +116,76 @@ final class PlayAlong: ObservableObject {
     private var loading = false
     private func loadSettings() {
         loading = true
-        bpm = UserDefaults.standard.object(forKey: "pa.bpm.\(exerciseID)") as? Int ?? exercise.tempo.start
+        let d = UserDefaults.standard
+        bpm = d.object(forKey: "pa.bpm.\(exerciseID)") as? Int ?? exercise.tempo.start
         session = PlayAlong.storedSession(exerciseID) ?? exercise.session
+        guided = d.object(forKey: "pa.guided.\(exerciseID)") as? Bool ?? true
+        intro = d.object(forKey: "pa.intro.\(exerciseID)") as? Bool ?? true
+        resume = d.object(forKey: "pa.resume.\(exerciseID)") as? Bool ?? true
+        zoneChoice = d.string(forKey: "pa.zone.\(exerciseID)") ?? ""
         loading = false
     }
 
     private func saveSettings() {
         guard !loading else { return }
         UserDefaults.standard.set(bpm, forKey: "pa.bpm.\(exerciseID)")
+        UserDefaults.standard.set(guided, forKey: "pa.guided.\(exerciseID)")
+        UserDefaults.standard.set(intro, forKey: "pa.intro.\(exerciseID)")
+        UserDefaults.standard.set(resume, forKey: "pa.resume.\(exerciseID)")
+        UserDefaults.standard.set(zoneChoice, forKey: "pa.zone.\(exerciseID)")
         if let d = try? JSONEncoder().encode(session) { UserDefaults.standard.set(d, forKey: "pa.session.\(exerciseID)") }
     }
 
+    /// The zone in use: the one picked, else the one this kind of run suggests.
+    var activeZone: TempoZones.Zone? {
+        (zoneChoice.isEmpty ? nil : zones.zone(zoneChoice)) ?? zones.suggested(for: session)
+    }
+
+    /// "Z3 · 80–90% of max 150 → 120–135 bpm"
+    var zoneLine: String? {
+        guard let max = level(), let z = activeZone else { return nil }
+        let r = TempoZones.range(z, max: max)
+        return "\(z.name) \(z.title) · \(Int(z.low))–\(Int(z.high))% of max \(max) → \(r.lowerBound)–\(r.upperBound) bpm"
+    }
+
+    /// His max on a drill: the server's when it has been reached, else worked out from the phone's own runs.
+    func level(_ id: String? = nil) -> Int? {
+        let key = id ?? exerciseID
+        let local = Stats.learnedTempo(history.results, exerciseID: key, step: exercise.tempo.stepOnPass)
+        return serverLevels[key] ?? local
+    }
+
+    /// The tempo a run starts at: his level when resuming and there is one, else the tempo set by hand.
+    var startTempo: Int {
+        if resume, let m = level(), let z = activeZone {
+            return min(max(zones.start(z, max: m), exercise.tempo.min), exercise.tempo.max)
+        }
+        return bpm
+    }
+
+    func refreshLevels() async {
+        if let l = await DrillServer.fetchLevels() {
+            serverLevels = l
+            UserDefaults.standard.set(l, forKey: "pa.levels")
+        }
+    }
+
+    func setBPM(_ value: Int) {
+        let t = exercise.tempo
+        let v = min(max(value, t.min), t.max)
+        guard v != bpm else { return }
+        bpm = v
+        saveSettings()
+    }
+
+    /// Opens a drill: its remembered tempo, run, guide and intro.
+    func select(_ id: String) {
+        guard id != exerciseID else { return }
+        exerciseID = id
+    }
+
     func apply(_ level: Level) {
-        bpm = level.bpm
+        setBPM(level.bpm)
         if let s = level.session { session = s }
     }
 
@@ -124,9 +200,12 @@ final class PlayAlong: ObservableObject {
         case .unreachable: catalogNote = "The mini PC is out of reach; using the drills on the phone."
         case .invalid: catalogNote = "The mini PC's drills could not be read; using the ones on the phone."
         }
-        exercises = Library.load().exercises
+        let lib = Library.load()
+        exercises = lib.exercises
+        zones = lib.zones ?? .standard
         if !exercises.contains(where: { $0.id == exerciseID }) { exerciseID = exercises[0].id }
         await history.sync()
+        await refreshLevels()
     }
 
     // MARK: Bests
@@ -152,6 +231,12 @@ final class PlayAlong: ObservableObject {
 
     private func begin(calibrating: Bool) {
         message = nil
+        AudioEngine.prepareRecordSession()
+        routeChanged()
+        if !interfacePresent && !allowPhoneMic {
+            message = "Plug in your audio interface: the guitar comes in through it."
+            return
+        }
         switch AVAudioApplication.shared.recordPermission {
         case .granted: break
         case .undetermined:
@@ -165,14 +250,9 @@ final class PlayAlong: ObservableObject {
             message = "Allow the microphone in Settings, Practice, to be scored."
             return
         }
-        routeChanged()
-        if !interfacePresent && !allowPhoneMic {
-            message = "Plug in your audio interface: the guitar comes in through it."
-            return
-        }
-        if !calibrating && player.voice.introOn {
+        if !calibrating && intro {
             phase = .intro
-            player.voice.speak(IntroText.exercise(exercise, bpm: bpm, session: session, guided: guided)) { [weak self] in
+            player.voice.speak(IntroText.exercise(exercise, bpm: startTempo, session: session, guided: guided), always: true) { [weak self] in
                 guard let self, self.phase == .intro else { return }
                 self.launch(calibrating: false)
             }
@@ -212,7 +292,9 @@ final class PlayAlong: ObservableObject {
         runSettings = session
         runGuided = guided && !calibrating
         lastRunWasGuided = runGuided
-        let startBPM = Double(calibrating ? 80 : bpm)
+        let startBPM = Double(calibrating ? 80 : startTempo)
+        levelUp = nil
+        runZoneMax = calibrating ? nil : level()
         currentBPM = startBPM
         topBPM = Int(startBPM)
         slots = []; noteStart = []; notes = []; states = []; played = []; errors = []
@@ -489,7 +571,12 @@ final class PlayAlong: ObservableObject {
         if !runGuided, let previous = Stats.best(history.results, exerciseID: result.exerciseID, mode: result.mode, bpm: result.startBPM) {
             newBest = result.bestValue > previous
         }
+        let levelBefore = level(result.exerciseID)
         if r.expected > 0 { history.add(result) }
+        if let after = level(result.exerciseID), after > (levelBefore ?? 0), !runGuided {
+            levelUp = (levelBefore ?? 0, after)
+        }
+        Task { await history.sync(); await refreshLevels() }
         saved = result
         phase = .result
     }

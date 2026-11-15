@@ -14,7 +14,7 @@ struct MetronomeView: View {
             Spacer(minLength: 16)
 
             HStack(spacing: 16) {
-                IconButton(systemImage: "minus", size: 52) { player.bpm -= 1 }
+                IconButton(systemImage: "minus", size: 52) { player.setBPM(player.bpm - 1) }
                 VStack(spacing: 0) {
                     Text("\(player.bpm)")
                         .font(.system(size: 96, weight: .semibold, design: .rounded))
@@ -30,15 +30,15 @@ struct MetronomeView: View {
                 .gesture(DragGesture(minimumDistance: 4)
                     .onChanged { g in
                         if dragStart == nil { dragStart = player.bpm }
-                        player.bpm = (dragStart ?? player.bpm) + Int((-g.translation.height + g.translation.width) / 6)
+                        player.setBPM((dragStart ?? player.bpm) + Int((-g.translation.height + g.translation.width) / 6))
                     }
                     .onEnded { _ in dragStart = nil })
                 .accessibilityLabel("\(player.bpm) beats per minute. Drag up or down to change.")
-                IconButton(systemImage: "plus", size: 52) { player.bpm += 1 }
+                IconButton(systemImage: "plus", size: 52) { player.setBPM(player.bpm + 1) }
             }
             .padding(.horizontal, 16)
 
-            Slider(value: Binding(get: { Double(player.bpm) }, set: { player.bpm = Int($0.rounded()) }), in: 30...300)
+            Slider(value: Binding(get: { Double(player.bpm) }, set: { player.setBPM(Int($0.rounded())) }), in: 30...300)
                 .tint(Theme.accent)
                 .padding(.horizontal, 24)
                 .padding(.top, 8)

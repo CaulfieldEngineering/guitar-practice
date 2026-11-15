@@ -11,6 +11,9 @@ final class Voice: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     @Published var cuesOn: Bool { didSet { UserDefaults.standard.set(cuesOn, forKey: "voice.cues") } }
     @Published var voiceID: String? { didSet { UserDefaults.standard.set(voiceID, forKey: "voice.id") } }
     @Published private(set) var speaking = false
+    /// English voices, best first; filled once in the background.
+    @Published private(set) var voices: [VoiceChoice] = []
+    private var chosen: AVSpeechSynthesisVoice?
 
     private let synth = AVSpeechSynthesizer()
     private var onDone: (() -> Void)?
@@ -23,10 +26,21 @@ final class Voice: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         super.init()
         synth.delegate = self
         synth.usesApplicationAudioSession = true
+        Task.detached(priority: .utility) {
+            let list = Voice.englishVoices
+            let choices = list.map { VoiceChoice(id: $0.identifier, name: $0.name, quality: Voice.qualityName($0.quality)) }
+            let best = list.first
+            await MainActor.run {
+                self.voices = choices
+                self.fallback = best
+            }
+        }
     }
 
+    private var fallback: AVSpeechSynthesisVoice?
+
     /// English voices, best first.
-    static var englishVoices: [AVSpeechSynthesisVoice] {
+    nonisolated static var englishVoices: [AVSpeechSynthesisVoice] {
         AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("en") }.sorted { a, b in
             if rank(a.quality) != rank(b.quality) { return rank(a.quality) > rank(b.quality) }
             if (a.language == "en-US") != (b.language == "en-US") { return a.language == "en-US" }
@@ -34,18 +48,22 @@ final class Voice: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         }
     }
 
-    static func rank(_ q: AVSpeechSynthesisVoiceQuality) -> Int {
+    nonisolated static func rank(_ q: AVSpeechSynthesisVoiceQuality) -> Int {
         switch q { case .premium: return 3; case .enhanced: return 2; default: return 1 }
     }
 
-    static func qualityName(_ q: AVSpeechSynthesisVoiceQuality) -> String {
+    nonisolated static func qualityName(_ q: AVSpeechSynthesisVoiceQuality) -> String {
         switch q { case .premium: return "Premium"; case .enhanced: return "Enhanced"; default: return "Standard" }
     }
 
     var voice: AVSpeechSynthesisVoice? {
-        if let id = voiceID, let v = AVSpeechSynthesisVoice(identifier: id) { return v }
-        return Voice.englishVoices.first ?? AVSpeechSynthesisVoice(language: "en-US")
+        if let c = chosen, c.identifier == voiceID { return c }
+        if let id = voiceID, let v = AVSpeechSynthesisVoice(identifier: id) { chosen = v; return v }
+        return fallback ?? AVSpeechSynthesisVoice(language: "en-US")
     }
+
+    /// The voice in use, for the picker (the chosen one, else the best found).
+    var selectedID: String { voiceID ?? fallback?.identifier ?? voices.first?.id ?? "" }
 
     /// Speaks, then calls `done` (at once if the voice is off or there is nothing to say).
     func speak(_ text: String, cue: Bool = false, always: Bool = false, done: (() -> Void)? = nil) {
@@ -95,6 +113,8 @@ final class Voice: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         Task { @MainActor in self.speaking = false }
     }
 }
+
+struct VoiceChoice: Identifiable, Hashable { var id: String; var name: String; var quality: String }
 
 /// The words of an intro: the drill's own text from its data, then the tempo and the goal.
 enum IntroText {

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 1,
+  "version": 2,
   "updated": "2026-11-14",
   "files": [
     {
@@ -10,6 +10,10 @@
     {
       "path": "routines/perfect-picking.json",
       "kind": "routines"
+    },
+    {
+      "path": "zones.json",
+      "kind": "zones"
     }
   ]
 }

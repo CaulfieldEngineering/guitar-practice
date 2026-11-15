@@ -277,7 +277,7 @@ final class AudioEngine {
     static let interfacePorts: [AVAudioSession.Port] = [.usbAudio, .lineIn, .headsetMic]
 
     static func interfaceInput(_ session: AVAudioSession = .sharedInstance()) -> AVAudioSessionPortDescription? {
-        let inputs = session.availableInputs ?? []
+        let inputs = (session.availableInputs ?? []) + session.currentRoute.inputs
         for type in interfacePorts { if let p = inputs.first(where: { $0.portType == type }) { return p } }
         return nil
     }
@@ -291,6 +291,15 @@ final class AudioEngine {
             throw Failure.noInterface
         }
         try? session.setPreferredInput(mic)
+    }
+
+    /// Puts the session in record mode (A2DP only), so the interface's input is listed. Leaves a running engine alone.
+    static func prepareRecordSession() {
+        let s = AVAudioSession.sharedInstance()
+        if s.category != .playAndRecord {
+            try? s.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+        }
+        try? s.setActive(true)
     }
 
     /// Before speaking with nothing running: the playback session, mixing with other apps. Leaves a running one alone.

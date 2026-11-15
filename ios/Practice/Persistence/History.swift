@@ -82,6 +82,19 @@ enum Stats {
         bests(results).first { $0.exerciseID == exerciseID && $0.mode == mode && $0.bpm == bpm }?.value
     }
 
+    /// His level on a drill: the tempo he can be trusted to resume at. Rule 1 (the server's learnedTempo is the same,
+    /// and the server's answer wins when it can be reached, so the rule can be tuned there): take his last 10 solo runs
+    /// of the drill; the ones that passed (at the drill's target, e.g. 85% within 30 ms) give the tempo they reached;
+    /// the level is the second highest of those, so one lucky run does not count. With a single pass, that tempo less
+    /// one ladder step. None: no level yet.
+    static func learnedTempo(_ results: [SessionResult], exerciseID: String, recent: Int = 10, step: Int = 4) -> Int? {
+        let solo = results.filter { $0.exerciseID == exerciseID && !$0.guided }.sorted { $0.date > $1.date }.prefix(recent)
+        let passed = solo.filter(\.passed).map(\.topBPM).sorted(by: >)
+        if passed.count >= 2 { return passed[1] }
+        if let one = passed.first { return max(20, one - step) }
+        return nil
+    }
+
     /// The fastest starting tempo with a passing solo run.
     static func fastestPass(_ results: [SessionResult], exerciseID: String) -> Int? {
         results.filter { $0.exerciseID == exerciseID && !$0.guided && $0.passed }.map(\.topBPM).max()

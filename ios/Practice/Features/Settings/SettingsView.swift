@@ -44,9 +44,11 @@ struct SettingsView: View {
                 Section {
                     Toggle("Speak an intro before each drill", isOn: $voice.introOn).tint(Theme.accent)
                     Toggle("Short spoken cues", isOn: $voice.cuesOn).tint(Theme.accent)
-                    Picker("Voice", selection: Binding(get: { voice.voice?.identifier ?? "" }, set: { voice.voiceID = $0 })) {
-                        ForEach(Voice.englishVoices, id: \.identifier) { v in
-                            Text("\(v.name), \(Voice.qualityName(v.quality))").tag(v.identifier)
+                    if voice.voices.isEmpty {
+                        HStack { Text("Voice"); Spacer(); ProgressView() }
+                    } else {
+                        Picker("Voice", selection: Binding(get: { voice.selectedID }, set: { voice.voiceID = $0 })) {
+                            ForEach(voice.voices) { v in Text("\(v.name), \(v.quality)").tag(v.id) }
                         }
                     }
                     Button("Hear it") {

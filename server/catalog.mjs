@@ -73,9 +73,20 @@ export function checkCatalog(folder) {
           list.push({ id: e.id, name: e.name, version: e.version });
         }
       }
+    } else if (f.kind === 'zones') {
+      const zs = doc.zones ?? [];
+      if (!zs.length) errors.push(`${f.path}: no zones`);
+      for (const z of zs) {
+        if (typeof z?.id !== 'string' || !Number.isFinite(z?.low) || !Number.isFinite(z?.high) || z.low >= z.high) {
+          errors.push(`${f.path}: each zone needs an id and low < high (percent of max)`); break;
+        }
+      }
+      for (const [mode, id] of Object.entries(doc.suggest ?? {})) {
+        if (!zs.some((z) => z.id === id)) errors.push(`${f.path}: suggest.${mode} names ${id}, which is not a zone`);
+      }
     } else if (f.kind === 'routines') {
       for (const r of doc.routines ?? []) { checkRoutine(r, f.path, errors); routines += 1; }
-    } else errors.push(`index.json: ${f.path} has kind ${f.kind} (exercises or routines)`);
+    } else errors.push(`index.json: ${f.path} has kind ${f.kind} (exercises, routines or zones)`);
   }
   // Every JSON file in the folder should be in the index, or the app never sees it.
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((x) => x.isDirectory() ? walk(path.join(d, x.name)) : [path.join(d, x.name)]);

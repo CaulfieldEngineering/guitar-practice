@@ -6,6 +6,7 @@
 //   POST /api/sessions                {sessions: [SessionResult]} -> {stored: [ids held now]}; an id already held is kept once
 //   GET  /api/sessions[?exercise=id]  {sessions: [...]}, newest first
 //   GET  /api/stats[?exercise=id]     {bests: [{exerciseID, mode, bpm, best, runs, last}], progress: [...]}
+//   GET  /api/levels                  {levels: {<exercise id>: {max, basedOn, passes, rule}}}: his max per drill (zones are % of it)
 //   GET  /                            a small page: the drills and the latest runs
 //
 // Runs are kept in one place, data/sessions.jsonl (one JSON object a line, never rewritten, only appended).
@@ -15,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkCatalog } from './catalog.mjs';
-import { createStore, bests, progress } from './store.mjs';
+import { createStore, bests, progress, levels } from './store.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CATALOG = process.env.PRACTICE_CATALOG || path.join(ROOT, 'catalog');
@@ -77,6 +78,7 @@ export function createApp({ catalog = CATALOG, data = DATA } = {}) {
         const list = store.all().filter((s) => !ex || s.exerciseID === ex);
         return send(res, 200, { bests: bests(list), progress: progress(list) });
       }
+      if (req.method === 'GET' && p === '/api/levels') return send(res, 200, { levels: levels(store.all()) });
       if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, page(catalog, store), 'text/html; charset=utf-8');
       return send(res, 404, { error: 'not found' });
     } catch (e) {

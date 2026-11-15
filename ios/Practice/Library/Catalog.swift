@@ -9,6 +9,58 @@ import Foundation
 // Support/catalog, so the app works away from Tailscale. Loading order: bundled, then cached, then the user folder
 // (Documents/Exercises); the same id later replaces the earlier one.
 
+/// Tempo zones, like heart-rate zones: percentages of his max on a drill (catalog/zones.json).
+struct TempoZones: Codable, Equatable {
+    struct Zone: Codable, Equatable, Hashable, Identifiable {
+        var id: String
+        var name: String     // "Z3"
+        var title: String    // "Tempo"
+        var low: Double      // percent of max
+        var high: Double
+    }
+    var schema: Int = 1
+    var zones: [Zone]
+    /// The zone each kind of run suggests ("endurance", "duration", "cycles", and "ladder" for a run that climbs).
+    var suggest: [String: String] = [:]
+    /// Where in the zone a run starts: 0 the bottom, 1 the top.
+    var startAt: Double = 0.5
+
+    static let standard = TempoZones(zones: [
+        Zone(id: "z1", name: "Z1", title: "Warm-up", low: 60, high: 70),
+        Zone(id: "z2", name: "Z2", title: "Cruise", low: 70, high: 80),
+        Zone(id: "z3", name: "Z3", title: "Tempo", low: 80, high: 90),
+        Zone(id: "z4", name: "Z4", title: "Threshold", low: 90, high: 100),
+        Zone(id: "z5", name: "Z5", title: "Max", low: 100, high: 105),
+    ], suggest: ["endurance": "z2", "duration": "z3", "cycles": "z3", "ladder": "z4"])
+
+    func zone(_ id: String) -> Zone? { zones.first { $0.id == id } }
+
+    /// The zone a run of this kind suggests (a ladder run starts lower and climbs).
+    func suggested(for s: SessionSettings) -> Zone? {
+        let key = s.ladderStep > 0 ? "ladder" : s.kind.rawValue
+        return suggest[key].flatMap(zone) ?? zones.first
+    }
+
+    /// The tempos of a zone for a max: whole bpm, low to high.
+    static func range(_ z: Zone, max: Int) -> ClosedRange<Int> {
+        let lo = Int((Double(max) * z.low / 100).rounded()), hi = Int((Double(max) * z.high / 100).rounded())
+        return Swift.min(lo, hi)...Swift.max(lo, hi)
+    }
+
+    /// Where a run in the zone starts.
+    func start(_ z: Zone, max: Int) -> Int {
+        let r = TempoZones.range(z, max: max)
+        return r.lowerBound + Int((Double(r.upperBound - r.lowerBound) * startAt).rounded())
+    }
+
+    /// Which zone a tempo is in, for the run screen.
+    func zone(forBPM bpm: Double, max: Int) -> Zone? {
+        guard max > 0 else { return nil }
+        let pct = bpm / Double(max) * 100
+        return zones.last { pct >= $0.low - 0.5 } ?? zones.first
+    }
+}
+
 struct CatalogIndex: Codable, Equatable {
     struct File: Codable, Equatable { var path: String; var kind: String }
     var schema: Int
@@ -44,6 +96,13 @@ enum Library {
         return f.routines.compactMap(\.value)
     }
 
+    static func decodeZones(_ data: Data) throws -> TempoZones {
+        let z = try JSONDecoder().decode(TempoZones.self, from: data)
+        guard z.schema <= supportedSchema else { throw LibraryError.newerSchema(z.schema) }
+        guard !z.zones.isEmpty, z.zones.allSatisfy({ $0.low < $0.high }) else { throw LibraryError.badPath("zones") }
+        return z
+    }
+
     static func decodeIndex(_ data: Data) throws -> CatalogIndex {
         let i = try JSONDecoder().decode(CatalogIndex.self, from: data)
         guard i.schema <= supportedSchema else { throw LibraryError.newerSchema(i.schema) }
@@ -59,19 +118,21 @@ enum Library {
         return order.compactMap { byID[$0] }
     }
 
-    struct Contents { var exercises: [Exercise]; var routines: [Routine] }
+    struct Contents { var exercises: [Exercise]; var routines: [Routine]; var zones: TempoZones? = nil }
 
     /// Reads one catalog folder (index.json and the files it names).
     static func read(folder: URL) -> Contents? {
         guard let data = try? Data(contentsOf: folder.appendingPathComponent("index.json")),
               let index = try? decodeIndex(data) else { return nil }
         var ex: [Exercise] = [], ro: [Routine] = []
+        var zones: TempoZones?
         for f in index.files {
             guard let d = try? Data(contentsOf: folder.appendingPathComponent(f.path)) else { continue }
             if f.kind == "exercises", let list = try? decodeExercises(d) { ex += list }
             if f.kind == "routines", let list = try? decodeRoutines(d) { ro += list }
+            if f.kind == "zones", let z = try? decodeZones(d) { zones = z }
         }
-        return Contents(exercises: ex, routines: ro)
+        return Contents(exercises: ex, routines: ro, zones: zones)
     }
 
     static var bundledFolder: URL? { Bundle.main.url(forResource: "catalog", withExtension: nil) }
@@ -86,8 +147,9 @@ enum Library {
 
     static func load() -> Contents {
         var exLists: [[Exercise]] = [], roLists: [[Routine]] = []
+        var zones: TempoZones?
         for folder in [bundledFolder, cacheFolder].compactMap({ $0 }) {
-            if let c = read(folder: folder) { exLists.append(c.exercises); roLists.append(c.routines) }
+            if let c = read(folder: folder) { exLists.append(c.exercises); roLists.append(c.routines); zones = c.zones ?? zones }
         }
         let files = (try? FileManager.default.contentsOfDirectory(at: userFolder, includingPropertiesForKeys: nil)) ?? []
         for f in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where f.pathExtension == "json" {
@@ -95,7 +157,7 @@ enum Library {
         }
         let ex = merge(exLists, id: \.id)
         let ro = merge(roLists, id: \.name)
-        return Contents(exercises: ex.isEmpty ? [Exercise.fallback] : ex, routines: ro)
+        return Contents(exercises: ex.isEmpty ? [Exercise.fallback] : ex, routines: ro, zones: zones ?? .standard)
     }
 
     static func loadStarterRoutines() -> [Routine] { load().routines }
@@ -141,6 +203,7 @@ enum DrillServer {
                 guard (r as? HTTPURLResponse)?.statusCode == 200 else { return .unreachable }
                 if f.kind == "exercises" { _ = try Library.decodeExercises(d) }
                 if f.kind == "routines" { _ = try Library.decodeRoutines(d) }
+                if f.kind == "zones" { _ = try Library.decodeZones(d) }
                 let dest = tmp.appendingPathComponent(f.path)
                 try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try d.write(to: dest)
@@ -170,6 +233,17 @@ enum DrillServer {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let ids = json["stored"] as? [String] else { return [] }
         return Set(ids.compactMap(UUID.init(uuidString:)))
+    }
+
+    /// His level on every drill, worked out on the server (GET /api/levels); nil when it cannot be reached.
+    static func fetchLevels() async -> [String: Int]? {
+        guard let (data, resp) = try? await session().data(from: base.appendingPathComponent("api/levels")),
+              (resp as? HTTPURLResponse)?.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let levels = json["levels"] as? [String: Any] else { return nil }
+        var out: [String: Int] = [:]
+        for (k, v) in levels { if let d = v as? [String: Any], let b = (d["max"] ?? d["bpm"]) as? Int { out[k] = b } }
+        return out
     }
 
     /// Every session the server holds, newest first (nil when it cannot be reached).
