@@ -92,7 +92,7 @@ struct PatternStrip: View {
         }
         .frame(height: 28)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("The pattern")
-        .accessibilityValue(sizes.map { $0 == 0 ? "a rest" : "\($0)" }.joined(separator: ", ") + " notes a beat")
+        .accessibilityLabel(L.columnPattern)
+        .accessibilityValue(sizes.map { $0 == 0 ? L.rest : "\($0)" }.joined(separator: ", ") + " " + L.notesPerBeat)
     }
 }

@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "about": "Timed routines are out of the app since 0.1.7 (Joe, 2026-11-14: omit them for now, build them in later). This file stays for 0.1.5 and 0.1.6, and as the data to bring them back from; the routines saved on a phone are untouched.",
   "routines": [
     {
       "name": "Starting Protocol",

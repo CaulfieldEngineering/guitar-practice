@@ -180,8 +180,8 @@ final class AudioEngine {
         case noInput, noInterface
         var errorDescription: String? {
             switch self {
-            case .noInput: return "No input is available. Plug in your interface."
-            case .noInterface: return "Plug in your audio interface: the guitar comes in through it."
+            case .noInput: return L.noAudioInput
+            case .noInterface: return L.connectInterface
             }
         }
     }
@@ -207,11 +207,11 @@ final class AudioEngine {
         if record {
             // A2DP only (never .allowBluetooth, which is hands-free): Bluetooth headphones stay in their listening
             // mode, and the input is the interface or the phone's microphone, never the headphones' own.
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+            try session.setCategory(.playAndRecord, mode: .measurement, options: AudioEngine.recordOptions)
             try? session.setActive(true)
             try AudioEngine.preferInterface(session, allowPhoneMic: allowPhoneMic)
         } else {
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setCategory(.playback, mode: .default, options: AudioEngine.playOptions)
         }
         try? session.setPreferredIOBufferDuration(0.005)
         try session.setActive(true)
@@ -297,16 +297,25 @@ final class AudioEngine {
     static func prepareRecordSession() {
         let s = AVAudioSession.sharedInstance()
         if s.category != .playAndRecord {
-            try? s.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+            try? s.setCategory(.playAndRecord, mode: .measurement, options: recordOptions)
         }
         try? s.setActive(true)
+    }
+
+    /// The click plays alongside other apps' sound, unless lock-screen controls are switched on in Settings: iOS
+    /// only shows an app on the lock screen and in Control Center, and only sends it pause and stop from there,
+    /// when its sound is not mixed with others'.
+    static var mixesWithOthers: Bool { !UserDefaults.standard.bool(forKey: "audio.lockScreen") }
+    static var playOptions: AVAudioSession.CategoryOptions { mixesWithOthers ? [.mixWithOthers] : [] }
+    static var recordOptions: AVAudioSession.CategoryOptions {
+        mixesWithOthers ? [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP] : [.defaultToSpeaker, .allowBluetoothA2DP]
     }
 
     /// Before speaking with nothing running: the playback session, mixing with other apps. Leaves a running one alone.
     static func prepareSession() {
         let s = AVAudioSession.sharedInstance()
         if s.category != .playback && s.category != .playAndRecord {
-            try? s.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try? s.setCategory(.playback, mode: .default, options: playOptions)
         }
         try? s.setActive(true)
     }

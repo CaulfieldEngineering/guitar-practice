@@ -1,8 +1,9 @@
 import XCTest
 
 /// Taps through every screen on a simulator with no audio interface, the way Joe uses the app (0.1.4 crashed on
-/// choosing a drill and froze on the Settings gear), and keeps a screenshot of each screen, dark and light, in the
-/// test results (the workflow publishes them as the "screens" artifact).
+/// choosing a drill and froze on the Settings gear; on 0.1.6 a drill kept playing after he left it and he could not
+/// find how to stop it), and keeps a screenshot of each screen, dark and light, in the test results (the workflow
+/// puts them on the ci-screens branch).
 final class TapThroughTests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 
@@ -21,78 +22,96 @@ final class TapThroughTests: XCTestCase {
         add(a)
     }
 
+    /// "running" or "stopped": whether the app's one player is making sound (a debug-only line on the Drills list).
+    private func engineState(_ app: XCUIApplication) -> String {
+        let t = app.staticTexts["engine.state"]
+        return t.waitForExistence(timeout: 10) ? t.label : "missing"
+    }
+
+    private func waitForEngine(_ app: XCUIApplication, _ wanted: String) -> Bool {
+        for _ in 0..<20 {
+            if engineState(app) == wanted { return true }
+            usleep(250_000)
+        }
+        return false
+    }
+
     func testDrillSettingsAndProgress() {
         let app = launch()
 
-        // Metronome: starts and stops.
+        // Metronome: starts; on the Drills tab a bar says it is running and stops it.
         let metro = app.buttons["metronome.start"]
         XCTAssertTrue(metro.waitForExistence(timeout: 20))
         shot("01-metronome-dark")
         metro.tap()
         XCTAssertEqual(app.state, .runningForeground)
-        metro.tap()
-
-        // Drills: open a drill.
         app.tabBars.buttons["Drills"].tap()
         let drill = app.buttons["exercise.alt8"]
         XCTAssertTrue(drill.waitForExistence(timeout: 10))
-        shot("02-drills-dark")
+        XCTAssertTrue(waitForEngine(app, "running"), "the metronome is ticking")
+        let barStop = app.buttons["running.stop"]
+        XCTAssertTrue(barStop.waitForExistence(timeout: 5), "the running bar shows on the other tab")
+        shot("02-drills-running-bar-dark")
+        barStop.tap()
+        XCTAssertTrue(waitForEngine(app, "stopped"), "the bar's Stop stops the metronome")
+        shot("03-drills-table-dark")
+
+        // Open a drill. Start with the audio input on and no interface: a clear message, no crash.
         drill.tap()
         XCTAssertTrue(app.buttons["start"].waitForExistence(timeout: 10), "the drill's own screen opens")
-        XCTAssertEqual(app.state, .runningForeground)
-        shot("03-setup-dark")
-
-        // Start with the audio input on and no interface: a clear message, no crash.
+        shot("04-setup-dark")
         app.buttons["start"].tap()
         XCTAssertTrue(app.staticTexts["message"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.state, .runningForeground)
-        shot("04-setup-no-interface-dark")
-
-        // Audio input off: the run starts with no interface and nothing asks for the microphone.
-        app.swipeUp()
-        let input = app.switches["Audio input"]
-        if input.waitForExistence(timeout: 5) {
-            input.tap()
-            shot("05-setup-audio-input-off-dark")
-            app.buttons["start"].tap()
-            let skip = app.buttons["Skip the intro"]
-            if skip.waitForExistence(timeout: 5) {
-                shot("06-intro-dark")
-                skip.tap()
-            }
-            let stop = app.buttons["run.stop"]
-            if stop.waitForExistence(timeout: 10) {
-                sleep(1)
-                shot("07-run-audio-input-off-dark")
-                // A short drill ends by itself; otherwise stop it.
-                sleep(3)
-                if stop.exists && stop.isHittable { stop.tap() }
-                let done = app.buttons["result.done"]
-                if done.waitForExistence(timeout: 20) {
-                    shot("08-result-audio-input-off-dark")
-                    done.tap()
-                }
-            }
-            XCTAssertEqual(app.state, .runningForeground)
-        }
-
-        XCTAssertTrue(app.buttons["Back"].waitForExistence(timeout: 10))
+        shot("05-setup-no-interface-dark")
         app.buttons["Back"].tap()
+
+        // The flagship with the audio input off: it starts with no interface, pauses on a tap, resumes, and stops.
         let flagship = app.buttons["exercise.trip16x4"]
         XCTAssertTrue(flagship.waitForExistence(timeout: 10))
         flagship.tap()
         XCTAssertTrue(app.buttons["start"].waitForExistence(timeout: 10))
-        shot("09-setup-flagship-dark")
-        app.buttons["Back"].tap()
+        app.swipeUp()
+        let input = app.switches["Audio Input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        shot("06-setup-audio-input-off-dark")
+        startRun(app)
+        let pause = app.buttons["run.pause"]
+        XCTAssertTrue(pause.waitForExistence(timeout: 15), "the run screen shows, with Pause and Stop on it")
+        XCTAssertTrue(app.buttons["run.stop"].exists, "Stop is always on the run screen")
+        sleep(5)
+        shot("07-run-audio-input-off-dark")
+        pause.tap()
+        let resume = app.buttons["run.resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 10), "a tap on Pause holds the run")
+        XCTAssertTrue(app.buttons["run.end"].exists)
+        shot("08-run-paused-dark")
+        resume.tap()
+        XCTAssertTrue(pause.waitForExistence(timeout: 15), "Resume picks it up")
+        sleep(7)
+        app.buttons["run.stop"].tap()
+        let done = app.buttons["result.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10), "Stop ends the run")
+        shot("09-result-audio-input-off-dark")
+        done.tap()
 
-        // A timed routine opens ready to run.
-        let routine = app.buttons["routine.Starting Protocol"]
-        if routine.waitForExistence(timeout: 5) {
-            routine.tap()
-            XCTAssertTrue(app.buttons["routine.start"].waitForExistence(timeout: 10), "the routine opens")
-            shot("10-routine-dark")
+        // Leaving a drill that is running ends it: start, pause, go back by the edge swipe or by End, and nothing plays.
+        startRun(app)
+        XCTAssertTrue(pause.waitForExistence(timeout: 15))
+        sleep(2)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)))
+        if !flagship.waitForExistence(timeout: 3) {
+            // The swipe is not offered while a run is on the screen: end it and go back.
+            if app.buttons["run.stop"].exists { app.buttons["run.stop"].tap() } else if app.buttons["run.end"].exists { app.buttons["run.end"].tap() }
+            if done.waitForExistence(timeout: 10) { done.tap() }
+            XCTAssertTrue(app.buttons["Back"].waitForExistence(timeout: 10))
             app.buttons["Back"].tap()
         }
+        XCTAssertTrue(flagship.waitForExistence(timeout: 10), "back on the list")
+        XCTAssertTrue(waitForEngine(app, "stopped"), "nothing keeps playing after the drill is left")
+        XCTAssertFalse(app.buttons["running.stop"].exists, "and no running bar")
 
         // Settings opens and closes.
         XCTAssertTrue(app.buttons["Settings"].firstMatch.waitForExistence(timeout: 10))
@@ -107,6 +126,13 @@ final class TapThroughTests: XCTestCase {
         shot("12-progress-dark")
         app.navigationBars["Progress"].buttons["Done"].tap()
         XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    /// Start, and past the spoken intro if it is on.
+    private func startRun(_ app: XCUIApplication) {
+        app.buttons["start"].tap()
+        let skip = app.buttons["intro.skip"]
+        if skip.waitForExistence(timeout: 4) { skip.tap() }
     }
 
     /// With a max on the drill: the zones fit, each says its tempos, and the options unfold.
@@ -159,7 +185,7 @@ final class TapThroughTests: XCTestCase {
         app.tabBars.buttons["Drills"].tap()
         let flagship = app.buttons["exercise.trip16x4"]
         XCTAssertTrue(flagship.waitForExistence(timeout: 10))
-        shot("31-drills-light")
+        shot("31-drills-table-light")
         flagship.tap()
         XCTAssertTrue(app.buttons["start"].waitForExistence(timeout: 10))
         shot("32-setup-light")
@@ -174,13 +200,16 @@ final class TapThroughTests: XCTestCase {
     /// The screens that need a guitar and an interface, drawn from made-up values (debug builds, -screen).
     func testRunAndResultScreens() {
         for appearance in ["dark", "light"] {
-            for screen in ["run", "runUnscored", "result", "resultEndurance", "unscored"] {
+            for screen in ["run", "runUnscored", "runPaused", "result", "resultEndurance", "unscored"] {
                 let app = launch(appearance, ["-screen", screen])
                 XCTAssertEqual(app.state, .runningForeground)
                 sleep(2)
-                if screen == "run" || screen == "runUnscored" {
+                switch screen {
+                case "run", "runUnscored":
                     XCTAssertTrue(app.buttons["run.stop"].waitForExistence(timeout: 10), "\(screen) shows")
-                } else {
+                case "runPaused":
+                    XCTAssertTrue(app.buttons["run.resume"].waitForExistence(timeout: 10), "\(screen) shows")
+                default:
                     XCTAssertTrue(app.buttons["result.done"].waitForExistence(timeout: 10), "\(screen) shows")
                 }
                 shot("40-\(screen)-\(appearance)")

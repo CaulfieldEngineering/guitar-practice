@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// After a scored run: the accuracy (or the time held) big, what it means in a line, the detail in two columns, and
-/// every note's timing as a strip. One primary button: again, or now solo after a guided run.
+/// After a scored run: the accuracy (or the time held) big, what it means in a line, every note's timing as a
+/// strip, and the detail in rows. The run is already saved; the buttons are Again (or Play Solo after a guided
+/// run) and Done.
 struct ResultView: View {
     let score: ScoreResult
     let saved: SessionResult
@@ -19,19 +20,19 @@ struct ResultView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: Space.lg) {
-                    Chip(text: chipText).padding(.top, Space.xs)
+                    Chip(text: L.chip(guided: guided, tempo: L.tempoRange(saved.startBPM, saved.topBPM))).padding(.top, Space.xs)
 
                     VStack(spacing: Space.xxs) {
                         if endurance {
                             Text(formatClock(saved.sustainedSeconds ?? 0))
                                 .font(Typo.number(96)).foregroundStyle(Theme.accentText)
                                 .lineLimit(1).minimumScaleFactor(0.5)
-                            Text("held at \(saved.targetPercent)% accuracy or better").font(Typo.callout).foregroundStyle(Theme.muted)
+                            Text(L.heldAt(saved.targetPercent)).font(Typo.callout).foregroundStyle(Theme.muted)
                         } else {
-                            Text("\(score.score)%")
+                            Text(L.percent(score.score))
                                 .font(Typo.number(96)).foregroundStyle(score.passed ? Theme.accentText : Theme.text)
                                 .lineLimit(1).minimumScaleFactor(0.5)
-                            Text(score.passed ? "accuracy · passed" : "accuracy · \(score.passMark)% passes")
+                            Text(score.passed ? L.accuracyPassed : L.accuracyPassMark(score.passMark))
                                 .font(Typo.callout).foregroundStyle(Theme.muted)
                         }
                     }
@@ -39,19 +40,24 @@ struct ResultView: View {
 
                     if newBest || maxUp != nil {
                         VStack(spacing: Space.xxs) {
-                            if newBest { Text("A new best at this tempo.") }
-                            if let up = maxUp {
-                                Text(up.0 > 0 ? "Your max is now \(up.1), up from \(up.0)." : "Your max is now \(up.1).")
-                            }
+                            if newBest { Text(L.newBest) }
+                            if let up = maxUp { Text(L.newMax(up.1, from: up.0)) }
                         }
                         .font(Typo.subStrong).foregroundStyle(Theme.accentText)
                         .multilineTextAlignment(.center)
                     }
 
                     VStack(alignment: .leading, spacing: Space.xs) {
-                        SectionLabel("Every note: early above, late below")
+                        SectionLabel(L.timingPerNote)
                         ErrorStrip(errors: score.errors, spanMs: max(40, score.zeroMs))
                             .frame(height: 64)
+                        HStack {
+                            Text(L.early)
+                            Spacer()
+                            Text(L.late)
+                        }
+                        .font(Typo.caption).foregroundStyle(Theme.faint)
+                        .accessibilityHidden(true)
                     }
 
                     VStack(spacing: 0) {
@@ -70,7 +76,7 @@ struct ResultView: View {
             VStack(spacing: 0) {
                 PrimaryButton(title: primaryTitle, systemImage: primaryImage, action: onPrimary)
                     .accessibilityIdentifier("result.primary")
-                TextButton(title: "Done", action: onDone)
+                TextButton(title: L.done, action: onDone)
                     .accessibilityIdentifier("result.done")
             }
             .padding(.horizontal, Space.page)
@@ -79,31 +85,28 @@ struct ResultView: View {
         }
     }
 
-    private var chipText: String {
-        let tempo = saved.topBPM > saved.startBPM ? "\(saved.startBPM) to \(saved.topBPM) bpm" : "\(saved.startBPM) bpm"
-        return "\(guided ? "Guided" : "Solo") · \(tempo)"
-    }
-
     /// The detail, most telling first.
     private var stats: [(String, String)] {
         var out: [(String, String)] = []
-        if endurance { out.append(("Accuracy", "\(score.score)%")) }
-        out.append(("On the click", "\(score.pctFull)% of notes"))
-        out.append(("On average", averageText(score.meanError)))
-        out.append(("Spread", "\(Int(score.spread.rounded())) ms"))
-        out.append(("Missed", "\(score.missed) of \(score.expected)"))
-        out.append(("Extra notes", "\(score.extra)"))
-        if let a = saved.accentsPercent { out.append(("Accents that stood out", "\(a)%")) }
-        out.append(("Played", "\(formatClock(saved.seconds)), \(saved.cycles) cycle\(saved.cycles == 1 ? "" : "s")"))
+        if endurance { out.append((L.statAccuracy, L.percent(score.score))) }
+        out.append((L.statOnBeat, L.percent(score.pctFull)))
+        out.append((L.statAverage, averageText(score.meanError)))
+        out.append((L.statSpread, L.ms(Int(score.spread.rounded()))))
+        out.append((L.statMissed, L.ofTotal(score.missed, score.expected)))
+        out.append((L.statExtra, "\(score.extra)"))
+        if let a = saved.accentsPercent { out.append((L.statAccents, L.percent(a))) }
+        out.append((L.statDuration, L.durationAndCycles(formatClock(saved.seconds), saved.cycles)))
         return out
     }
 
     private func averageText(_ e: Double) -> String {
-        abs(e) < 3 ? "right on the click" : "\(Int(abs(e).rounded())) ms \(e > 0 ? "late" : "early")"
+        if abs(e) < 3 { return L.onTheBeat }
+        let ms = Int(abs(e).rounded())
+        return e > 0 ? L.msLate(ms) : L.msEarly(ms)
     }
 }
 
-/// After a run with the audio input off: how long it went, and that nothing was scored.
+/// After a run with the audio input off: how long it went, and that it was not scored.
 struct UnscoredResultView: View {
     let run: PlayAlong.UnscoredRun
     /// Minutes on this drill with the audio input off, in all (this run included).
@@ -119,10 +122,11 @@ struct UnscoredResultView: View {
                 Text(formatClock(run.seconds))
                     .font(Typo.number(96)).foregroundStyle(Theme.text)
                     .lineLimit(1).minimumScaleFactor(0.5)
-                Text(tempoLine).font(Typo.callout).foregroundStyle(Theme.muted)
+                Text(L.durationAndCycles(L.tempoRange(run.startBPM, run.topBPM), run.cycles))
+                    .font(Typo.callout).foregroundStyle(Theme.muted)
             }
             .accessibilityElement(children: .combine)
-            Text("Not scored: the audio input was off. \(formatMinutes(total).capitalizedFirst) on this drill that way so far.")
+            Text(L.unscoredTotal(formatMinutes(total)))
                 .font(Typo.sub).foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
                 .padding(.top, Space.lg)
@@ -131,22 +135,12 @@ struct UnscoredResultView: View {
             VStack(spacing: 0) {
                 PrimaryButton(title: againTitle, systemImage: "arrow.clockwise", action: onAgain)
                     .accessibilityIdentifier("result.primary")
-                TextButton(title: "Done", action: onDone)
+                TextButton(title: L.done, action: onDone)
                     .accessibilityIdentifier("result.done")
             }
             .padding(.horizontal, Space.page)
         }
     }
-
-    private var tempoLine: String {
-        let tempo = run.topBPM > run.startBPM ? "\(run.startBPM) to \(run.topBPM) bpm" : "\(run.startBPM) bpm"
-        return "played at \(tempo), \(run.cycles) cycle\(run.cycles == 1 ? "" : "s")"
-    }
-}
-
-extension String {
-    /// The same words with the first letter a capital.
-    var capitalizedFirst: String { isEmpty ? self : prefix(1).uppercased() + dropFirst() }
 }
 
 /// Every note of the run, early above the line and late below, so a drift shows at a glance.

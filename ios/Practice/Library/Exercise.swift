@@ -99,6 +99,8 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
     var id: String
     var name: String
     var detail: String = ""
+    /// A shorter name for the Drills table ("Alt 16ths"); the full name when the data gives none.
+    var short: String = ""
     /// What the voice says before the count-in (the tempo and the goal are added to it).
     var intro: String = ""
     var category: String = "Right hand"
@@ -111,9 +113,22 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
     /// How a run starts out (cycles, duration or endurance); the player can change it.
     var session: SessionSettings = SessionSettings()
     var levels: [Level] = []
+    /// A drill of timed blocks (what used to be an interval routine): play at a tempo, rest, or a timed block with no
+    /// click, repeated `rounds` times, every play block `stepBPM` faster each round. Empty for an ordinary drill.
+    /// In a play block the drill's pattern is what is played (`pattern` in the data, notes per beat like `groups`;
+    /// without one, `subdivision` notes a beat). The tempo set on the drill's screen is the first play block's; the
+    /// other blocks move with it.
+    var segments: [Interval] = []
+    var rounds: Int = 1
+    var stepBPM: Int = 0
+    var subdivision: Int = 1
+    var countInBeats: Int = 4
+
+    var isRoutine: Bool { !segments.isEmpty }
 
     private enum CodingKeys: String, CodingKey {
         case schema, version, id, name, detail, intro, category, beatsPerBar, cycleBeats, notes, groups, accent, tempo, scoring, session, levels
+        case segments, rounds, stepBPM, subdivision, countInBeats, pattern, short
     }
 
     init(id: String, name: String, detail: String = "", category: String = "Right hand", beatsPerBar: Int = 4,
@@ -129,15 +144,33 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
         let c = try d.container(keyedBy: CodingKeys.self)
         schema = try c.decodeIfPresent(Int.self, forKey: .schema) ?? 1
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
-        session = try c.decodeIfPresent(SessionSettings.self, forKey: .session) ?? SessionSettings()
+        let blocks = try c.decodeIfPresent([Interval].self, forKey: .segments) ?? []
+        let roundCount = try c.decodeIfPresent(Int.self, forKey: .rounds) ?? 1
+        let step = try c.decodeIfPresent(Int.self, forKey: .stepBPM) ?? 0
+        let sub = Swift.max(1, try c.decodeIfPresent(Int.self, forKey: .subdivision) ?? 1)
+        segments = blocks
+        rounds = Swift.max(1, roundCount)
+        stepBPM = step
+        subdivision = sub
+        countInBeats = try c.decodeIfPresent(Int.self, forKey: .countInBeats) ?? 4
+        session = try c.decodeIfPresent(SessionSettings.self, forKey: .session)
+            ?? (blocks.isEmpty ? SessionSettings() : SessionSettings.routine(rounds: roundCount, step: step))
         levels = try c.decodeIfPresent([Level].self, forKey: .levels) ?? []
         id = try c.decode(String.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
         detail = try c.decodeIfPresent(String.self, forKey: .detail) ?? ""
+        short = try c.decodeIfPresent(String.self, forKey: .short) ?? ""
         intro = try c.decodeIfPresent(String.self, forKey: .intro) ?? ""
-        category = try c.decodeIfPresent(String.self, forKey: .category) ?? "Right hand"
+        category = try c.decodeIfPresent(String.self, forKey: .category) ?? (blocks.isEmpty ? "Right hand" : "Timed routines")
         beatsPerBar = try c.decodeIfPresent(Int.self, forKey: .beatsPerBar) ?? 4
-        tempo = try c.decode(TempoRule.self, forKey: .tempo)
+        if let t = try c.decodeIfPresent(TempoRule.self, forKey: .tempo) {
+            tempo = t
+        } else if !blocks.isEmpty {
+            // A drill of timed blocks: the tempo is its first play block's.
+            tempo = TempoRule(start: blocks.first { $0.kind == .play }?.bpm ?? 100, min: 20, max: 400)
+        } else {
+            throw DecodingError.dataCorruptedError(forKey: .tempo, in: c, debugDescription: "An exercise needs a tempo.")
+        }
         scoring = try c.decodeIfPresent(ScoringRule.self, forKey: .scoring) ?? .standard
         if let list = try c.decodeIfPresent([NoteSpec].self, forKey: .notes) {
             notes = list.sorted { $0.at.beats < $1.at.beats }
@@ -147,6 +180,11 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
             let accent = (try c.decodeIfPresent(String.self, forKey: .accent)) == "first"
             notes = Exercise.expand(groups: groups, accentFirst: accent)
             cycleBeats = groups.count
+        } else if !blocks.isEmpty {
+            let pattern = try c.decodeIfPresent([Int].self, forKey: .pattern) ?? [sub]
+            let shape = pattern.isEmpty ? [sub] : pattern
+            notes = Exercise.expand(groups: shape, accentFirst: false)
+            cycleBeats = shape.count
         } else {
             throw DecodingError.dataCorruptedError(forKey: .notes, in: c, debugDescription: "An exercise needs notes or groups.")
         }
@@ -163,6 +201,53 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
         try c.encode(tempo, forKey: .tempo); try c.encode(scoring, forKey: .scoring)
         try c.encode(schema, forKey: .schema); try c.encode(version, forKey: .version)
         try c.encode(session, forKey: .session); try c.encode(levels, forKey: .levels)
+        if !short.isEmpty { try c.encode(short, forKey: .short) }
+        if !segments.isEmpty {
+            try c.encode(segments, forKey: .segments); try c.encode(rounds, forKey: .rounds); try c.encode(stepBPM, forKey: .stepBPM)
+            try c.encode(subdivision, forKey: .subdivision); try c.encode(countInBeats, forKey: .countInBeats)
+        }
+    }
+
+    /// A routine saved on the phone, as a drill of timed blocks. Its id is the routine's own, so its settings and
+    /// runs stay with it.
+    init(routine r: Routine) {
+        let sub = Swift.max(1, r.subdivision)
+        self.init(id: Exercise.routineID(r.id), name: r.name, detail: r.notes, category: "Timed routines",
+                  beatsPerBar: r.beatsPerBar, cycleBeats: 1, notes: Exercise.expand(groups: [sub], accentFirst: false),
+                  tempo: TempoRule(start: r.intervals.first { $0.kind == .play }?.bpm ?? 100, min: 20, max: 400))
+        intro = r.intro
+        segments = r.intervals
+        rounds = Swift.max(1, r.rounds)
+        stepBPM = r.stepBPM
+        subdivision = sub
+        countInBeats = r.countInBeats
+        session = SessionSettings.routine(rounds: r.rounds, step: r.stepBPM)
+    }
+
+    /// The pattern in a few characters, for the Drills table: "16th" for four a beat, "3→4" for triplets then
+    /// sixteenths, "16th·rest" for a bar on and a bar off, "mixed" when the notes of a beat are not evenly spaced.
+    var glyph: String {
+        let sizes = RunBuilder.groupSizes(self)
+        for n in notes where n.at.of != sizes[Swift.min(sizes.count - 1, Swift.max(0, n.at.beat))] { return "mixed" }
+        var runs: [Int] = []
+        for s in sizes where runs.last != s { runs.append(s) }
+        if runs.count > 1 && runs.first == runs.last { runs.removeLast() }
+        func word(_ n: Int) -> String {
+            switch n { case 0: return "rest"; case 1: return "4th"; case 2: return "8th"; case 3: return "trip"; case 4: return "16th"; case 6: return "6s"; default: return "\(n)s" }
+        }
+        if runs.count == 1 { return word(runs[0]) }
+        if runs.contains(0) { return runs.map(word).joined(separator: "·") }
+        return runs.map { "\($0)" }.joined(separator: "→")
+    }
+
+    static func routineID(_ id: UUID) -> String { "routine." + id.uuidString.lowercased() }
+
+    /// The timed blocks as a routine, for laying them out on a timeline (RoutinePlan).
+    var routine: Routine {
+        var r = Routine(name: name, intervals: segments, rounds: rounds, stepBPM: stepBPM, beatsPerBar: beatsPerBar,
+                        subdivision: subdivision, countInBeats: countInBeats, notes: detail)
+        r.intro = intro
+        return r
     }
 
     static func expand(groups: [Int], accentFirst: Bool) -> [NoteSpec] {

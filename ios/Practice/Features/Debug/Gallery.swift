@@ -9,13 +9,15 @@ struct Gallery: View {
     var body: some View {
         Group {
             switch screen {
-            case "run": RunView(d: Gallery.run(scored: true)) {}
-            case "runUnscored": RunView(d: Gallery.run(scored: false)) {}
+            case "run": RunView(d: Gallery.run(scored: true), onPause: {}, onResume: {}, onEnd: {})
+            case "runUnscored": RunView(d: Gallery.run(scored: false), onPause: {}, onResume: {}, onEnd: {})
+            case "runPaused":
+                RunView(d: Gallery.run(scored: true), paused: true, route: L.route("iRig HD 2", "OpenRun"), onPause: {}, onResume: {}, onEnd: {})
             case "result": result(endurance: false)
             case "resultEndurance": result(endurance: true)
             case "unscored":
                 UnscoredResultView(run: PlayAlong.UnscoredRun(seconds: 184, startBPM: 120, topBPM: 132, cycles: 23), total: 1260,
-                                   againTitle: "Again at 120", onAgain: {}, onDone: {})
+                                   againTitle: L.again, onAgain: {}, onDone: {})
             default: Text("No such screen: \(screen)").foregroundStyle(Theme.text)
             }
         }
@@ -59,9 +61,9 @@ struct Gallery: View {
             }
         }
         return RunDisplay(
-            chip: scored ? "Solo · Z3 Tempo · 85% of max" : "Guided · Z3 Tempo · 85% of max · not scored",
+            chip: scored ? "Solo · Z3 Tempo · 85% of max" : "Guided · Z3 Tempo · 85% of max · Not scored",
             cue: "Sixteenths", cueDetail: "Triplets in 3", cueWarn: false, bpm: 128,
-            scored: scored, accuracy: 91, accuracyGood: true, cycle: "3 of 8", clock: "1:12", clockLabel: scored ? "held" : "left",
+            scored: scored, accuracy: 91, accuracyGood: true, cycle: "3 of 8", clock: "1:12", clockLabel: scored ? L.held : L.left,
             countingIn: false, calibrating: false,
             notes: s.notes, played: scored ? s.played.filter { $0.time < now } : [], states: states, now: now, beat: 60.0 / 128,
             recentErrors: Array(errors.suffix(12)), spanMs: config.windows(gap: gaps.last ?? 0.1).zero, inputLevel: 0.2)
@@ -81,7 +83,7 @@ struct Gallery: View {
             score: r.score, passed: true, accentsPercent: nil, offsetMs: 12, appVersion: "0",
             scoringVersion: 2, fullMs: r.fullMs, zeroMs: r.zeroMs)
         ResultView(score: r, saved: saved, guided: false, newBest: !endurance, maxUp: endurance ? nil : (132, 136),
-                   primaryTitle: "Again at 128", primaryImage: "arrow.clockwise", onPrimary: {}, onDone: {})
+                   primaryTitle: L.again, primaryImage: "arrow.clockwise", onPrimary: {}, onDone: {})
     }
 }
 #endif

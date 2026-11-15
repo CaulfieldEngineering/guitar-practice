@@ -16,6 +16,7 @@ struct RunDisplay {
     var accuracyGood: Bool
     /// "3 of 8", or "3" when the run has no set number of cycles.
     var cycle: String
+    var cycleLabel: String = L.cycle
     var clock: String
     var clockLabel: String
     var countingIn: Bool
@@ -32,12 +33,42 @@ struct RunDisplay {
 }
 
 /// A run, made to be glanced at while playing: the pattern now, the tempo, the accuracy and the time, all big; the
-/// lane of notes; whether the picks land early or late. Tapping anywhere stops the run.
+/// lane of notes; whether the picks land early or late. Tapping anywhere pauses it; Pause and Stop are always there
+/// at the bottom (Joe, on 0.1.6: "can't figure out how to stop it"). Paused, the screen says so and offers Resume
+/// and End.
 struct RunView: View {
     let d: RunDisplay
-    let onStop: () -> Void
+    var paused = false
+    /// Something to say while paused (the interface was unplugged, say).
+    var message: String? = nil
+    /// Where the sound comes in and goes out ("In: iRig · Out: Shokz"), shown while paused beside the picker.
+    var route: String = ""
+    let onPause: () -> Void
+    let onResume: () -> Void
+    let onEnd: () -> Void
 
     var body: some View {
+        ZStack {
+            running
+                .opacity(paused ? 0.5 : 1)
+                .allowsHitTesting(!paused)
+                .accessibilityHidden(paused)
+            if paused { pausedCard }
+        }
+        // The system's output picker, always in reach: the headphones, the interface or the speaker.
+        .overlay(alignment: .topTrailing) {
+            RoutePicker().frame(width: 40, height: 40)
+                .padding(.trailing, Space.xs)
+                .padding(.top, Space.xxs)
+                .accessibilityLabel(L.chooseOutput)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.bg)
+        .contentShape(Rectangle())
+        .onTapGesture { if !paused { onPause() } }
+    }
+
+    private var running: some View {
         VStack(spacing: 0) {
             Chip(text: d.chip)
                 .padding(.top, Space.sm)
@@ -60,12 +91,12 @@ struct RunView: View {
             Spacer(minLength: Space.sm)
 
             HStack(alignment: .top, spacing: 0) {
-                BigStat(value: "\(d.bpm)", label: "bpm")
+                BigStat(value: "\(d.bpm)", label: L.bpm)
                 if d.scored {
-                    BigStat(value: d.accuracy.map { "\($0)%" } ?? "--", label: "accuracy",
+                    BigStat(value: d.accuracy.map { L.percent($0) } ?? "--", label: L.accuracy,
                             colour: d.accuracy == nil ? Theme.muted : (d.accuracyGood ? Theme.accentText : Theme.warn))
                 } else {
-                    BigStat(value: d.cycle, label: "cycle")
+                    BigStat(value: d.cycle, label: d.cycleLabel)
                 }
                 BigStat(value: d.clock, label: d.clockLabel, colour: d.countingIn ? Theme.warn : Theme.text)
             }
@@ -79,7 +110,7 @@ struct RunView: View {
                     .frame(height: 44)
                     .padding(.top, Space.sm)
                 HStack(spacing: Space.xs) {
-                    Text("Input").font(Typo.caption).foregroundStyle(Theme.faint)
+                    Text(L.input).font(Typo.caption).foregroundStyle(Theme.faint)
                     ProgressLine(fraction: Double(meterFraction(d.inputLevel)), height: 3)
                 }
                 .padding(.top, Space.xs)
@@ -87,19 +118,56 @@ struct RunView: View {
 
             Spacer(minLength: Space.sm)
 
-            QuietButton(title: "Stop", systemImage: "stop.fill", height: 48) { onStop() }
-                .accessibilityIdentifier("run.stop")
-            Text("or tap anywhere")
+            HStack(spacing: Space.sm) {
+                QuietButton(title: L.pause, systemImage: "pause.fill", height: 52) { onPause() }
+                    .accessibilityIdentifier("run.pause")
+                QuietButton(title: L.stop, systemImage: "stop.fill", height: 52) { onEnd() }
+                    .accessibilityIdentifier("run.stop")
+            }
+            Text(L.tapToPause)
                 .font(Typo.foot).foregroundStyle(Theme.faint)
                 .padding(.top, Space.xs)
                 .padding(.bottom, Space.sm)
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, Space.page)
+    }
+
+    private var pausedCard: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            Image(systemName: "pause.fill").font(.system(size: 34, weight: .regular)).foregroundStyle(Theme.muted)
+                .accessibilityHidden(true)
+            Text(L.paused).font(Typo.number(44)).foregroundStyle(Theme.text)
+                .padding(.top, Space.sm)
+            Text(L.pausedHelp)
+                .font(Typo.callout).foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, Space.xs)
+            if let message {
+                Text(message).font(Typo.sub).foregroundStyle(Theme.warn)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, Space.sm)
+                    .accessibilityIdentifier("run.message")
+            }
+            if !route.isEmpty {
+                Text(route).font(Typo.foot).foregroundStyle(Theme.faint)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, Space.sm)
+            }
+            Spacer()
+            PrimaryButton(title: L.resume, systemImage: "play.fill") { onResume() }
+                .accessibilityIdentifier("run.resume")
+            QuietButton(title: L.end, systemImage: "stop.fill", height: 52) { onEnd() }
+                .accessibilityIdentifier("run.end")
+                .padding(.top, Space.sm)
+                .padding(.bottom, Space.md)
+        }
+        .padding(.horizontal, Space.page)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.bg)
-        .contentShape(Rectangle())
-        .onTapGesture { onStop() }
+        .background(Theme.bg.opacity(0.95))
     }
 
     /// The input level as a fraction of a 60 dB scale.
@@ -137,21 +205,74 @@ struct TimingMeter: View {
                 }
             }
             HStack {
-                Text("early")
+                Text(L.early)
                 Spacer()
-                Text("late")
+                Text(L.late)
             }
             .font(Typo.caption)
             .foregroundStyle(Theme.faint)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Timing")
+        .accessibilityLabel(L.timingLabel)
         .accessibilityValue(spoken)
     }
 
     private var spoken: String {
-        guard let last = errors.last else { return "No notes yet" }
-        if abs(last) < 3 { return "On the click" }
-        return "\(Int(abs(last).rounded())) milliseconds \(last > 0 ? "late" : "early")"
+        guard let last = errors.last else { return L.noNotesYet }
+        if abs(last) < 3 { return L.onTheBeat }
+        let ms = Int(abs(last).rounded())
+        return last > 0 ? L.msLate(ms) : L.msEarly(ms)
+    }
+}
+
+/// A quiet bar that says something is playing and stops it: on a tab whose own screen is not the one making the
+/// sound (the metronome ticking while the Drills list is open, a drill that somehow outlived its screen).
+struct RunningBar: View {
+    /// The mode this screen makes itself; its own sound needs no bar.
+    let own: Player.Mode
+    @EnvironmentObject var player: Player
+    @EnvironmentObject var pa: PlayAlong
+
+    private var drill: Bool { player.mode == .playAlong || pa.phase == .paused }
+    private var shows: Bool {
+        if drill { return own != .playAlong }
+        return player.mode != .idle && player.mode != own
+    }
+
+    var body: some View {
+        if shows {
+            HStack(spacing: Space.sm) {
+                Circle().fill(Theme.accent).frame(width: 8, height: 8).accessibilityHidden(true)
+                Text(text).font(Typo.sub).foregroundStyle(Theme.text).lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: Space.xs)
+                Button {
+                    Haptics.tap()
+                    pa.leave()
+                    player.stop()
+                } label: {
+                    Label(L.stop, systemImage: "stop.fill")
+                        .font(Typo.subStrong)
+                        .foregroundStyle(Theme.text)
+                        .padding(.horizontal, Space.sm)
+                        .frame(minHeight: 36)
+                        .background(Theme.hover, in: Capsule())
+                }
+                .buttonStyle(PressStyle())
+                .accessibilityIdentifier("running.stop")
+            }
+            .padding(.horizontal, Space.page)
+            .frame(minHeight: Space.touch + Space.xs)
+            .background(Theme.accentSoft)
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    private var text: String {
+        if drill { return pa.phase == .paused ? L.drillPaused : L.drillRunning }
+        switch player.mode {
+        case .metronome: return L.metronomeAt(player.bpm)
+        case .routine: return L.routineRunning
+        default: return L.playing
+        }
     }
 }

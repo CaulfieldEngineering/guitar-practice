@@ -47,7 +47,7 @@ final class ModelTests: XCTestCase {
         pa.start()
         if !pa.interfacePresent {
             XCTAssertEqual(pa.phase, .ready)
-            XCTAssertEqual(pa.message, "Plug in your audio interface: the guitar comes in through it.")
+            XCTAssertEqual(pa.message, L.connectInterface)
         }
     }
 
@@ -61,7 +61,7 @@ final class ModelTests: XCTestCase {
         pa.intro = false
         pa.audioInput = false
         pa.start()
-        XCTAssertNotEqual(pa.message, "Plug in your audio interface: the guitar comes in through it.")
+        XCTAssertNotEqual(pa.message, L.connectInterface)
         if pa.phase == .running {
             XCTAssertFalse(pa.player.audio.recording)
             XCTAssertEqual(AVAudioSession.sharedInstance().category, .playback)
@@ -78,6 +78,88 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(pa.audioInput)
         pa.audioInput = true
         pa.intro = true
+    }
+
+    /// A run can be held and picked up; leaving the drill ends it; and the app has one player, so starting the
+    /// metronome ends a drill too. Nothing is left making sound (Joe, on 0.1.6: "Drills keep running when I leave").
+    func testPauseResumeLeaveAndOnePlayer() {
+        let player = Player()
+        let pa = PlayAlong(player: player, history: History(inMemory: true))
+        pa.select("trip16x4")
+        pa.intro = false
+        pa.audioInput = false
+        pa.start()
+        if pa.phase == .running {
+            XCTAssertEqual(player.mode, .playAlong)
+            pa.pause()
+            XCTAssertEqual(pa.phase, .paused)
+            XCTAssertEqual(player.mode, .idle)
+            XCTAssertFalse(player.audio.isRunning, "paused: the engine is off")
+            pa.resumeRun()
+            XCTAssertEqual(pa.phase, .running)
+            XCTAssertTrue(player.audio.isRunning)
+            XCTAssertFalse(player.audio.recording, "the input stays closed")
+            pa.pause()
+            pa.leave()
+            XCTAssertEqual(pa.phase, .ready)
+            XCTAssertFalse(player.audio.isRunning, "left while paused: still off")
+
+            pa.start()
+            XCTAssertEqual(pa.phase, .running)
+            pa.leave()
+            XCTAssertEqual(pa.phase, .ready)
+            XCTAssertEqual(player.mode, .idle)
+            XCTAssertFalse(player.audio.isRunning, "left while running: the engine is off")
+
+            pa.start()
+            player.startMetronome()
+            XCTAssertEqual(pa.phase, .paused, "the metronome took over, and the drill is held")
+            XCTAssertEqual(player.mode, .metronome)
+            player.stop()
+            XCTAssertFalse(player.audio.isRunning)
+        }
+        pa.leave()
+        XCTAssertEqual(pa.phase, .ready)
+        pa.audioInput = true
+        pa.intro = true
+    }
+
+    func testPatternGlyphsAndShortNames() throws {
+        let pa = PlayAlong(player: Player(), history: History(inMemory: true))
+        func glyph(_ id: String) -> String? { pa.exercises.first { $0.id == id }?.glyph }
+        XCTAssertEqual(glyph("trip16x4"), "3→4")
+        XCTAssertEqual(glyph("alt8"), "8th")
+        XCTAssertEqual(glyph("alt3"), "trip")
+        XCTAssertEqual(glyph("alt16"), "16th")
+        XCTAssertEqual(glyph("burst"), "16th·rest")
+        XCTAssertEqual(glyph("gallop"), "mixed")
+        let alt = try XCTUnwrap(pa.exercises.first { $0.id == "alt16" })
+        XCTAssertEqual(alt.short, "Alt 16ths")
+        XCTAssertEqual(alt.category, "Picking")
+        XCTAssertFalse(pa.exercises.contains { $0.isRoutine }, "no drill of timed blocks in 0.1.7")
+    }
+
+    /// The groundwork for bringing the timed routines back as drills: the data reads, and nothing else changes.
+    func testTimedBlocksRead() throws {
+        let json = """
+        {"schema": 1, "exercises": [
+          {"id": "ladder", "name": "Speed ladder", "rounds": 8, "stepBPM": 4, "subdivision": 4,
+           "segments": [{"kind": "play", "seconds": 60, "bpm": 100}, {"kind": "rest", "seconds": 30}]},
+          {"id": "plain", "name": "Plain", "groups": [4], "tempo": {"start": 90}}
+        ]}
+        """
+        let list = try Library.decodeExercises(Data(json.utf8))
+        XCTAssertEqual(list.count, 2)
+        XCTAssertTrue(list[0].isRoutine)
+        XCTAssertEqual(list[0].tempo.start, 100)
+        XCTAssertEqual(list[0].session.kind, .routine)
+        XCTAssertEqual(list[0].session.cycles, 8)
+        XCTAssertEqual(list[0].notes.count, 4)
+        XCTAssertEqual(list[0].routine.plan.total, 8 * 90 + 4 * 0.6, accuracy: 1e-9, "eight rounds of 90 seconds behind four beats of count-in at 100")
+        XCTAssertFalse(list[1].isRoutine)
+        XCTAssertEqual(list[1].session.kind, .cycles)
+        let slot = RunBuilder.cycle(list[0], index: 0, start: 0, bpm: 120, guided: false, subdivision: 4)
+        XCTAssertEqual(slot.events.filter { $0.kind == .sub }.count, 3)
     }
 
     /// Changing the tempo by hand leaves the zones; picking a zone comes back to them. Neither loops.

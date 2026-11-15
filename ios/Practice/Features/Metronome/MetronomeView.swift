@@ -8,13 +8,14 @@ struct MetronomeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "Metronome")
+            ScreenHeader(title: L.metronome)
+            RunningBar(own: .metronome)
 
             Spacer(minLength: Space.xs)
             BeatDots(beats: player.beatsPerBar, current: running ? player.currentBeat : -1)
             Spacer(minLength: Space.sm)
 
-            TempoDial(value: player.bpm, caption: "bpm", size: 104) { player.setBPM($0) }
+            TempoDial(value: player.bpm, caption: L.bpm, size: 104) { player.setBPM($0) }
                 .padding(.horizontal, Space.page)
 
             Slider(value: Binding(get: { Double(player.bpm) }, set: { player.setBPM(Int($0.rounded())) }), in: 30...300)
@@ -26,7 +27,7 @@ struct MetronomeView: View {
             Spacer(minLength: Space.md)
 
             VStack(spacing: 0) {
-                Row(label: "Time signature") {
+                Row(label: L.timeSignature) {
                     Menu {
                         ForEach(meterOptions, id: \.self) { n in
                             Button("\(n)/4") { player.beatsPerBar = n }
@@ -40,11 +41,12 @@ struct MetronomeView: View {
                         .frame(minHeight: Space.touch)
                         .contentShape(Rectangle())
                     }
-                    .accessibilityLabel("Time signature, \(player.beatsPerBar) 4")
+                    .accessibilityLabel(L.timeSignature)
+                    .accessibilityValue("\(player.beatsPerBar) 4")
                 }
-                ToggleRow(label: "Accent the one", isOn: $player.accent)
+                ToggleRow(label: L.accentFirstBeat, isOn: $player.accent)
                 VStack(spacing: Space.xs) {
-                    SectionLabel("Clicks per beat")
+                    SectionLabel(L.subdivision)
                     Segmented(options: subdivisionOptions, selection: $player.subdivision)
                 }
                 .padding(.top, Space.md)
@@ -54,13 +56,13 @@ struct MetronomeView: View {
             Spacer(minLength: Space.md)
 
             HStack(spacing: Space.sm) {
-                QuietButton(title: "Tap", systemImage: "hand.tap") {
+                QuietButton(title: L.tap, systemImage: "hand.tap") {
                     Haptics.tick()
                     player.tap()
                 }
                 .frame(maxWidth: 112)
-                .accessibilityLabel("Tap the tempo")
-                PrimaryButton(title: running ? "Stop" : "Start", systemImage: running ? "stop.fill" : "play.fill") {
+                .accessibilityLabel(L.tapTempo)
+                PrimaryButton(title: running ? L.stop : L.start, systemImage: running ? "stop.fill" : "play.fill") {
                     player.toggleMetronome()
                 }
                 .accessibilityIdentifier("metronome.start")

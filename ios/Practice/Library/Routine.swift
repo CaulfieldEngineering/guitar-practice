@@ -73,6 +73,17 @@ struct Routine: Codable, Identifiable, Equatable, Hashable {
         intro = try c.decodeIfPresent(String.self, forKey: .intro) ?? ""
     }
 
+    /// The same routine, whatever the ids: the name, the blocks, the rounds and the feel.
+    func sameContent(as o: Routine) -> Bool {
+        guard name == o.name, rounds == o.rounds, stepBPM == o.stepBPM, beatsPerBar == o.beatsPerBar,
+              subdivision == o.subdivision, countInBeats == o.countInBeats, intervals.count == o.intervals.count else { return false }
+        for (a, b) in zip(intervals, o.intervals) {
+            if a.kind != b.kind || a.seconds != b.seconds || a.label != b.label { return false }
+            if a.kind == .play && a.bpm != b.bpm { return false }
+        }
+        return true
+    }
+
     func bpm(of interval: Interval, round: Int) -> Int {
         min(max(interval.bpm + round * stepBPM, Routine.bpmRange.lowerBound), Routine.bpmRange.upperBound)
     }

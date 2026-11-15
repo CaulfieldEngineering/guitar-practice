@@ -335,7 +335,7 @@ struct BeatDots: View {
 /// handler is what crashed 0.1.4).
 struct TempoDial: View {
     let value: Int
-    var caption: String = "bpm"
+    var caption: String = L.bpm
     var size: CGFloat = 96
     var step: Int = 1
     /// Off inside a scrolling screen, where an up and down drag belongs to the scroll.
@@ -345,7 +345,7 @@ struct TempoDial: View {
 
     var body: some View {
         HStack(spacing: Space.md) {
-            IconButton(systemImage: "minus", size: 52, label: "Slower", repeats: true) { onChange(value - step) }
+            IconButton(systemImage: "minus", size: 52, label: L.slower, repeats: true) { onChange(value - step) }
             VStack(spacing: 0) {
                 Text("\(value)")
                     .font(Typo.number(size))
@@ -363,12 +363,12 @@ struct TempoDial: View {
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
             .gesture(scrub)
-            IconButton(systemImage: "plus", size: 52, label: "Faster", repeats: true) { onChange(value + step) }
+            IconButton(systemImage: "plus", size: 52, label: L.faster, repeats: true) { onChange(value + step) }
         }
         .sensoryFeedback(.selection, trigger: value)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Tempo")
-        .accessibilityValue("\(value) beats per minute")
+        .accessibilityLabel(L.tempo)
+        .accessibilityValue(L.beatsPerMinute(value))
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: onChange(value + step)
@@ -409,7 +409,7 @@ struct ScreenHeader<Trailing: View>: View {
             Spacer(minLength: Space.xs)
             if updater.available != nil {
                 Button { updater.install() } label: {
-                    Text("Update").font(Typo.subStrong)
+                    Text(L.update).font(Typo.subStrong)
                         .padding(.horizontal, Space.sm).frame(height: 30)
                         .background(Theme.accent, in: Capsule()).foregroundStyle(Theme.onAccent)
                 }
@@ -417,7 +417,7 @@ struct ScreenHeader<Trailing: View>: View {
                 .padding(.trailing, Space.xxs)
             }
             trailing
-            BarIcon(systemImage: "gearshape", label: "Settings") { settings = true }
+            BarIcon(systemImage: "gearshape", label: L.settings) { settings = true }
         }
         .padding(.leading, Space.page)
         .padding(.trailing, Space.xs)
@@ -456,7 +456,7 @@ struct NavBar<Trailing: View>: View {
             .buttonStyle(PressStyle())
             .opacity(backEnabled ? 1 : 0.3)
             .disabled(!backEnabled)
-            .accessibilityLabel("Back")
+            .accessibilityLabel(L.back)
             Text(title).font(Typo.title).foregroundStyle(Theme.text).lineLimit(1).minimumScaleFactor(0.75)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: Space.xs)
@@ -501,7 +501,7 @@ struct Disclosure<Content: View>: View {
             }
             .buttonStyle(PressStyle())
             .accessibilityLabel(title)
-            .accessibilityValue(open ? "Open" : (summary.isEmpty ? "Closed" : summary))
+            .accessibilityValue(summary)
             Hairline()
             if open { content }
         }

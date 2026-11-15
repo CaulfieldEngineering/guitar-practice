@@ -37,7 +37,7 @@ struct TempoZones: Codable, Equatable {
 
     /// The zone a run of this kind suggests (a ladder run starts lower and climbs).
     func suggested(for s: SessionSettings) -> Zone? {
-        let key = s.ladderStep > 0 ? "ladder" : s.kind.rawValue
+        let key = s.kind == .routine ? "duration" : (s.ladderStep > 0 ? "ladder" : s.kind.rawValue)
         return suggest[key].flatMap(zone) ?? zones.first
     }
 

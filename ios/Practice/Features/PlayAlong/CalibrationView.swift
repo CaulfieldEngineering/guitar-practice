@@ -4,10 +4,10 @@ import SwiftUI
 /// needs to line up with the audible component plus the guitar pluck. Like the line passing through the center of
 /// the screen").
 ///
-/// 1. Sight and sound. A click plays and marks scroll across a line in the middle of the screen. The slider moves
+/// 1. Display Sync. A click plays and marks scroll across a line in the middle of the screen. The slider moves
 ///    the marks until each one crosses the line exactly on the click he hears, through whatever the sound is coming
 ///    out of. That is the display offset for this output: the lane of a run is drawn that much later.
-/// 2. The guitar. The same marks; he picks one note as each crosses the line. The median of what is heard is the
+/// 2. Input. The same marks; he plays one note as each crosses the line. The median of what is heard is the
 ///    offset every pick is scored with on this setup, and the spread says how steady it was.
 struct CalibrationView: View {
     @EnvironmentObject var pa: PlayAlong
@@ -18,14 +18,12 @@ struct CalibrationView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Chip(text: syncing ? "Calibration · step 1 of 2" : "Calibration · step 2 of 2")
+            Chip(text: L.calibrationStep(syncing ? 1 : 2))
                 .padding(.top, Space.sm)
-            Text(syncing ? "Sight and sound" : "The guitar")
+            Text(syncing ? L.displaySync : L.inputSync)
                 .font(Typo.screen).foregroundStyle(Theme.text)
                 .padding(.top, Space.md)
-            Text(syncing
-                 ? "Move the slider until each mark crosses the line exactly on the click you hear."
-                 : "Pick one note as each mark crosses the line.")
+            Text(syncing ? L.displaySyncHelp : L.inputSyncHelp)
                 .font(Typo.callout).foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -48,57 +46,59 @@ struct CalibrationView: View {
 
     private var sightControls: some View {
         VStack(spacing: 0) {
-            Text("\(offsetMs >= 0 ? "+" : "")\(offsetMs) ms")
+            Text(L.signedMs(offsetMs))
                 .font(Typo.number(44)).foregroundStyle(Theme.text)
                 .contentTransition(.numericText())
                 .accessibilityHidden(true)
             HStack(spacing: Space.sm) {
-                IconButton(systemImage: "minus", label: "Earlier by 5 milliseconds", repeats: true) {
+                IconButton(systemImage: "minus", label: L.earlier, repeats: true) {
                     pa.setDisplayOffset(pa.displayOffset - 0.005)
                 }
                 Slider(value: Binding(get: { pa.displayOffset * 1000 },
                                       set: { pa.setDisplayOffset(($0 / 5).rounded() * 5 / 1000) }),
                        in: (DisplayOffsetStore.range.lowerBound * 1000)...(DisplayOffsetStore.range.upperBound * 1000))
                     .tint(Theme.accent)
-                    .accessibilityLabel("Picture against sound")
-                    .accessibilityValue("\(offsetMs) milliseconds")
+                    .accessibilityLabel(L.displayOffset)
+                    .accessibilityValue(L.milliseconds(offsetMs))
                     .accessibilityIdentifier("calibration.slider")
-                IconButton(systemImage: "plus", label: "Later by 5 milliseconds", repeats: true) {
+                IconButton(systemImage: "plus", label: L.later, repeats: true) {
                     pa.setDisplayOffset(pa.displayOffset + 0.005)
                 }
             }
             .padding(.top, Space.xs)
             .sensoryFeedback(.selection, trigger: offsetMs)
-            Text("Sound out: \(pa.route.output). Kept for this output.")
-                .font(Typo.foot).foregroundStyle(Theme.faint)
-                .multilineTextAlignment(.center)
-                .padding(.top, Space.sm)
+            HStack(spacing: Space.xs) {
+                Text(L.output(pa.route.output)).font(Typo.foot).foregroundStyle(Theme.faint)
+                RoutePicker().frame(width: 32, height: 32).accessibilityLabel(L.chooseOutput)
+            }
+            .padding(.top, Space.xs)
 
             Spacer(minLength: Space.md)
 
-            PrimaryButton(title: "Next: the guitar", systemImage: "arrow.right") { pa.calibrateInput() }
+            PrimaryButton(title: L.next, systemImage: "arrow.right") { pa.calibrateInput() }
                 .accessibilityIdentifier("calibration.next")
-            TextButton(title: "Done, keep this") { pa.stop() }
+            TextButton(title: L.done) { pa.stop() }
                 .accessibilityIdentifier("calibration.done")
         }
     }
 
     private var guitarReadout: some View {
         VStack(spacing: 0) {
-            BigStat(value: "\(heard) of \(PlayAlong.calibrationCount)", label: pa.now < pa.countInEnd ? "count-in" : "notes heard")
+            BigStat(value: L.ofTotal(heard, PlayAlong.calibrationCount), label: pa.countingIn ? L.countIn : L.notes)
             HStack(spacing: Space.xs) {
-                Text("Input").font(Typo.caption).foregroundStyle(Theme.faint)
+                Text(L.input).font(Typo.caption).foregroundStyle(Theme.faint)
                 ProgressLine(fraction: inputFraction, height: 3)
             }
             .padding(.top, Space.md)
-            Text("In: \(pa.route.input). Out: \(pa.route.output).")
+            Text(L.route(pa.route.input, pa.route.output))
                 .font(Typo.foot).foregroundStyle(Theme.faint)
                 .multilineTextAlignment(.center)
                 .padding(.top, Space.sm)
 
             Spacer(minLength: Space.md)
 
-            QuietButton(title: "Stop", systemImage: "stop.fill", height: 48) { pa.stop() }
+            QuietButton(title: L.stop, systemImage: "stop.fill", height: 52) { pa.stop() }
+                .accessibilityIdentifier("calibration.stop")
                 .padding(.bottom, Space.md)
         }
     }

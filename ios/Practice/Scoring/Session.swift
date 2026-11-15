@@ -2,7 +2,9 @@ import Foundation
 
 /// How a play-along run is shaped. Generic for every exercise; each exercise's data gives the starting values.
 struct SessionSettings: Codable, Equatable, Hashable {
-    enum Kind: String, Codable, CaseIterable { case cycles, duration, endurance }
+    /// `routine` is a drill made of timed blocks (Exercise.segments): `cycles` is then its number of rounds and
+    /// `ladderStep` how much faster each round is.
+    enum Kind: String, Codable, CaseIterable { case cycles, duration, endurance, routine }
     var kind: Kind = .cycles
     /// Cycles mode: how many times through the pattern.
     var cycles: Int = 4
@@ -28,6 +30,15 @@ struct SessionSettings: Codable, Equatable, Hashable {
         toleranceMs = try c.decodeIfPresent(Double.self, forKey: .toleranceMs) ?? 30
         windowCycles = try c.decodeIfPresent(Int.self, forKey: .windowCycles) ?? 2
         ladderStep = try c.decodeIfPresent(Int.self, forKey: .ladderStep) ?? 0
+    }
+
+    /// How a drill of timed blocks starts out: its rounds, and how much faster each round is.
+    static func routine(rounds: Int, step: Int) -> SessionSettings {
+        var s = SessionSettings()
+        s.kind = .routine
+        s.cycles = max(1, rounds)
+        s.ladderStep = step
+        return s
     }
 
     /// Endurance stops on its own; this is the cap so it cannot run forever.
@@ -64,7 +75,9 @@ enum RunBuilder {
     /// Cycle `index` of `exercise` starting at `start`, at `bpm`. Notes at or past `limit` are left out (the end of a
     /// timed run). `guided` adds a pluck for every note, louder on accents and on the first note after the number of
     /// notes in a beat changes (the switch from triplets to sixteenths is heard).
-    static func cycle(_ ex: Exercise, index: Int, start: Double, bpm: Double, guided: Bool, limit: Double? = nil) -> CycleSlot {
+    /// `subdivision` above 1 adds quiet clicks between the beats (a block of a timed routine played solo).
+    static func cycle(_ ex: Exercise, index: Int, start: Double, bpm: Double, guided: Bool, limit: Double? = nil,
+                      subdivision: Int = 1) -> CycleSlot {
         let beat = 60 / max(1, bpm)
         let duration = Double(ex.cycleBeats) * beat
         let cap = limit.map { $0 - start } ?? duration
@@ -77,6 +90,12 @@ enum RunBuilder {
             let global = index * ex.cycleBeats + b
             let inBar = global % max(1, ex.beatsPerBar)
             events.append(TimedEvent(time: start + Double(b) * beat, kind: inBar == 0 ? .accent : .beat, beat: inBar))
+            if subdivision > 1 {
+                for s in 1..<subdivision {
+                    let t = (Double(b) + Double(s) / Double(subdivision)) * beat
+                    if t < seconds - 1e-9 { events.append(TimedEvent(time: start + t, kind: .sub)) }
+                }
+            }
         }
         if guided {
             let sizes = groupSizes(ex)

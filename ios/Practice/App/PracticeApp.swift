@@ -9,6 +9,8 @@ struct PracticeApp: App {
     @StateObject private var store = RoutineStore()
     @StateObject private var updater = Updater()
     @Environment(\.scenePhase) private var scenePhase
+    /// The lock screen's and Control Center's pause and stop.
+    private let nowPlaying: NowPlaying
 
     init() {
         #if DEBUG
@@ -26,6 +28,7 @@ struct PracticeApp: App {
         _player = StateObject(wrappedValue: p)
         _history = StateObject(wrappedValue: h)
         _playAlong = StateObject(wrappedValue: pa)
+        nowPlaying = NowPlaying(player: p, playAlong: pa)
         PracticeApp.styleBars()
     }
 
@@ -79,8 +82,8 @@ struct RootView: View {
         content
             .tint(Theme.accentText)
             .preferredColorScheme(forcedScheme)
-            .alert("Sound could not start", isPresented: Binding(get: { player.errorText != nil }, set: { if !$0 { player.errorText = nil } })) {
-                Button("OK", role: .cancel) {}
+            .alert(L.couldNotStartAudio, isPresented: Binding(get: { player.errorText != nil }, set: { if !$0 { player.errorText = nil } })) {
+                Button(L.ok, role: .cancel) {}
             } message: { Text(player.errorText ?? "") }
     }
 
@@ -102,9 +105,9 @@ struct RootView: View {
     private var tabs: some View {
         TabView(selection: $tab) {
             MetronomeView()
-                .tabItem { tabLabel("Metronome", "metronome") }.tag(0)
+                .tabItem { tabLabel(L.metronome, "metronome") }.tag(0)
             DrillsView()
-                .tabItem { tabLabel("Drills", "waveform") }.tag(1)
+                .tabItem { tabLabel(L.drills, "waveform") }.tag(1)
         }
     }
 

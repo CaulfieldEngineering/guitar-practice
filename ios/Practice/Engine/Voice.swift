@@ -124,11 +124,18 @@ enum IntroText {
         switch s.kind {
         case .cycles: goal = "\(s.cycles) times through."
         case .duration: goal = "For \(spokenTime(Double(s.seconds)))."
+        case .routine:
+            var r = ex.routine
+            r.rounds = max(1, s.cycles)
+            r.stepBPM = s.ladderStep
+            r.countInBeats = 0
+            goal = (s.cycles > 1 ? "\(s.cycles) rounds, " : "") + "\(spokenTime(r.plan.total)) in all."
         case .endurance:
             goal = scored ? "Endurance: keep your accuracy at \(s.targetPercent) percent or better for as long as you can."
                 : "Keep going until you stop it."
         }
-        let ladder = s.ladderStep > 0 ? (scored ? " Up \(s.ladderStep) each time you pass a cycle." : " Up \(s.ladderStep) each cycle.") : ""
+        let ladder = s.kind == .routine ? (s.ladderStep != 0 && s.cycles > 1 ? " \(abs(s.ladderStep)) \(s.ladderStep > 0 ? "faster" : "slower") each round." : "")
+            : s.ladderStep > 0 ? (scored ? " Up \(s.ladderStep) each time you pass a cycle." : " Up \(s.ladderStep) each cycle.") : ""
         let mode = guided ? "Guided: play along with the guitar." : "Solo: just the click."
         let unscored = scored ? "" : " The audio input is off, so nothing is scored."
         return "\(what) \(bpm) beats per minute. \(goal)\(ladder) \(mode)\(unscored) Here is the count."

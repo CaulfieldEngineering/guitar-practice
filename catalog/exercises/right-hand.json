@@ -5,6 +5,8 @@
       "id": "trip16x4",
       "version": 1,
       "name": "Triplets to sixteenths, 4 and 4",
+      "short": "Trips to 16ths, 4+4",
+      "category": "Speed",
       "detail": "Four beats of triplets, then four beats of sixteenths, alternate picking, round and round. One string, muted or open.",
       "intro": "Triplets to sixteenths, four and four. Four beats of triplets, then four beats of sixteenths, alternate picking on one string. Keep the motion small and the switch clean.",
       "groups": [
@@ -90,6 +92,8 @@
       "id": "alt8",
       "version": 1,
       "name": "Alternate picking, eighths",
+      "short": "Alt 8ths",
+      "category": "Picking",
       "detail": "Two notes a beat, down up. One string, muted or open.",
       "intro": "Alternate picking in eighths. Two notes a beat, down then up, on one string.",
       "groups": [
@@ -105,6 +109,8 @@
       "id": "alt3",
       "version": 1,
       "name": "Alternate picking, triplets",
+      "short": "Alt triplets",
+      "category": "Picking",
       "detail": "Three a beat; the pick direction flips each beat.",
       "intro": "Alternate picking in triplets. Three notes a beat, so each beat starts on the other pick stroke.",
       "groups": [
@@ -120,6 +126,8 @@
       "id": "alt16",
       "version": 1,
       "name": "Alternate picking, sixteenths",
+      "short": "Alt 16ths",
+      "category": "Picking",
       "detail": "Four a beat. Picking small, cruise speed.",
       "intro": "Alternate picking in sixteenths. Four notes a beat. Picking small, at cruise speed.",
       "groups": [
@@ -135,6 +143,8 @@
       "id": "3to4",
       "version": 1,
       "name": "3's to 4's",
+      "short": "3s to 4s",
+      "category": "Speed",
       "detail": "A beat of triplets, a beat of sixteenths, back and forth. Start on the G and B strings.",
       "intro": "Three's to four's. One beat of triplets, one beat of sixteenths, back and forth.",
       "groups": [
@@ -152,6 +162,8 @@
       "id": "burst",
       "version": 1,
       "name": "Speed bursts",
+      "short": "Speed bursts",
+      "category": "Speed",
       "detail": "One bar of sixteenths at full speed, one bar off.",
       "intro": "Speed bursts. One bar of sixteenths as fast and clean as you can, then one bar off.",
       "groups": [
@@ -174,6 +186,8 @@
       "id": "accent16",
       "version": 1,
       "name": "Accents, sixteenths",
+      "short": "Accent 16ths",
+      "category": "Accents",
       "detail": "Four a beat, the first of each louder.",
       "intro": "Accents in sixteenths. Four notes a beat, the first of each beat louder.",
       "groups": [
@@ -190,6 +204,8 @@
       "id": "accent3",
       "version": 1,
       "name": "Accents, triplets",
+      "short": "Accent triplets",
+      "category": "Accents",
       "detail": "Three a beat, the first of each louder.",
       "intro": "Accents in triplets. Three notes a beat, the first of each beat louder.",
       "groups": [
@@ -206,6 +222,8 @@
       "id": "gallop",
       "version": 1,
       "name": "Gallop",
+      "short": "Gallop",
+      "category": "Picking",
       "detail": "Eighth and two sixteenths: down, down up. Accent the first.",
       "intro": "The gallop. An eighth and two sixteenths: down, down up. Accent the first.",
       "cycleBeats": 1,
