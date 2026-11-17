@@ -6,27 +6,27 @@ import XCTest
 /// two-input interface, what is remembered per device, and the plain-words check.
 final class LevelMathTests: XCTestCase {
     func testDecibels() {
-        XCTAssertEqual(Level.dB(1), 0, accuracy: 1e-9)
-        XCTAssertEqual(Level.dB(0.5), -6.0206, accuracy: 1e-3)
-        XCTAssertEqual(Level.dB(0.001), -60, accuracy: 1e-6)
-        XCTAssertEqual(Level.dB(0), -120)
-        XCTAssertEqual(Level.dB(-1), -120)
+        XCTAssertEqual(AudioLevel.dB(1), 0, accuracy: 1e-9)
+        XCTAssertEqual(AudioLevel.dB(0.5), -6.0206, accuracy: 1e-3)
+        XCTAssertEqual(AudioLevel.dB(0.001), -60, accuracy: 1e-6)
+        XCTAssertEqual(AudioLevel.dB(0), -120)
+        XCTAssertEqual(AudioLevel.dB(-1), -120)
     }
 
     func testMeterFraction() {
-        XCTAssertEqual(Level.fraction(-60), 0)
-        XCTAssertEqual(Level.fraction(-90), 0)
-        XCTAssertEqual(Level.fraction(-30), 0.5, accuracy: 1e-9)
-        XCTAssertEqual(Level.fraction(0), 1)
-        XCTAssertEqual(Level.fraction(6), 1)
+        XCTAssertEqual(AudioLevel.fraction(-60), 0)
+        XCTAssertEqual(AudioLevel.fraction(-90), 0)
+        XCTAssertEqual(AudioLevel.fraction(-30), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(AudioLevel.fraction(0), 1)
+        XCTAssertEqual(AudioLevel.fraction(6), 1)
     }
 
     func testRmsAndPeakOfASine() {
         let s = (0..<4800).map { Float(0.5 * sin(2 * Double.pi * 440 * Double($0) / 48000)) }
-        let m = Level.measure(s)
+        let m = AudioLevel.measure(s)
         XCTAssertEqual(m.peak, 0.5, accuracy: 1e-3)
         XCTAssertEqual(m.rms, 0.5 / Float(2).squareRoot(), accuracy: 1e-3)
-        XCTAssertEqual(Level.measure([]).rms, 0)
+        XCTAssertEqual(AudioLevel.measure([]).rms, 0)
     }
 
     func testReadingsAddUpAndClipOnlyAtTheTop() {
@@ -70,7 +70,7 @@ final class LevelMathTests: XCTestCase {
     func testPeakHoldWaitsThenFalls() {
         var m = PeakMeter()
         m.update(peak: 0.5, clipped: false, dt: 1.0 / 30)
-        let top = Level.dB(0.5)
+        let top = AudioLevel.dB(0.5)
         XCTAssertEqual(m.holdDB, top, accuracy: 1e-9)
         XCTAssertEqual(m.levelDB, top, accuracy: 1e-9)
         // Silence for a second: the bar falls, the tick holds.

@@ -71,7 +71,7 @@ struct MeterReading: Equatable {
         sumSquares += sq
         frames += s.count
         peak = max(peak, pk)
-        if pk >= Level.clipThreshold { clipped = true }
+        if pk >= AudioLevel.clipThreshold { clipped = true }
     }
 
     /// Adds a raw channel's peak (channel 0 or 1); a raw sample at the top counts as clipping.
@@ -80,13 +80,13 @@ struct MeterReading: Equatable {
         var pk: Float = 0
         for x in s { pk = max(pk, abs(x)) }
         channelPeaks[index] = max(channelPeaks[index], pk)
-        if pk >= Level.clipThreshold { clipped = true }
+        if pk >= AudioLevel.clipThreshold { clipped = true }
     }
 
     mutating func add(_ samples: [Float]) { samples.withUnsafeBufferPointer { add($0) } }
 }
 
-enum Level {
+enum AudioLevel {
     /// The bottom of the meter.
     static let floorDB = -60.0
     /// A sample this close to full scale is taken as clipping (about -0.2 dBFS): interfaces hold at just under 1.
@@ -149,7 +149,7 @@ struct PeakMeter: Equatable {
 
     /// One step of the meter, `dt` seconds after the last one.
     mutating func update(peak: Float, clipped: Bool, dt: Double) {
-        let db = Level.dB(peak)
+        let db = AudioLevel.dB(peak)
         // The bar: jumps up, falls at the release rate.
         levelDB = db >= levelDB ? db : max(db, levelDB - PeakMeter.fallDBPerSecond * 2 * dt)
         // The hold tick.

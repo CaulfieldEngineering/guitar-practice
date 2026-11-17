@@ -179,8 +179,8 @@ struct MeterRow: View {
         HStack(spacing: Space.sm) {
             GeometryReader { g in
                 let w = g.size.width
-                let level = Level.fraction(setup.meter.levelDB)
-                let hold = Level.fraction(setup.meter.holdDB)
+                let level = AudioLevel.fraction(setup.meter.levelDB)
+                let hold = AudioLevel.fraction(setup.meter.holdDB)
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2).fill(Theme.lineStrong)
                     RoundedRectangle(cornerRadius: 2)

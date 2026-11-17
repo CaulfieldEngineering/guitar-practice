@@ -433,7 +433,7 @@ final class AudioSetup: ObservableObject {
         meter = m
         // Each raw channel, held for a second so a note is seen.
         for k in 0..<2 {
-            let db = Level.dB(r.channelPeaks[k])
+            let db = AudioLevel.dB(r.channelPeaks[k])
             channelPeakDB[k] = db >= channelPeakDB[k] ? db : max(db, channelPeakDB[k] - 30 * dt)
         }
         if m.verdict == .noSignal { if silentSince == nil { silentSince = now } } else { silentSince = nil }
