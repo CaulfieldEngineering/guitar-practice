@@ -132,9 +132,10 @@ final class TapThroughTests: XCTestCase {
     /// whichever screen is in front.
     private func changeRoute(_ app: XCUIApplication) {
         let buttons = app.buttons.matching(identifier: "debug.routeChange").allElementsBoundByIndex
-        let b = buttons.first { $0.exists && $0.isHittable } ?? buttons.first
+        let b = buttons.first { $0.exists && $0.isHittable } ?? buttons.last
         XCTAssertNotNil(b, "the route-change button is there")
-        b?.tap()
+        // By its place on the screen: the clear button cannot be scrolled to, which a plain tap asks for.
+        b?.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     /// Joe, 2026-11-16: "during the calibrate or anywhere else, when I swap the audio device it closes that current
