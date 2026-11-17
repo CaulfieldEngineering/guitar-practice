@@ -22,6 +22,8 @@ final class Voice: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, AVAu
     private var clipQueue: [Data] = []
     private var clipPlayer: AVAudioPlayer?
     private var clipVolume: Float = 1
+    /// The App Sounds level (Settings > Audio), so the voice sits with the clicks against the guitar.
+    var level: Float = 1
     private var clipTurn = 0
 
     override init() {
@@ -119,7 +121,7 @@ final class Voice: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, AVAu
         let data = clipQueue.removeFirst()
         guard let p = try? AVAudioPlayer(data: data) else { playNextClip(turn: turn); return }
         p.delegate = self
-        p.volume = clipVolume
+        p.volume = clipVolume * level
         clipPlayer = p
         if !p.play() { playNextClip(turn: turn) }
     }
@@ -147,7 +149,7 @@ final class Voice: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, AVAu
         u.voice = voice
         u.rate = cue ? 0.52 : 0.5
         u.prefersAssistiveTechnologySettings = false
-        u.volume = cue ? 0.8 : 1
+        u.volume = (cue ? 0.8 : 1) * level
         onDone = done
         speaking = true
         synth.speak(u)

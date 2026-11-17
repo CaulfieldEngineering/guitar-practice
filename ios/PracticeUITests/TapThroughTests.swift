@@ -128,6 +128,119 @@ final class TapThroughTests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    /// Taps the debug-only button that fakes a route change (an interface plugged in, the Shokz picked), on
+    /// whichever screen is in front.
+    private func changeRoute(_ app: XCUIApplication) {
+        let buttons = app.buttons.matching(identifier: "debug.routeChange").allElementsBoundByIndex
+        let b = buttons.first { $0.exists && $0.isHittable } ?? buttons.first
+        XCTAssertNotNil(b, "the route-change button is there")
+        b?.tap()
+    }
+
+    /// Joe, 2026-11-16: "during the calibrate or anywhere else, when I swap the audio device it closes that current
+    /// window". A route change on each screen keeps the screen, keeps the sound going and says what changed.
+    func testRouteChangeKeepsEveryScreen() {
+        let app = launch("dark", ["-debugRoute", "1"])
+        let notice = app.staticTexts["route.notice"]
+
+        // The metronome keeps ticking.
+        let metro = app.buttons["metronome.start"]
+        XCTAssertTrue(metro.waitForExistence(timeout: 20))
+        metro.tap()
+        changeRoute(app)
+        XCTAssertTrue(notice.waitForExistence(timeout: 5), "a notice says the device changed")
+        shot("50-route-metronome-dark")
+        app.tabBars.buttons["Drills"].tap()
+        XCTAssertTrue(waitForEngine(app, "running"), "the metronome carried on across the change")
+        app.buttons["running.stop"].tap()
+        XCTAssertTrue(waitForEngine(app, "stopped"))
+
+        // A drill's setup stays open.
+        let flagship = app.buttons["exercise.trip16x4"]
+        XCTAssertTrue(flagship.waitForExistence(timeout: 10))
+        flagship.tap()
+        XCTAssertTrue(app.buttons["start"].waitForExistence(timeout: 10))
+        changeRoute(app)
+        sleep(1)
+        XCTAssertTrue(app.buttons["start"].exists, "the setup is still there")
+        shot("51-route-setup-dark")
+
+        // A run goes on.
+        app.swipeUp()
+        let input = app.switches["Audio Input"]
+        if input.waitForExistence(timeout: 5), (input.value as? String) == "1" { input.tap() }
+        startRun(app)
+        let pause = app.buttons["run.pause"]
+        XCTAssertTrue(pause.waitForExistence(timeout: 15))
+        sleep(2)
+        changeRoute(app)
+        sleep(2)
+        XCTAssertTrue(pause.exists, "the run is still running, not paused or closed")
+        shot("52-route-run-dark")
+        app.buttons["run.stop"].tap()
+        let done = app.buttons["result.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        done.tap()
+
+        // The calibration's first step stays on screen.
+        app.swipeUp()
+        let options = app.buttons["Options"]
+        if options.waitForExistence(timeout: 5) { options.tap(); app.swipeUp() }
+        let calibrate = app.buttons["calibrate"]
+        if calibrate.waitForExistence(timeout: 5) {
+            calibrate.tap()
+            let calDone = app.buttons["calibration.done"]
+            XCTAssertTrue(calDone.waitForExistence(timeout: 10))
+            sleep(1)
+            changeRoute(app)
+            sleep(2)
+            XCTAssertTrue(calDone.exists, "the calibration did not close")
+            shot("53-route-calibration-dark")
+            calDone.tap()
+        }
+        XCTAssertTrue(app.buttons["start"].waitForExistence(timeout: 10))
+        app.buttons["Back"].tap()
+
+        // Settings and its Audio screen stay open.
+        XCTAssertTrue(app.buttons["Settings"].firstMatch.waitForExistence(timeout: 10))
+        app.buttons["Settings"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
+        app.buttons["settings.audio"].tap()
+        XCTAssertTrue(app.navigationBars["Audio"].waitForExistence(timeout: 10), "the Audio screen opens")
+        sleep(2)
+        shot("54-audio-dark")
+        app.swipeUp()
+        shot("55-audio-scrolled-dark")
+        app.swipeDown()
+        changeRoute(app)
+        sleep(2)
+        XCTAssertTrue(app.navigationBars["Audio"].exists, "the Audio screen did not close")
+        shot("56-route-audio-dark")
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    /// The Audio screen in light, and its Input list.
+    func testAudioScreenLight() {
+        let app = launch("light")
+        XCTAssertTrue(app.buttons["metronome.start"].waitForExistence(timeout: 20))
+        app.tabBars.buttons["Drills"].tap()
+        XCTAssertTrue(app.buttons["Settings"].firstMatch.waitForExistence(timeout: 10))
+        app.buttons["Settings"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
+        app.buttons["settings.audio"].tap()
+        XCTAssertTrue(app.navigationBars["Audio"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("57-audio-light")
+        let inputRow = app.buttons["audio.input"]
+        if inputRow.waitForExistence(timeout: 5) {
+            inputRow.tap()
+            sleep(1)
+            shot("58-audio-input-list-light")
+            if app.navigationBars.buttons.firstMatch.exists { app.navigationBars.buttons.firstMatch.tap() }
+        }
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     /// Start, and past the spoken intro if it is on.
     private func startRun(_ app: XCUIApplication) {
         app.buttons["start"].tap()

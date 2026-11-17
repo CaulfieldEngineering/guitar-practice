@@ -61,14 +61,23 @@ enum Latency {
 
     // MARK: The live session
 
+    #if DEBUG
+    /// Raised by the UI test's simulated route change, so the route reads as a new device.
+    static var debugRouteTag = 0
+    #endif
+
     static func currentRoute() -> RouteInfo {
         let route = AVAudioSession.sharedInstance().currentRoute
         let ins = route.inputs, outs = route.outputs
         let bt: Set<AVAudioSession.Port> = [.bluetoothA2DP, .bluetoothLE]
+        var tag = ""
+        #if DEBUG
+        if debugRouteTag > 0 { tag = " \(debugRouteTag + 1)" }
+        #endif
         return RouteInfo(
-            key: routeKey(inputs: ins.map(\.uid), outputs: outs.map(\.uid)),
+            key: routeKey(inputs: ins.map(\.uid), outputs: outs.map(\.uid)) + tag,
             input: ins.first?.portName ?? "No input",
-            output: outs.first?.portName ?? "No output",
+            output: (outs.first?.portName ?? "No output") + tag,
             inputIsBuiltInMic: ins.first?.portType == .builtInMic,
             inputIsInterface: ins.contains { AudioEngine.interfacePorts.contains($0.portType) },
             outputIsInterface: outs.contains { ([.usbAudio, .lineOut, .headphones] as [AVAudioSession.Port]).contains($0.portType) },

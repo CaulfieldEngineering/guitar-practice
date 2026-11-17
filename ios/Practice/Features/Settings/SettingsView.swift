@@ -8,6 +8,7 @@ struct SettingsView: View {
     @EnvironmentObject var history: History
     @EnvironmentObject var pa: PlayAlong
     @EnvironmentObject var voice: Voice
+    @EnvironmentObject var audio: AudioSetup
     @Environment(\.dismiss) private var dismiss
     @State private var advanced = false
     @AppStorage("audio.lockScreen") private var lockScreen = false
@@ -16,11 +17,12 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    HStack(spacing: Space.sm) {
-                        Text(L.clickVolume)
-                        Slider(value: $player.volume, in: 0...1).tint(Theme.accent)
-                            .accessibilityLabel(L.clickVolume)
+                    NavigationLink {
+                        AudioSettingsView()
+                    } label: {
+                        LabeledContent(L.audio, value: audio.input?.name ?? L.noInputName)
                     }
+                    .accessibilityIdentifier("settings.audio")
                     Toggle(L.keepScreenOn, isOn: $player.keepScreenOn).tint(Theme.accent)
                     Toggle(L.lockScreenControls, isOn: $lockScreen).tint(Theme.accent)
                 } header: { Text(L.sound) } footer: { Text(L.soundFooter) }
@@ -93,9 +95,11 @@ struct SettingsView: View {
             .navigationTitle(L.settings)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L.done) { dismiss() } } }
+            .onAppear { audio.refresh() }
+            .routeNotice()
             .fullScreenCover(isPresented: Binding(get: { pa.phase == .syncing || pa.phase == .calibrating },
                                                   set: { if !$0 { pa.stop() } })) {
-                CalibrationView()
+                CalibrationView().routeNotice()
             }
         }
     }

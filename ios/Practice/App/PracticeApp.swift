@@ -8,6 +8,7 @@ struct PracticeApp: App {
     @StateObject private var history: History
     @StateObject private var store = RoutineStore()
     @StateObject private var updater = Updater()
+    @StateObject private var audioSetup: AudioSetup
     @Environment(\.scenePhase) private var scenePhase
     /// The lock screen's and Control Center's pause and stop.
     private let nowPlaying: NowPlaying
@@ -28,6 +29,7 @@ struct PracticeApp: App {
         _player = StateObject(wrappedValue: p)
         _history = StateObject(wrappedValue: h)
         _playAlong = StateObject(wrappedValue: pa)
+        _audioSetup = StateObject(wrappedValue: AudioSetup(player: p, playAlong: pa))
         nowPlaying = NowPlaying(player: p, playAlong: pa)
         PracticeApp.styleBars()
     }
@@ -41,6 +43,7 @@ struct PracticeApp: App {
                 .environmentObject(updater)
                 .environmentObject(history)
                 .environmentObject(player.voice)
+                .environmentObject(audioSetup)
                 .task { await updater.check() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { Task { await updater.check(); await history.sync() } }
@@ -80,6 +83,7 @@ struct RootView: View {
 
     var body: some View {
         content
+            .routeNotice()
             .tint(Theme.accentText)
             .preferredColorScheme(forcedScheme)
             .alert(L.couldNotStartAudio, isPresented: Binding(get: { player.errorText != nil }, set: { if !$0 { player.errorText = nil } })) {

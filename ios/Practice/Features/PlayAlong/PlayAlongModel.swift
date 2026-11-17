@@ -67,6 +67,10 @@ final class PlayAlong: ObservableObject {
     @Published private(set) var outputNote: String?
     /// Sight against sound on this output, in seconds: the lane is drawn this much later (DisplayOffsetStore).
     @Published private(set) var displayOffset: Double = 0
+    /// A short notice when the audio device changed ("Audio device changed: OpenRun Pro"), for a few seconds. The
+    /// screen stays where it is (Joe, 2026-11-16: "when I swap the audio device it closes that current window").
+    @Published private(set) var routeNotice: String?
+    private var noticeTurn = 0
 
     @Published private(set) var phase: Phase = .ready
     @Published private(set) var now: Double = 0
@@ -160,8 +164,38 @@ final class PlayAlong: ObservableObject {
         NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.routeChanged() }
         }
+        player.afterReroute = { [weak self] in self?.rerouted() }
         routeChanged()
     }
+
+    /// The engine carried on across a route change. In the guitar step of the calibration the notes heard so far
+    /// were on the old route, so the step starts again on the new one; everything else simply goes on.
+    private func rerouted() {
+        routeChanged()
+        guard phase == .calibrating else { return }
+        guard interfacePresent || allowPhoneMic else { return }
+        player.onStopped = nil
+        player.onFrame = nil
+        launch(calibrating: true)
+    }
+
+    /// With the audio input on, the drill's screen puts the session in record mode, so iOS lists the inputs (in
+    /// playback mode it lists none, and the route read "In: No input" on his phone, 2026-11-16).
+    func prepareInput() {
+        guard audioInput, phase == .ready, player.mode == .idle else { return }
+        AudioEngine.prepareRecordSession()
+        AudioEngine.reassertInput(allowPhoneMic: allowPhoneMic)
+        routeChanged()
+    }
+
+    #if DEBUG
+    /// For the UI test: what plugging in or picking another device does, as near as a simulator can.
+    func simulateRouteChange() {
+        Latency.debugRouteTag += 1
+        NotificationCenter.default.post(name: AVAudioSession.routeChangeNotification, object: nil)
+        player.audio.simulateConfigurationChange()
+    }
+    #endif
 
     // MARK: Settings per exercise
 
@@ -834,9 +868,15 @@ final class PlayAlong: ObservableObject {
     /// Re-reads the route: picks up its calibration, and warns about hands-free Bluetooth or an uncalibrated route.
     /// A route change in the middle of a run stops it (the engine restarts on the new route), and says why.
     func routeChanged() {
+        if !changingRoute {
+            changingRoute = true
+            AudioEngine.reassertInput(allowPhoneMic: allowPhoneMic)
+            changingRoute = false
+        }
         let r = Latency.currentRoute()
         let changed = r.key != route.key
         route = r
+        if changed { showNotice(L.deviceChanged(r.name)) }
         calibration = CalibrationStore.get(r.key)
         interfacePresent = AudioEngine.interfaceInput() != nil
         let onInterface = AVAudioSession.sharedInstance().currentRoute.outputs.contains { $0.portType == .usbAudio }
@@ -855,6 +895,18 @@ final class PlayAlong: ObservableObject {
         }
         if changed && (phase == .running || phase == .calibrating) && r.key != runRouteKey {
             message = L.routeChanged(r.name)
+        }
+    }
+
+    private var changingRoute = false
+
+    private func showNotice(_ text: String) {
+        noticeTurn += 1
+        let turn = noticeTurn
+        routeNotice = text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
+            guard let self, self.noticeTurn == turn else { return }
+            self.routeNotice = nil
         }
     }
 

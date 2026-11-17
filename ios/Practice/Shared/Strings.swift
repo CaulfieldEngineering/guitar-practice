@@ -264,4 +264,100 @@ enum L {
     static let advanced = "Advanced"
     static let useMicrophone = "Use iPhone Microphone"
     static let microphoneFooter = "For testing without an interface."
+
+    // MARK: Audio (Settings > Audio, and the drill's Input and Output rows)
+    static let audio = "Audio"
+    static let inputDevice = "Input"
+    static let outputDevice = "Output"
+    static let noInputName = "No input"
+    static let noOutputName = "No output"
+    static let pickedDevice = "The device you picked"
+    static let phoneSpeaker = "iPhone Speaker"
+    static let otherOutput = "Other Output…"
+    static func inputOf(_ name: String, _ n: Int) -> String { "\(name) · Input \(n)" }
+    static func inputsBoth(_ name: String) -> String { "\(name) · Inputs 1 and 2" }
+    static let micPosition = "Mic"
+    static let channel = "Channel"
+    static func channelName(_ c: InputChannel) -> String {
+        switch c { case .both: return "Inputs 1 and 2"; case .first: return "Input 1"; case .second: return "Input 2" }
+    }
+    static let inputGain = "Input Gain"
+    static let level = "Level"
+    static func verdict(_ v: LevelVerdict) -> String {
+        switch v { case .noSignal: return "No signal"; case .tooQuiet: return "Too quiet"; case .good: return "Good"; case .clipping: return "Clipping" }
+    }
+    static let notListening = "Not listening"
+    static let testTone = "Test Tone"
+    static let clickTest = "Click Test"
+    static let appSounds = "App Sounds"
+    static let appSoundsFooter = "Clicks, guide and voice, against the guitar. Kept for each output."
+    static let monitoring = "Monitoring"
+    static let hearGuitar = "Hear Guitar"
+    static let guitarLevel = "Guitar Level"
+    static let monitorBluetooth = "Bluetooth adds delay. Listen through the interface's own headphone out."
+    static let monitorSpeaker = "Off on the iPhone speaker and mic, which would feed back."
+    static let latency = "Latency"
+    static let latencyInput = "Input"
+    static let latencyOutput = "Output"
+    static let latencyBuffer = "Buffer"
+    static let latencyTotal = "Total"
+    static let calibration = "Calibration"
+    static let notCalibrated = "Not calibrated"
+    static func calibratedOn(_ ms: Int, _ date: String) -> String { "\(ms) ms, \(date)" }
+    static let check = "Check"
+    static let sessionDetails = "Session Details"
+    static let category = "Category"
+    static let mode = "Mode"
+    static let sessionOptions = "Options"
+    static let microphone = "Microphone"
+    static let allowed = "Allowed"
+    static let denied = "Denied"
+    static let notAsked = "Not asked"
+    static let interface = "Interface"
+    static let notFound = "Not found"
+    static let inputsListed = "Inputs"
+    static let outputsListed = "Outputs"
+    static let sampleRate = "Sample Rate"
+    static let channels = "Channels"
+    static let openSettings = "Open Settings"
+    static let allow = "Allow"
+    static func useInput(_ n: Int) -> String { "Use Input \(n)" }
+    static func deviceChanged(_ name: String) -> String { "Audio device changed: \(name)" }
+    static func hz(_ rate: Double) -> String { "\(Int(rate.rounded())) Hz" }
+
+    // The choice, and why iOS used something else (one line each).
+    static func fallbackInputMissing(_ want: String, _ now: String) -> String { "\(want) isn't connected. Using \(now)." }
+    static func fallbackInputRefused(_ want: String, _ now: String) -> String { "iOS kept \(now) instead of \(want)." }
+    static func fallbackSpeaker(_ now: String) -> String { "iOS kept the sound on \(now)." }
+    static func fallbackSpeakerClosed(_ now: String) -> String { "The speaker is used once the input opens. Now on \(now)." }
+    static func fallbackOutput(_ want: String, _ now: String) -> String { "Sound is on \(now). Pick \(want) in the list again." }
+    static func fallbackBluetoothUSB(_ want: String, _ now: String) -> String {
+        "iOS won't send sound to \(want) while recording from the interface, so it's on \(now)."
+    }
+
+    // What is wrong, in plain words.
+    static let diagPermissionOff = "Microphone access is off"
+    static let diagPermissionStep = "Settings > Practice > Microphone"
+    static let diagPermissionAsk = "Allow microphone access to hear the guitar"
+    static let diagNoInterface = "No interface found"
+    static let diagStepPower = "Power it: most interfaces need a powered USB-C hub on iPhone"
+    static let diagStepClassCompliant = "It has to work without a driver (class compliant)"
+    static let diagStepReplug = "Unplug it and plug it back in"
+    static let diagBluetoothLimit = "iOS moved the input off the interface for Bluetooth"
+    static let diagStepTransmitter = "Pair a Bluetooth transmitter on the interface's headphone out with the Shokz"
+    static let diagOnInterface = "Sound goes to the interface"
+    static let diagStepPickShokz = "Pick the Shokz under Output"
+    static let diagGainZero = "Input gain is at zero"
+    static let diagStepRaiseGain = "Raise Input Gain above"
+    static func diagOtherInput(_ n: Int) -> String { "The guitar is on Input \(n)" }
+    static let diagNoSignal = "No guitar signal"
+    static let diagStepPlay = "Play a few notes"
+    static let diagStepBoth = "Set Channel to Inputs 1 and 2"
+    static let diagStepGain = "Turn up the gain knob on the interface"
+    static let diagStepInst = "Use the instrument (Inst or Hi-Z) input"
+    static let diagStepCable = "Check the cable and the guitar's volume knob"
+    static let diagStepPickInterface = "Pick the interface under Input"
+    static let diagTooQuiet = "The guitar is quiet"
+    static let diagClipping = "The guitar is clipping"
+    static let diagStepLower = "Turn down the gain knob on the interface"
 }

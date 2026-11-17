@@ -38,6 +38,8 @@ struct EngineParams {
     var accent = true
     /// Off: the grid clicks go quiet (count-ins, bells and the guided notes still sound).
     var gridClicks = true
+    /// Raised by one to play a second of test tone (the Audio screen).
+    var toneSerial = 0
 }
 
 /// What the audio thread reports back.
@@ -84,6 +86,11 @@ final class RenderState {
     private var gGain = [Float](repeating: 1, count: strings)
     private var gFade = [Bool](repeating: false, count: strings)
 
+    // The test tone: an A at 440 Hz, -12 dBFS, one second with short fades.
+    private var lastToneSerial = 0
+    private var toneLeft = 0
+    private var tonePhase = 0.0
+
     init(sampleRate: Double, params: Locked<EngineParams>, report: Locked<EngineReport>, sounds: SoundBank = SynthSounds(),
          guitar: GuitarBank? = GuitarBank.shared) {
         self.sampleRate = sampleRate
@@ -92,6 +99,7 @@ final class RenderState {
         paramsBox = params
         reportBox = report
         self.params = params.current
+        lastToneSerial = self.params.toneSerial
         var ptrs: [UnsafeMutablePointer<Float>] = [], lens: [Int] = []
         for raw in 0...ClickKind.pluckAccent.rawValue {
             let s = sounds.samples(for: ClickKind(rawValue: raw)!, sampleRate: sampleRate)
@@ -181,6 +189,25 @@ final class RenderState {
                 if ended { gSample[v] = -1 }
             }
         }
+        if params.toneSerial != lastToneSerial {
+            lastToneSerial = params.toneSerial
+            toneLeft = Int(sampleRate)
+            tonePhase = 0
+        }
+        if toneLeft > 0 {
+            let total = Int(sampleRate), fade = max(1, Int(sampleRate * 0.01))
+            let step = 2 * Double.pi * 440 / sampleRate
+            var i = 0
+            while i < n && toneLeft > 0 {
+                let done = total - toneLeft
+                let env = Float(min(1, Double(min(done, toneLeft)) / Double(fade)))
+                out[i] += Float(sin(tonePhase)) * 0.25 * env
+                tonePhase += step
+                if tonePhase > 2 * Double.pi { tonePhase -= 2 * Double.pi }
+                toneLeft -= 1
+                i += 1
+            }
+        }
         if bufs.count > 1 {
             for b in 1..<bufs.count {
                 if let o = bufs[b].mData?.assumingMemoryBound(to: Float.self) { for i in 0..<n { o[i] = out[i] } }
@@ -204,22 +231,47 @@ final class RenderState {
 /// The audio engine: one source node that renders the clicks sample by sample from the sequencers, so timing is
 /// exact to the frame and never depends on a UI timer. Plays alongside other apps and keeps going when the screen
 /// locks (the audio background mode). With `record`, the input (an interface, or the phone's microphone) is tapped
-/// for the play-along.
+/// for the play-along and the meter, on the channel picked on the Audio screen, and can be heard through the app.
+///
+/// A route change (an interface plugged in, Bluetooth headphones connecting, another output picked) rebuilds the
+/// engine in place on the new route with the same render state, so the clicks, the run and the screen carry on
+/// (Joe, 2026-11-16: "when I swap the audio device it closes that current window"). Only a call or a reset of the
+/// audio system stops it.
 final class AudioEngine {
     let params = Locked(EngineParams())
     let report = Locked(EngineReport())
     private(set) var engine: AVAudioEngine?
     private(set) var state: RenderState?
     private(set) var recording = false
-    /// Input samples, the host time (seconds) of the first one, and the input sample rate. Called off the main thread.
+    /// Whether the input is tapped now (a record engine on a route with no input runs without it).
+    private(set) var tapped = false
+    /// Input samples (the picked channel), the host time (seconds) of the first one, and the input sample rate.
+    /// Called off the main thread.
     var onInput: ((UnsafeBufferPointer<Float>, Double, Double) -> Void)?
-    /// Called on the main thread when the system stopped the engine (a call, a route change).
+    /// What the input tap saw since the meter last took it.
+    let meter = Locked(MeterReading())
+    /// The input's channel count and the channel listened to, as built.
+    private(set) var inputChannels = 0
+    private(set) var listening: InputChannel = .both
+    /// Called on the main thread when the system stopped the engine (a call, a reset) and it could not go on.
     var onInterrupted: (() -> Void)?
+    /// Called on the main thread after the engine was rebuilt on a new route and carries on.
+    var onRerouted: (() -> Void)?
     private var observers: [NSObjectProtocol] = []
+    private var configObserver: NSObjectProtocol?
+    private var rebuildScheduled = false
+    private var source: AVAudioSourceNode?
+    private var monitorMixer: AVAudioMixerNode?
     /// The clicks, bells and guide notes; swap in a sampled set here.
     var sounds: SoundBank = SynthSounds()
 
+    /// The app's own sounds against the guitar, 0 to 1 (the Audio screen's App Sounds).
+    var appVolume: Float = 1 { didSet { source?.volume = appVolume } }
+    /// The guitar heard through the app, 0 to 1, when monitoring is on for this output.
+    var monitorVolume: Float = 0.8 { didSet { monitorMixer?.outputVolume = monitorVolume } }
+
     var isRunning: Bool { engine?.isRunning ?? false }
+    var isMonitoring: Bool { monitorMixer != nil }
     var sampleRate: Double { state?.sampleRate ?? 48000 }
     /// Frames of silence before plan time 0, so the first click is never cut.
     var leadIn: Double { 0.12 * sampleRate }
@@ -252,59 +304,189 @@ final class AudioEngine {
     func start(record: Bool, setup: (RenderState, Double) -> Void) throws {
         stop()
         let session = AVAudioSession.sharedInstance()
-        if record {
-            // A2DP only (never .allowBluetooth, which is hands-free): Bluetooth headphones stay in their listening
-            // mode, and the input is the interface or the phone's microphone, never the headphones' own.
-            try session.setCategory(.playAndRecord, mode: .measurement, options: AudioEngine.recordOptions)
-            try? session.setActive(true)
-            try AudioEngine.preferInterface(session, allowPhoneMic: allowPhoneMic)
-        } else {
-            try session.setCategory(.playback, mode: .default, options: AudioEngine.playOptions)
-        }
-        try? session.setPreferredIOBufferDuration(0.005)
-        try session.setActive(true)
+        try AudioEngine.configure(session, record: record, allowPhoneMic: allowPhoneMic)
 
         let engine = AVAudioEngine()
         let outFormat = engine.outputNode.outputFormat(forBus: 0)
         let sr = outFormat.sampleRate > 0 ? outFormat.sampleRate : session.sampleRate
         let st = RenderState(sampleRate: sr, params: params, report: report, sounds: sounds)
         setup(st, 0.12 * sr)
-        let fmt = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1)!
+        try build(engine, state: st, record: record, requireInput: record)
+    }
+
+    /// The session for a run, a check or the metronome. Recording: play and record, A2DP only (never .allowBluetooth,
+    /// which is hands-free), so Bluetooth headphones stay in their listening mode and the input is the interface (or
+    /// the phone's microphone when allowed), never the headphones' own; measurement mode, so iOS adds no processing
+    /// or gain control to the guitar. Then the input picked on the Audio screen, its channels, gain and mic position.
+    static func configure(_ session: AVAudioSession, record: Bool, allowPhoneMic: Bool) throws {
+        if record {
+            try session.setCategory(.playAndRecord, mode: .measurement, options: recordOptions)
+            try? session.setActive(true)
+            try preferInterface(session, allowPhoneMic: allowPhoneMic)
+        } else {
+            try session.setCategory(.playback, mode: .default, options: playOptions)
+        }
+        try? session.setPreferredIOBufferDuration(0.005)
+        try session.setActive(true)
+        if record { applyInputPrefs(session) }
+        applyOutputChoice(session)
+    }
+
+    /// The output picked by hand. iOS lets an app choose only the phone's speaker by itself (and only while the
+    /// input is open); any other output is chosen in the system's list, and the Audio screen says when iOS put the
+    /// sound somewhere else.
+    static func applyOutputChoice(_ session: AVAudioSession = .sharedInstance()) {
+        guard session.category == .playAndRecord else { return }
+        let onSpeaker = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
+        if AudioPrefs.preferredOutput == AudioPrefs.speakerID {
+            if !onSpeaker { try? session.overrideOutputAudioPort(.speaker) }
+        } else if onSpeaker && AudioPrefs.preferredOutput != nil {
+            try? session.overrideOutputAudioPort(.none)
+        }
+    }
+
+    /// Wires the engine: the source node (at the render state's own rate, so a new route's rate is converted by the
+    /// mixer and the frame clock never jumps), the input tap on the picked channel, and the monitor path.
+    private func build(_ engine: AVAudioEngine, state st: RenderState, record: Bool, requireInput: Bool) throws {
+        let fmt = AVAudioFormat(standardFormatWithSampleRate: st.sampleRate, channels: 1)!
         let node = AVAudioSourceNode(format: fmt) { _, ts, frameCount, abl in
             st.render(Int(frameCount), ts, abl)
             return noErr
         }
+        node.volume = appVolume
         engine.attach(node)
         engine.connect(node, to: engine.mainMixerNode, format: fmt)
+        engine.mainMixerNode.outputVolume = 1
 
+        var didTap = false
+        var mixer: AVAudioMixerNode?
         if record {
             let input = engine.inputNode
             let inFormat = input.outputFormat(forBus: 0)
-            guard inFormat.sampleRate > 0, inFormat.channelCount > 0 else { throw Failure.noInput }
-            let inRate = inFormat.sampleRate
-            input.installTap(onBus: 0, bufferSize: 512, format: inFormat) { [weak self] buffer, when in
-                guard let ch = buffer.floatChannelData?[0] else { return }
-                let host = when.isHostTimeValid ? AVAudioTime.seconds(forHostTime: when.hostTime) : 0
-                self?.onInput?(UnsafeBufferPointer(start: ch, count: Int(buffer.frameLength)), host, inRate)
+            if inFormat.sampleRate > 0 && inFormat.channelCount > 0 {
+                installTap(on: input, format: inFormat)
+                didTap = true
+                let route = Latency.currentRoute()
+                let out = AudioPrefs.output(AudioEngine.outputUID())
+                // Not on the phone's own speaker and microphone: it would feed back.
+                if out.monitor && !route.phoneSpeakerAndMic {
+                    let m = AVAudioMixerNode()
+                    engine.attach(m)
+                    engine.connect(input, to: m, format: inFormat)
+                    // Mono out of the monitor, so a guitar on one input is heard in both ears.
+                    engine.connect(m, to: engine.mainMixerNode,
+                                   format: AVAudioFormat(standardFormatWithSampleRate: inFormat.sampleRate, channels: 1))
+                    monitorVolume = Float(out.monitorLevel)
+                    m.outputVolume = monitorVolume
+                    mixer = m
+                }
+            } else if requireInput {
+                throw Failure.noInput
             }
         }
-        observers.append(NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
-            if self?.engine === engine { self?.onInterrupted?() }
-        })
+        configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            if self?.engine === engine { self?.scheduleRebuild() }
+        }
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            if didTap { engine.inputNode.removeTap(onBus: 0) }
+            if let o = configObserver { NotificationCenter.default.removeObserver(o); configObserver = nil }
+            throw error
+        }
         self.engine = engine
         self.state = st
+        self.source = node
+        self.monitorMixer = mixer
         recording = record
+        tapped = didTap
+    }
+
+    private func installTap(on input: AVAudioInputNode, format inFormat: AVAudioFormat) {
+        let inRate = inFormat.sampleRate
+        let chans = Int(inFormat.channelCount)
+        let pick = AudioPrefs.input(AudioEngine.inputUID()).channel
+        inputChannels = chans
+        listening = pick
+        let meter = self.meter
+        let scratch = Scratch()
+        meter.with { $0 = MeterReading() }
+        input.installTap(onBus: 0, bufferSize: 512, format: inFormat) { [weak self] buffer, when in
+            guard let data = buffer.floatChannelData else { return }
+            let n = Int(buffer.frameLength)
+            guard n > 0 else { return }
+            let host = when.isHostTimeValid ? AVAudioTime.seconds(forHostTime: when.hostTime) : 0
+            let ptrs = (0..<min(chans, 2)).map { UnsafePointer(data[$0]) }
+            let out = scratch.buffer(n)
+            InputChannel.mix(ptrs, frames: n, pick: pick, into: out)
+            let picked = UnsafeBufferPointer(start: UnsafePointer(out), count: n)
+            meter.with { m in
+                m.add(picked)
+                for (k, p) in ptrs.enumerated() { m.addChannelPeak(k, UnsafeBufferPointer(start: p, count: n)) }
+            }
+            self?.onInput?(picked, host, inRate)
+        }
+    }
+
+    /// The meter's reading since it was last taken.
+    func takeMeter() -> MeterReading { meter.with { let r = $0; $0 = MeterReading(); return r } }
+
+    /// Route changes come in bursts: rebuild once, a moment after the last.
+    private func scheduleRebuild() {
+        guard !rebuildScheduled else { return }
+        rebuildScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self else { return }
+            self.rebuildScheduled = false
+            self.rebuild()
+        }
+    }
+
+    #if DEBUG
+    /// For the UI test of route changes: what a real AVAudioEngineConfigurationChange does.
+    func simulateConfigurationChange() { if engine != nil { scheduleRebuild() } }
+    #endif
+
+    /// The engine again, on the route there is now, carrying on from the same frame (the Audio screen calls it too,
+    /// after the channel or monitoring changes).
+    func rebuild() {
+        guard let old = engine, let st = state else { return }
+        let record = recording
+        if tapped { old.inputNode.removeTap(onBus: 0) }
+        old.stop()
+        if let o = configObserver { NotificationCenter.default.removeObserver(o); configObserver = nil }
+        engine = nil; source = nil; monitorMixer = nil; tapped = false
+        let session = AVAudioSession.sharedInstance()
+        if record {
+            try? AudioEngine.preferInterface(session, allowPhoneMic: allowPhoneMic)
+            try? session.setActive(true)
+            AudioEngine.applyInputPrefs(session)
+        } else {
+            try? session.setActive(true)
+        }
+        do {
+            // A run whose interface was unplugged goes on without its input (the screen says why).
+            try build(AVAudioEngine(), state: st, record: record, requireInput: false)
+            onRerouted?()
+        } catch {
+            state = nil
+            recording = false
+            onInterrupted?()
+        }
     }
 
     func stop() {
-        guard let engine else { return }
-        if recording { engine.inputNode.removeTap(onBus: 0) }
+        if let o = configObserver { NotificationCenter.default.removeObserver(o); configObserver = nil }
+        guard let engine else { state = nil; recording = false; return }
+        if tapped { engine.inputNode.removeTap(onBus: 0) }
         engine.stop()
         self.engine = nil
         state = nil
+        source = nil
+        monitorMixer = nil
         recording = false
+        tapped = false
     }
 
     /// Seconds of plan time played so far (frames rendered, less the lead-in, less the output latency).
@@ -330,8 +512,21 @@ final class AudioEngine {
         return nil
     }
 
+    /// The input picked by hand on the Audio screen, if it is plugged in.
+    static func pickedInput(_ session: AVAudioSession = .sharedInstance()) -> AVAudioSessionPortDescription? {
+        guard let uid = AudioPrefs.preferredInput else { return nil }
+        return (session.availableInputs ?? []).first { $0.uid == uid }
+    }
+
+    /// The input to ask for: the one picked by hand when it is here (the phone's microphone only when allowed),
+    /// else the interface.
+    static func wantedInput(_ session: AVAudioSession, allowPhoneMic: Bool) -> AVAudioSessionPortDescription? {
+        if let p = pickedInput(session), p.portType != .builtInMic || allowPhoneMic { return p }
+        return interfaceInput(session)
+    }
+
     static func preferInterface(_ session: AVAudioSession, allowPhoneMic: Bool) throws {
-        if let port = interfaceInput(session) {
+        if let port = wantedInput(session, allowPhoneMic: allowPhoneMic) {
             if session.preferredInput?.uid != port.uid { try? session.setPreferredInput(port) }
             return
         }
@@ -339,6 +534,39 @@ final class AudioEngine {
             throw Failure.noInterface
         }
         try? session.setPreferredInput(mic)
+    }
+
+    /// After a route change with the session recording: iOS can move the input off the interface (to the phone's
+    /// microphone) when Bluetooth headphones are picked for the output. Ask for the interface again; whether iOS
+    /// keeps it is read back from the route (the Audio screen says so when it does not).
+    static func reassertInput(_ session: AVAudioSession = .sharedInstance(), allowPhoneMic: Bool) {
+        guard session.category == .playAndRecord else { return }
+        guard let want = wantedInput(session, allowPhoneMic: allowPhoneMic) else { applyOutputChoice(session); return }
+        if !session.currentRoute.inputs.contains(where: { $0.uid == want.uid }) { try? session.setPreferredInput(want) }
+        applyOutputChoice(session)
+    }
+
+    /// Both of a two-input interface's channels (iOS can open one unless asked), then the remembered gain and mic
+    /// position for the input in use. Needs an active session.
+    static func applyInputPrefs(_ session: AVAudioSession) {
+        if session.maximumInputNumberOfChannels >= 2 && session.inputNumberOfChannels < 2 {
+            try? session.setPreferredInputNumberOfChannels(2)
+        }
+        guard let port = session.currentRoute.inputs.first else { return }
+        let p = AudioPrefs.input(port.uid)
+        if let id = p.dataSourceID, let ds = port.dataSources?.first(where: { $0.dataSourceID.intValue == id }),
+           port.selectedDataSource?.dataSourceID != ds.dataSourceID {
+            try? port.setPreferredDataSource(ds)
+        }
+        if let g = p.gain, session.isInputGainSettable { try? session.setInputGain(g) }
+    }
+
+    static func inputUID(_ session: AVAudioSession = .sharedInstance()) -> String {
+        session.currentRoute.inputs.first?.uid ?? ""
+    }
+
+    static func outputUID(_ session: AVAudioSession = .sharedInstance()) -> String {
+        session.currentRoute.outputs.first?.uid ?? ""
     }
 
     /// Puts the session in record mode (A2DP only), so the interface's input is listed. Leaves a running engine alone.
@@ -367,5 +595,16 @@ final class AudioEngine {
         }
         try? s.setActive(true)
     }
+}
 
+/// A reusable buffer for the input tap (which runs on its own thread, one block at a time).
+private final class Scratch {
+    private var ptr: UnsafeMutablePointer<Float>
+    private var capacity: Int
+    init() { capacity = 4096; ptr = .allocate(capacity: capacity) }
+    deinit { ptr.deallocate() }
+    func buffer(_ n: Int) -> UnsafeMutablePointer<Float> {
+        if n > capacity { ptr.deallocate(); capacity = n; ptr = .allocate(capacity: n) }
+        return ptr
+    }
 }

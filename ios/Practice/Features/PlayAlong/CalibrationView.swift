@@ -94,6 +94,11 @@ struct CalibrationView: View {
                 .font(Typo.foot).foregroundStyle(Theme.faint)
                 .multilineTextAlignment(.center)
                 .padding(.top, Space.sm)
+            if let m = pa.message {
+                Text(m).font(Typo.foot).foregroundStyle(Theme.warn)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, Space.xs)
+            }
 
             Spacer(minLength: Space.md)
 

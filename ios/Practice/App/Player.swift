@@ -5,7 +5,8 @@ import UIKit
 /// The app's one player: the metronome, a running routine, or a play-along run. Starting one stops the others.
 @MainActor
 final class Player: ObservableObject {
-    enum Mode: Equatable { case idle, metronome, routine, playAlong }
+    /// `check` is the Audio screen listening to the input (the meter, the test tone, the click test).
+    enum Mode: Equatable { case idle, metronome, routine, playAlong, check }
 
     let audio = AudioEngine()
     let voice = Voice()
@@ -21,7 +22,12 @@ final class Player: ObservableObject {
     @Published var beatsPerBar: Int { didSet { pushParams(); save() } }
     @Published var subdivision: Int { didSet { pushParams(); save() } }
     @Published var accent: Bool { didSet { pushParams(); save() } }
-    @Published var volume: Double { didSet { audio.engine?.mainMixerNode.outputVolume = Float(volume); save() } }
+    /// The app's own sounds (clicks, guide, voice, test sounds), 0 to 1, against the guitar. Remembered per output
+    /// (the Shokz and the interface want different levels).
+    @Published var volume: Double { didSet { audio.appVolume = Float(volume); voice.level = Float(volume); save(); saveOutputVolume() } }
+    private var loadingVolume = false
+    /// Raised each time the engine carried on across a route change (screens show a short notice).
+    @Published private(set) var reroutes = 0
     @Published var keepScreenOn: Bool { didSet { save(); updateIdleTimer() } }
     @Published private(set) var currentBeat = -1
 
@@ -38,6 +44,8 @@ final class Player: ObservableObject {
     /// Called on every UI frame while running (the play-along reads its input here).
     var onFrame: (() -> Void)?
     var onStopped: (() -> Void)?
+    /// Called after the engine carried on across a route change (the calibration measures its step again).
+    var afterReroute: (() -> Void)?
 
     init() {
         let d = UserDefaults.standard
@@ -47,7 +55,34 @@ final class Player: ObservableObject {
         accent = d.object(forKey: "accent") as? Bool ?? true
         volume = d.object(forKey: "volume") as? Double ?? 1
         keepScreenOn = d.object(forKey: "keepScreenOn") as? Bool ?? true
+        audio.appVolume = Float(volume)
+        voice.level = Float(volume)
         audio.onInterrupted = { [weak self] in self?.interrupted() }
+        audio.onRerouted = { [weak self] in
+            self?.reroutes += 1
+            self?.afterReroute?()
+        }
+        NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.loadOutputVolume() }
+        }
+        loadOutputVolume()
+    }
+
+    /// The level kept for the output in use, if one was set on it.
+    private func loadOutputVolume() {
+        guard let v = AudioPrefs.output(AudioEngine.outputUID()).appVolume, v != volume else { return }
+        loadingVolume = true
+        volume = v
+        loadingVolume = false
+    }
+
+    private func saveOutputVolume() {
+        guard !loadingVolume else { return }
+        let uid = AudioEngine.outputUID()
+        guard !uid.isEmpty else { return }
+        var p = AudioPrefs.output(uid)
+        p.appVolume = volume
+        AudioPrefs.setOutput(p, for: uid)
     }
 
     private func save() {
@@ -78,7 +113,6 @@ final class Player: ObservableObject {
                 st.free = FreeSequencer(sampleRate: st.sampleRate, bpm: Double(bpm), beatsPerBar: beatsPerBar,
                                         subdivision: subdivision, accent: accent, startFrame: lead)
             }
-            audio.engine?.mainMixerNode.outputVolume = Float(volume)
             mode = .metronome
             startTimer()
         } catch { fail(error) }
@@ -143,7 +177,6 @@ final class Player: ObservableObject {
                 st.routine = RoutineSequencer(plan: plan, sampleRate: st.sampleRate, beatsPerBar: routine.beatsPerBar,
                                               subdivision: routine.subdivision, origin: origin, seek: seek)
             }
-            audio.engine?.mainMixerNode.outputVolume = Float(volume)
             mode = .routine
             paused = false
             startTimer()
@@ -192,9 +225,34 @@ final class Player: ObservableObject {
         stop()
         audio.params.with { $0 = params }
         try audio.start(record: record, setup: setup)
-        audio.engine?.mainMixerNode.outputVolume = Float(volume)
         mode = .playAlong
         startTimer()
+    }
+
+    // MARK: The Audio screen's check
+
+    /// Opens the input for the meter, with a queue for the click test. Stops anything else playing.
+    func startCheck() throws {
+        stop()
+        audio.params.with { $0 = EngineParams(bpm: 120, beatsPerBar: 4, subdivision: 1, accent: true, gridClicks: true) }
+        try audio.start(record: true) { st, _ in st.track = EventQueue() }
+        mode = .check
+    }
+
+    func stopCheck() { if mode == .check { stop() } }
+
+    /// One second of an A at 440 Hz, at the App Sounds level.
+    func playTestTone() {
+        guard mode == .check else { return }
+        audio.params.with { $0.toneSerial += 1 }
+    }
+
+    /// A bar of clicks, the first accented, at 120 bpm.
+    func playTestClicks() {
+        guard mode == .check, let q = audio.state?.track else { return }
+        let sr = audio.sampleRate
+        let start = audio.report.current.frame + Int64(0.1 * sr)
+        q.append((0..<4).map { ClickEvent(frame: start + Int64(Double($0) * 0.5 * sr), kind: $0 == 0 ? .accent : .beat, beat: $0) })
     }
 
     // MARK: Common

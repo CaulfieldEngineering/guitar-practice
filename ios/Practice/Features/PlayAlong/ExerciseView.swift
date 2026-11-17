@@ -4,8 +4,10 @@ import SwiftUI
 /// After: the result (ResultView). The words are in Shared/Strings.swift.
 struct ExerciseView: View {
     @EnvironmentObject var pa: PlayAlong
+    @EnvironmentObject var audio: AudioSetup
     @Environment(\.dismiss) private var dismiss
     @State private var optionsOpen = false
+    @State private var showAudio = false
 
     private var live: Bool { pa.phase == .running || pa.phase == .paused || pa.phase == .calibrating || pa.phase == .syncing }
     private var busy: Bool { live || pa.phase == .intro }
@@ -227,22 +229,76 @@ struct ExerciseView: View {
         }
     }
 
-    /// Where the sound comes in and goes out, said plainly, with the system's own picker to send it to the
-    /// headphones, the interface or the speaker (an interface that is plugged in takes the sound unless told
-    /// otherwise). One line more when iOS has put the sound on the interface.
+    /// The input and the output, each picked from a list (Joe, 2026-11-16: "just allow me to pick input and output
+    /// explicitly"), one amber line when iOS used something else, and the Audio screen one tap away.
     private var routeBlock: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Row(label: L.audioRoute, detail: routeText, divider: pa.outputNote == nil) {
-                RoutePicker().frame(width: 40, height: 40)
-                    .accessibilityLabel(L.chooseOutput)
-                    .accessibilityIdentifier("route")
+            if pa.audioInput {
+                Row(label: L.inputDevice, divider: audio.inputNote == nil) {
+                    Menu {
+                        Picker(L.inputDevice, selection: Binding(get: { audio.inputChoiceID ?? "" }, set: { id in
+                            if let c = audio.inputChoices.first(where: { $0.id == id }) { audio.select(c) }
+                        })) {
+                            ForEach(audio.inputChoices) { Text($0.name).tag($0.id) }
+                        }
+                    } label: { menuLabel(audio.inputChoices.first { $0.id == audio.inputChoiceID }?.name ?? L.noInputName) }
+                    .accessibilityIdentifier("drill.input")
+                }
+                if let n = audio.inputNote { note(n) }
             }
-            if let note = pa.outputNote {
-                Text(note).font(Typo.foot).foregroundStyle(Theme.warn)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.bottom, Space.xs)
-                Hairline()
+            Row(label: L.outputDevice, divider: audio.outputNote == nil && pa.outputNote == nil) {
+                HStack(spacing: Space.xxs) {
+                    Menu {
+                        Picker(L.outputDevice, selection: Binding(get: { audio.outputChoiceID ?? "" }, set: { audio.selectOutput($0) })) {
+                            ForEach(audio.outputChoices) { Text($0.name).tag($0.id) }
+                        }
+                    } label: { menuLabel(audio.outputs.first?.name ?? L.noOutputName) }
+                    .accessibilityIdentifier("drill.output")
+                    RoutePicker(trigger: audio.systemPicker).frame(width: 40, height: 40)
+                        .accessibilityLabel(L.chooseOutput)
+                        .accessibilityIdentifier("route")
+                }
             }
+            if let n = audio.outputNote ?? pa.outputNote { note(n) }
+            Button { showAudio = true } label: {
+                HStack {
+                    Text(L.audio).font(Typo.body).foregroundStyle(Theme.text)
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.faint)
+                }
+                .frame(minHeight: Control.row)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityIdentifier("drill.audio")
+            Hairline()
+        }
+        .onAppear { pa.prepareInput(); audio.refresh() }
+        .onChange(of: pa.audioInput) { _, _ in pa.prepareInput(); audio.refresh() }
+        .sheet(isPresented: $showAudio, onDismiss: { pa.prepareInput(); audio.refresh() }) {
+            NavigationStack {
+                AudioSettingsView()
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L.done) { showAudio = false } } }
+            }
+            .routeNotice()
+        }
+    }
+
+    private func menuLabel(_ text: String) -> some View {
+        HStack(spacing: Space.xxs) {
+            Text(text).font(Typo.body).foregroundStyle(Theme.muted).lineLimit(1).truncationMode(.middle)
+            Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.faint)
+        }
+        .frame(minHeight: Space.touch)
+    }
+
+    private func note(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(text).font(Typo.foot).foregroundStyle(Theme.warn)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, Space.xs)
+                .accessibilityIdentifier("drill.note")
+            Hairline()
         }
     }
 

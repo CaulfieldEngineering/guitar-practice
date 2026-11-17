@@ -234,7 +234,7 @@ struct RunningBar: View {
     private var drill: Bool { player.mode == .playAlong || pa.phase == .paused }
     private var shows: Bool {
         if drill { return own != .playAlong }
-        return player.mode != .idle && player.mode != own
+        return player.mode != .idle && player.mode != .check && player.mode != own
     }
 
     var body: some View {
