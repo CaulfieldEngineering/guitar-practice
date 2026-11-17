@@ -876,7 +876,7 @@ final class PlayAlong: ObservableObject {
         let r = Latency.currentRoute()
         let changed = r.key != route.key
         route = r
-        if changed { showNotice(L.deviceChanged(r.name)) }
+        if changed { showNotice(L.deviceChanged(r.input == L.noInputName ? r.output : r.name)) }
         calibration = CalibrationStore.get(r.key)
         interfacePresent = AudioEngine.interfaceInput() != nil
         let onInterface = AVAudioSession.sharedInstance().currentRoute.outputs.contains { $0.portType == .usbAudio }
