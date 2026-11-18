@@ -88,6 +88,9 @@ struct ScoreResult: Equatable {
     /// The windows the notes were judged with, averaged over the run (ms).
     var fullMs: Double = 0
     var zeroMs: Double = 0
+    /// Each extra note's distance from its nearest note of the drill, ms (positive: after it), so a run shows what
+    /// the extras were (0.2.2).
+    var extraOffsets: [Double] = []
 
     var pct20: Int { expected > 0 ? Int((100 * Double(within20) / Double(expected)).rounded()) : 0 }
     var pct40: Int { expected > 0 ? Int((100 * Double(within40) / Double(expected)).rounded()) : 0 }
@@ -178,9 +181,15 @@ enum Scoring {
             if a <= rule.closeMs { w40 += 1 }
         }
         var extra = 0
+        var extraOffsets: [Double] = []
         if let first = exp.first, let last = exp.last {
             let used = Set(m.compactMap { $0 })
-            for (j, t) in times.enumerated() where !used.contains(j) && t >= first - window && t <= last + window { extra += 1 }
+            for (j, t) in times.enumerated() where !used.contains(j) && t >= first - window && t <= last + window {
+                extra += 1
+                var near = exp[0]
+                for e in exp where abs(e - t) < abs(near - t) { near = e }
+                extraOffsets.append((t - near) * 1000)
+            }
         }
         let mean = matched.isEmpty ? 0 : matched.reduce(0, +) / Double(matched.count)
         let spread = matched.count < 2 ? 0 : (matched.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / Double(matched.count - 1)).squareRoot()
@@ -207,7 +216,42 @@ enum Scoring {
         return ScoreResult(expected: exp.count, hits: hits, within20: w20, within40: w40, missed: exp.count - hits,
                            extra: extra, errors: errors, meanError: mean, spread: spread,
                            accentsLanded: landed, accentBeats: beats, score: min(100, max(0, s)), passMark: rule.passMark,
-                           full: full, fullMs: exp.isEmpty ? 0 : fullSum / n, zeroMs: exp.isEmpty ? 0 : zeroSum / n)
+                           full: full, fullMs: exp.isEmpty ? 0 : fullSum / n, zeroMs: exp.isEmpty ? 0 : zeroSum / n,
+                           extraOffsets: extraOffsets)
+    }
+
+    /// Adds a pick heard to the run's list, unless it is the same pick heard twice (0.2.2). Two onsets closer than
+    /// `within` seconds, one with under `weakerThan` of the other's energy, are one pick: the stronger one is kept.
+    /// Two picks of like strength are two notes, so a real extra note is still an extra.
+    /// Returns false when the pick was folded into the one before it.
+    @discardableResult
+    static func addPick(_ o: Onset, to played: inout [Onset], within: Double, weakerThan ratio: Float = 0.5) -> Bool {
+        guard let last = played.last, o.time - last.time < within, o.time >= last.time else {
+            played.append(o); return true
+        }
+        if o.strength < last.strength * ratio { return false }
+        if last.strength < o.strength * ratio { played[played.count - 1] = o; return false }
+        played.append(o); return true
+    }
+
+    /// The same over a whole list in time order.
+    static func dropDoubles(_ list: [Onset], within: Double, weakerThan ratio: Float = 0.5) -> [Onset] {
+        var out: [Onset] = []
+        for o in list { addPick(o, to: &out, within: within, weakerThan: ratio) }
+        return out
+    }
+
+    /// What a run's timing means in plain words, from its spread (the standard deviation of the picks around his own
+    /// average, ms). The anchors are the timing research's: session players hold about 10 to 15 ms, a good amateur
+    /// 20 to 30, a beginner 40 to 60.
+    static func band(spreadMs: Double) -> String {
+        switch spreadMs {
+        case ..<15: return L.bandLocked
+        case ..<25: return L.bandTight
+        case ..<40: return L.bandGood
+        case ..<60: return L.bandLoose
+        default: return L.bandRough
+        }
     }
 
     /// Calibration: he plays along to clicks; the offset is the median of (played - click) over the clicks he hit

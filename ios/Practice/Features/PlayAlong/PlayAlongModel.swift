@@ -94,6 +94,8 @@ final class PlayAlong: ObservableObject {
 
     private(set) var notes: [Exercise.Note] = []
     private(set) var played: [Onset] = []       // plan time, calibration applied
+    /// Picks heard twice and folded into one (Scoring.addPick), this run.
+    private(set) var doubles = 0
     private(set) var states: [NoteState] = []
     private(set) var countInEnd: Double = 0
     private(set) var plannedEnd: Double?        // nil for endurance until it stops
@@ -551,7 +553,7 @@ final class PlayAlong: ObservableObject {
         runZoneMax = nil
         let tempo = 80.0
         currentBPM = tempo
-        slots = []; noteStart = []; played = []; errors = []; gaps = []; usedPlayed = []
+        slots = []; noteStart = []; played = []; doubles = 0; errors = []; gaps = []; usedPlayed = []
         accuracies = []; lastPassed = nil; rolling = nil; lastCycleAccuracy = nil; sustained = 0
         score = nil; saved = nil; unscored = nil; newBest = false
         level = 0
@@ -654,7 +656,7 @@ final class PlayAlong: ObservableObject {
         now = 0
         currentBPM = startBPM
         topBPM = Int(startBPM)
-        slots = []; noteStart = []; notes = []; states = []; played = []; errors = []; gaps = []; usedPlayed = []
+        slots = []; noteStart = []; notes = []; states = []; played = []; doubles = 0; errors = []; gaps = []; usedPlayed = []
         // With the audio input off nothing is judged, so the ladder climbs after every cycle.
         accuracies = []; lastPassed = runScored ? nil : true; rolling = nil; lastCycleAccuracy = nil; sustained = 0
         score = nil; saved = nil; unscored = nil; newBest = false
@@ -959,8 +961,11 @@ final class PlayAlong: ObservableObject {
         }
         if runScored {
             level = input.level
+            let within = window
             for o in input.drain() where o.time > 0 {
-                played.append(Onset(time: planTime(host: o.time) - shift, strength: o.strength))
+                if !Scoring.addPick(Onset(time: planTime(host: o.time) - shift, strength: o.strength), to: &played, within: within) {
+                    doubles += 1
+                }
             }
         }
         if phase == .running { scheduleAhead() }
@@ -1083,8 +1088,11 @@ final class PlayAlong: ObservableObject {
         player.stop()
         // Paused: the input was closed and emptied when the run was held.
         if !wasPaused {
+            let within = window
             for o in input.finish() where o.time > 0 {
-                played.append(Onset(time: planTime(host: o.time) - runShift, strength: o.strength))
+                if !Scoring.addPick(Onset(time: planTime(host: o.time) - runShift, strength: o.strength), to: &played, within: within) {
+                    doubles += 1
+                }
             }
         }
         if wasCalibrating {
@@ -1144,7 +1152,8 @@ final class PlayAlong: ObservableObject {
             meanErrorMs: r.meanError, spreadMs: r.spread, toleranceMs: r.fullMs, targetPercent: runSettings.targetPercent,
             accuracyPercent: r.score, sustainedSeconds: held, score: r.score, passed: passed,
             accentsPercent: accentsPercent, offsetMs: offsetMs, appVersion: appVersion,
-            scoringVersion: 2, fullMs: r.fullMs, zeroMs: r.zeroMs)
+            scoringVersion: 2, fullMs: r.fullMs, zeroMs: r.zeroMs, doubles: doubles,
+            extraOffsetsMs: r.extraOffsets.prefix(400).map { Int($0.rounded()) })
         newBest = false
         if !runGuided, let previous = Stats.best(history.results, exerciseID: result.exerciseID, mode: result.mode, bpm: result.startBPM) {
             newBest = result.bestValue > previous

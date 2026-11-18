@@ -209,9 +209,13 @@ final class AudioSetup: ObservableObject {
 
     func setMonitor(_ on: Bool) {
         let uid = AudioEngine.outputUID()
-        var p = AudioPrefs.output(uid)
-        p.monitor = on
-        AudioPrefs.setOutput(p, for: uid)
+        if Latency.currentRoute().bluetoothOutput {
+            AudioPrefs.bluetoothMonitor = on      // never kept on Bluetooth: off again next launch
+        } else {
+            var p = AudioPrefs.output(uid)
+            p.monitor = on
+            AudioPrefs.setOutput(p, for: uid)
+        }
         monitor = on
         restartIfListening()
     }
@@ -310,7 +314,7 @@ final class AudioSetup: ObservableObject {
         gainSettable = s.isInputGainSettable
         gain = s.inputGain
         let out = AudioPrefs.output(AudioEngine.outputUID())
-        monitor = out.monitor
+        monitor = AudioPrefs.monitorOn(out, bluetooth: Latency.currentRoute().bluetoothOutput)
         monitorLevel = out.monitorLevel
         inputLatency = s.inputLatency
         outputLatency = s.outputLatency

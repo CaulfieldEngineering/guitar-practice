@@ -189,6 +189,11 @@ enum L {
     static let statAccuracy = "Accuracy"
     static let statOnBeat = "On the Beat"
     static let statAverage = "Average"
+    static func resultTiming(average: String, spread: Int, band: String) -> String { "\(average) · spread \(spread) ms · \(band)" }
+    static let bandLocked = "Locked", bandTight = "Tight", bandGood = "Good", bandLoose = "Loose", bandRough = "Rough"
+    static func extraCost(_ n: Int, points: Int) -> String { "\(n) extra notes took \(points) points off" }
+    /// What the spread means (Scoring.band): the anchors from timing research, so the number reads against players.
+    static let timingAnchors = "Spread: session players 10–15 ms, good amateurs 20–30, beginners 40–60. At 90 bpm sixteenths, 15 ms scores about 99%, 25 about 91%, 40 about 74%."
     static let statSpread = "Spread"
     static let statMissed = "Missed"
     static let statExtra = "Extra"

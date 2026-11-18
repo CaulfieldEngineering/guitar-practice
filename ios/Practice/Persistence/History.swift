@@ -40,6 +40,9 @@ struct SessionResult: Codable, Identifiable, Equatable, Hashable {
     /// The windows the notes were judged with, averaged over the run (ms).
     var fullMs: Double? = nil
     var zeroMs: Double? = nil
+    /// 0.2.2: picks heard twice and folded into one, and each extra note's distance from its nearest note (ms).
+    var doubles: Int? = nil
+    var extraOffsetsMs: [Int]? = nil
 
     /// What "best" means for this run: time held for endurance, the score otherwise.
     var bestValue: Double { mode == "endurance" ? (sustainedSeconds ?? 0) : Double(score) }

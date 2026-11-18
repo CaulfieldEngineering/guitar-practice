@@ -56,6 +56,12 @@ enum AudioPrefs {
         save(all, outputsKey)
     }
 
+    /// Hearing the guitar on Bluetooth (0.2.2; Joe, 2026-11-17, on the Shokz: "Definitely don't want to monitor my
+    /// own guitar because the latency is big"). Off whenever the app opens: turned on, it lasts until the app quits,
+    /// and is never kept, whatever an earlier version saved for that output.
+    static var bluetoothMonitor = false
+    static func monitorOn(_ out: OutputPrefs, bluetooth: Bool) -> Bool { bluetooth ? bluetoothMonitor : out.monitor }
+
     /// An output seen on this phone, so it can be listed when it is not connected (iOS lists only the one in use).
     struct SeenOutput: Codable, Equatable { var name: String; var type: String }
     private static let seenKey = "audio.seenOutputs"

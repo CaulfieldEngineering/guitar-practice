@@ -383,7 +383,7 @@ final class AudioEngine {
                 let route = Latency.currentRoute()
                 let out = AudioPrefs.output(AudioEngine.outputUID())
                 // Not on the phone's own speaker and microphone: it would feed back.
-                if out.monitor && !route.phoneSpeakerAndMic {
+                if AudioPrefs.monitorOn(out, bluetooth: route.bluetoothOutput) && !route.phoneSpeakerAndMic {
                     let m = AVAudioMixerNode()
                     engine.attach(m)
                     engine.connect(input, to: m, format: inFormat)

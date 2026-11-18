@@ -20,6 +20,7 @@ Runs with the audio input off are not runs: nothing about them reaches the serve
 ## Read his runs
 
 - `GET http://127.0.0.1:4700/api/stats` (`?exercise=<id>`): bests per drill, mode and starting tempo, and every run in time order. `GET /api/sessions` gives the full results. The file is `data/sessions.jsonl` in this repo folder on the mini PC (one run a line; never edit it by hand).
+- Timing (0.2.2): `meanErrorMs` is the calibration's (near 0 means the latency is right), `spreadMs` is his (10 to 15 ms session player, 20 to 30 good amateur). `extra`, `doubles` and `extraOffsetsMs` (each extra's ms from its nearest note) say whether extras are real picks or one pick heard twice; README.md, Accuracy.
 - Tuning: when his solo runs at a level pass comfortably several times (score at or over the pass mark, or endurance held past a few minutes), the next level can start higher; when they fail, the level is too high. Add or change levels in the catalog as above. Practices are not targets for Joe: never turn this into a streak or a count to report at him (HQ CLAUDE.md, "Practices, not outcomes"). Mention progress only when he asks or it serves what he is working on.
 
 ## The pieces

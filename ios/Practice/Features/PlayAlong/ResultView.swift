@@ -38,6 +38,20 @@ struct ResultView: View {
                     }
                     .accessibilityElement(children: .combine)
 
+                    // The timing apart from the score (0.2.2): how far off on average, which the calibration owns,
+                    // and how steady, which is his; then what the extra notes cost.
+                    VStack(spacing: Space.xxs) {
+                        Text(L.resultTiming(average: averageText(score.meanError), spread: Int(score.spread.rounded()),
+                                          band: Scoring.band(spreadMs: score.spread)))
+                            .font(Typo.subStrong).foregroundStyle(Theme.text)
+                        if score.extra > 0, extraCost >= 5 {
+                            Text(L.extraCost(score.extra, points: extraCost)).font(Typo.caption).foregroundStyle(Theme.warn)
+                        }
+                        Text(L.timingAnchors).font(Typo.caption).foregroundStyle(Theme.faint)
+                    }
+                    .multilineTextAlignment(.center)
+                    .accessibilityElement(children: .combine)
+
                     if newBest || maxUp != nil {
                         VStack(spacing: Space.xxs) {
                             if newBest { Text(L.newBest) }
@@ -83,6 +97,16 @@ struct ResultView: View {
             .padding(.top, Space.sm)
             .background(alignment: .top) { Hairline() }
         }
+    }
+
+    /// The points the extra notes took off the accuracy.
+    private var extraCost: Int {
+        guard score.expected > 0, score.extra > 0 else { return 0 }
+        let n = Double(score.expected), x = Double(score.extra)
+        let withExtras = Double(score.score)
+        // The score is credit over notes plus extras (extraWeight is 1 unless the catalog says otherwise; close enough).
+        let without = min(100, withExtras * (n + x) / n)
+        return Int((without - withExtras).rounded())
     }
 
     /// The detail, most telling first.

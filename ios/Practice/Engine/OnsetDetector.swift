@@ -15,6 +15,14 @@ struct OnsetDetector {
     var floorRatio: Float = 4           // energy over the noise floor (6 dB)
     var minEnergy: Float = 2e-7         // absolute floor, so silence never triggers
     var refractory: Double = 0.040      // no two onsets closer than this
+    /// A new onset has to rise above this share of the last attack's energy, which fades with `envelopeTau` (0.2.2).
+    /// A pick's own ring, a bump of the muting hand or the pick leaving the string sit under it; the next pick,
+    /// even a soft one after an accent, comes well over it (Joe, 2026-11-17: 61% while "pretty locked in", from 923
+    /// extra notes on 1574 that were played, which looked like one pick heard twice).
+    var retriggerRatio: Float = 0.3
+    var envelopeTau: Double = 0.040
+    private var envelope: Float = 0
+    private var envelopeCoef: Float = 1
 
     private var hpA: Float
     private var x1: Float = 0, y1: Float = 0
@@ -44,6 +52,7 @@ struct OnsetDetector {
         avgCoef = Float(exp(-Double(hop) / (0.040 * sampleRate)))
         hopsPerBlock = max(1, Int(0.2 * sampleRate) / max(32, Int((sampleRate * 0.0025).rounded())))
         hopBuf = [Float](repeating: 0, count: hop)
+        envelopeCoef = Float(exp(-Double(hop) / (envelopeTau * sampleRate)))
     }
 
     /// Feed samples whose first one was captured at `time` (seconds). Returns the onsets found.
@@ -80,6 +89,7 @@ struct OnsetDetector {
             if pendingHops >= 4 { finished = p; pending = nil } else { pending = p }
         }
         let isOnset = e > minEnergy && e > avg * jumpRatio && e > noiseFloor * floorRatio
+            && e > envelope * retriggerRatio
             && (lastOnset < 0 || hopStart - lastOnset >= refractory)
         if isOnset {
             // The attack inside the hop: the first sample at half the hop's peak.
@@ -90,7 +100,12 @@ struct OnsetDetector {
             pending = Onset(time: t, strength: e)
             pendingHops = 0
             lastOnset = t
+            envelope = e
+        } else if pending != nil {
+            // The attack is still building over the hops after it: the envelope holds its peak.
+            envelope = max(envelope, e)
         }
+        envelope *= envelopeCoef
         avg = avgCoef * avg + (1 - avgCoef) * e
         blockMin = min(blockMin, e)
         blockHops += 1
