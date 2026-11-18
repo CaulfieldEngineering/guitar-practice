@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import UIKit
 
@@ -20,6 +21,14 @@ struct PracticeApp: App {
             UserDefaults.standard.removePersistentDomain(forName: id)
         }
         #endif
+        // 0.2.1, once: clear the saved output pick. In 0.2.0 a saved "iPhone Speaker" held the phone's microphone
+        // in place of the interface after every restart (Joe, 2026-11-17: "I've even restarted my phone and its still
+        // stuck"). Calibrations, runs and the input pick are kept.
+        if !UserDefaults.standard.bool(forKey: "migrated.0.2.1") {
+            AudioPrefs.preferredOutput = nil
+            UserDefaults.standard.set(true, forKey: "migrated.0.2.1")
+        }
+        RouteHub.start()
         let p = Player()
         let h = History()
         let pa = PlayAlong(player: p, history: h)
@@ -46,9 +55,22 @@ struct PracticeApp: App {
                 .environmentObject(audioSetup)
                 .task { await updater.check() }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { Task { await updater.check(); await history.sync() } }
+                    if phase == .active {
+                        audioSetup.resumeIfVisible()
+                        Task { await updater.check(); await history.sync() }
+                    }
+                    if phase == .background { PracticeApp.releaseInput(player: player, setup: audioSetup) }
                 }
         }
+    }
+
+    /// Leaving the app lets go of the microphone (Joe, 2026-11-17: "it still says guitar practice is using my
+    /// microphone"): the Audio screen's listening stops, and with nothing playing the session is let go. A run, the
+    /// calibration and the metronome carry on (the audio background mode is for them).
+    static func releaseInput(player: Player, setup: AudioSetup) {
+        setup.pauseListening()
+        guard player.mode == .idle else { return }
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     /// The tab bar and the sheets' title bars in the house colours: the content's own background, a hairline, no blur.

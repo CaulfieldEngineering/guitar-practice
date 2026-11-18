@@ -74,7 +74,7 @@ final class AudioSetup: ObservableObject {
     init(player: Player, playAlong: PlayAlong) {
         self.player = player
         self.pa = playAlong
-        observers.append(NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: .practiceRouteChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.routeChanged() }
         })
     }
@@ -94,6 +94,17 @@ final class AudioSetup: ObservableObject {
     func close() {
         visible = false
         stopListening()
+    }
+
+    /// The app went to the background: stop listening, and listen again when it is back if the screen is still open.
+    func pauseListening() {
+        guard player.mode == .check else { return }
+        stopListening()
+    }
+
+    func resumeIfVisible() {
+        guard visible, player.mode == .idle else { return }
+        open()
     }
 
     /// Listening needs the permission and nothing else playing; a run or the calibration takes the engine.
@@ -129,13 +140,16 @@ final class AudioSetup: ObservableObject {
     // MARK: Choices
 
     func selectInput(_ uid: String) {
+        RouteHub.picked()
         AudioPrefs.preferredInput = uid
         let s = AVAudioSession.sharedInstance()
         if let port = s.availableInputs?.first(where: { $0.uid == uid }) {
             AudioPrefs.setInputName(port.portName, for: uid)
             // The phone's microphone picked by hand is allowed from then on (the switch under Advanced says so).
             if port.portType == .builtInMic && !pa.allowPhoneMic { pa.allowPhoneMic = true }
-            try? s.setPreferredInput(port)
+            // The speaker override holds the phone's microphone: an interface picked by hand takes it off.
+            if port.portType != .builtInMic && AudioEngine.speakerOverridden { AudioEngine.applyOutputChoice(s) }
+            if RouteHub.mayAsk(for: uid) { try? s.setPreferredInput(port) }
         }
         AudioEngine.applyInputPrefs(s)
         restartIfListening()
@@ -152,15 +166,12 @@ final class AudioSetup: ObservableObject {
     /// The output picked by hand. The speaker the app sets itself; for another output iOS's own list opens, since
     /// only it can move the sound there, and the line under the row says if the sound ended up elsewhere.
     func selectOutput(_ id: String) {
+        RouteHub.picked()
         AudioPrefs.preferredOutput = id
         let s = AVAudioSession.sharedInstance()
-        if id == AudioPrefs.speakerID {
-            AudioEngine.prepareRecordSession()
-            try? s.overrideOutputAudioPort(.speaker)
-        } else {
-            if s.currentRoute.outputs.contains(where: { $0.portType == .builtInSpeaker }) { try? s.overrideOutputAudioPort(.none) }
-            if AudioEngine.outputUID(s) != id { systemPicker += 1 }
-        }
+        if id == AudioPrefs.speakerID { AudioEngine.prepareRecordSession() }
+        AudioEngine.applyOutputChoice(s)
+        if id != AudioPrefs.speakerID && AudioEngine.outputUID(s) != id { systemPicker += 1 }
         refresh()
     }
 
@@ -369,8 +380,9 @@ final class AudioSetup: ObservableObject {
         c.outputIsSpeaker = outputChoiceID == AudioPrefs.speakerID
         c.outputIsInterface = route.outputIsInterface
         c.recording = s.category == .playAndRecord
-        inputNote = AudioDiagnosis.inputNote(c)
-        outputNote = AudioDiagnosis.outputNote(c)
+        inputNote = RouteHub.gaveUp(on: picked) && c.pickedInputConnected && picked != current?.uid
+            ? L.replugInput(c.pickedInputName ?? L.pickedDevice) : AudioDiagnosis.inputNote(c)
+        outputNote = RouteHub.note ?? AudioDiagnosis.outputNote(c)
     }
 
     var facts: AudioFacts {

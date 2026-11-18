@@ -334,16 +334,30 @@ final class AudioEngine {
 
     /// The output picked by hand. iOS lets an app choose only the phone's speaker by itself (and only while the
     /// input is open); any other output is chosen in the system's list, and the Audio screen says when iOS put the
-    /// sound somewhere else.
+    /// sound somewhere else. Applied when the session is set up and on a pick, never in answer to a route change:
+    /// each override is a route change of its own, and answering them froze 0.2.0 (Joe, 2026-11-17).
+    ///
+    /// The speaker override is iOS's "speaker and built-in microphone": it drops an interface's input (Joe, the same
+    /// evening: "ios kept iphone microphone instead of momix-cab"). So with an interface as the input it is never
+    /// used: an interface with no output of its own already leaves the sound on the speaker (`.defaultToSpeaker`),
+    /// and one with an output keeps the sound, which the screen says.
     static func applyOutputChoice(_ session: AVAudioSession = .sharedInstance()) {
         guard session.category == .playAndRecord else { return }
-        let onSpeaker = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
-        if AudioPrefs.preferredOutput == AudioPrefs.speakerID {
-            if !onSpeaker { try? session.overrideOutputAudioPort(.speaker) }
-        } else if onSpeaker && AudioPrefs.preferredOutput != nil {
+        let wantSpeaker = AudioPrefs.preferredOutput == AudioPrefs.speakerID
+        let wanted = pickedInput(session) ?? interfaceInput(session)
+        let interfaceIn = wanted.map { interfacePorts.contains($0.portType) } ?? false
+        if wantSpeaker && !interfaceIn {
+            if !speakerOverridden {
+                try? session.overrideOutputAudioPort(.speaker)
+                speakerOverridden = true
+            }
+        } else if speakerOverridden {
             try? session.overrideOutputAudioPort(.none)
+            speakerOverridden = false
         }
     }
+    /// Whether this app set the speaker override (only then is it taken off again).
+    private(set) static var speakerOverridden = false
 
     /// Wires the engine: the source node (at the render state's own rate, so a new route's rate is converted by the
     /// mixer and the frame clock never jumps), the input tap on the picked channel, and the monitor path.
@@ -436,7 +450,7 @@ final class AudioEngine {
     private func scheduleRebuild() {
         guard !rebuildScheduled else { return }
         rebuildScheduled = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + (RouteHub.quiet ? 1.0 : 0.3)) { [weak self] in
             guard let self else { return }
             self.rebuildScheduled = false
             self.rebuild()
@@ -537,13 +551,19 @@ final class AudioEngine {
     }
 
     /// After a route change with the session recording: iOS can move the input off the interface (to the phone's
-    /// microphone) when Bluetooth headphones are picked for the output. Ask for the interface again; whether iOS
-    /// keeps it is read back from the route (the Audio screen says so when it does not).
+    /// microphone) when Bluetooth headphones are picked for the output. Ask for the interface again, at most once
+    /// every 2 s and 3 times in 10 s (RouteHub): each ask is a route change of its own. Whether iOS keeps it is read
+    /// back from the route (the Audio screen says so when it does not).
     static func reassertInput(_ session: AVAudioSession = .sharedInstance(), allowPhoneMic: Bool) {
-        guard session.category == .playAndRecord else { return }
-        guard let want = wantedInput(session, allowPhoneMic: allowPhoneMic) else { applyOutputChoice(session); return }
-        if !session.currentRoute.inputs.contains(where: { $0.uid == want.uid }) { try? session.setPreferredInput(want) }
-        applyOutputChoice(session)
+        guard session.category == .playAndRecord, !RouteHub.quiet else { return }
+        guard let want = wantedInput(session, allowPhoneMic: allowPhoneMic) else { return }
+        if session.currentRoute.inputs.contains(where: { $0.uid == want.uid }) { return }
+        // The speaker override takes the input to the phone's microphone; take it off first.
+        if speakerOverridden && want.portType != .builtInMic {
+            try? session.overrideOutputAudioPort(.none)
+            speakerOverridden = false
+        }
+        if RouteHub.mayAsk(for: want.uid) { try? session.setPreferredInput(want) }
     }
 
     /// Both of a two-input interface's channels (iOS can open one unless asked), then the remembered gain and mic

@@ -62,7 +62,7 @@ final class Player: ObservableObject {
             self?.reroutes += 1
             self?.afterReroute?()
         }
-        NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: .practiceRouteChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.loadOutputVolume() }
         }
         loadOutputVolume()

@@ -327,6 +327,8 @@ enum L {
 
     // The choice, and why iOS used something else (one line each).
     static func fallbackInputMissing(_ want: String, _ now: String) -> String { "\(want) isn't connected. Using \(now)." }
+    static let audioKeptSwitching = "Audio kept switching, so the output pick was cleared."
+    static func replugInput(_ name: String) -> String { "iOS won't switch to \(name). Unplug it and plug it in again." }
     static func fallbackInputRefused(_ want: String, _ now: String) -> String { "iOS kept \(now) instead of \(want)." }
     static func fallbackSpeaker(_ now: String) -> String { "iOS kept the sound on \(now)." }
     static func fallbackSpeakerClosed(_ now: String) -> String { "The speaker is used once the input opens. Now on \(now)." }

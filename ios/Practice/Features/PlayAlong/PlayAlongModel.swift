@@ -161,7 +161,7 @@ final class PlayAlong: ObservableObject {
         gridClicks = d.object(forKey: "pa.click") as? Bool ?? true
         allowPhoneMic = d.object(forKey: "pa.allowMic") as? Bool ?? false
         player.audio.allowPhoneMic = allowPhoneMic
-        NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: .practiceRouteChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.routeChanged() }
         }
         player.afterReroute = { [weak self] in self?.rerouted() }

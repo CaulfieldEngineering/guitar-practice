@@ -212,3 +212,17 @@ final class InputSessionTests: XCTestCase {
         XCTAssertFalse(s.categoryOptions.contains(.allowBluetooth), "never hands-free: the Shokz stay in listening mode")
     }
 }
+
+/// 0.2.0 froze answering its own route changes (Joe, 2026-11-17): asking iOS for an input is limited.
+final class RouteHubTests: XCTestCase {
+    func testAsksAreLimited() {
+        RouteHub.picked()
+        XCTAssertTrue(RouteHub.mayAsk(for: "usb-a"))
+        XCTAssertFalse(RouteHub.mayAsk(for: "usb-a"), "the same input again within 2 s")
+        XCTAssertTrue(RouteHub.mayAsk(for: "usb-b"), "another input may be asked for")
+        XCTAssertFalse(RouteHub.gaveUp(on: "usb-a"))
+        RouteHub.picked()
+        XCTAssertTrue(RouteHub.mayAsk(for: "usb-a"), "a pick by hand asks again")
+        RouteHub.picked()
+    }
+}
