@@ -102,3 +102,30 @@ test('his level: the second best pass of the last ten solo runs', async (t) => {
   const { levels } = await (await fetch(`${base}/api/levels`)).json();
   assert.equal(levels.trip16x4.max, 108);
 });
+
+test('serves the desktop updater from its releases folder, and nothing else from there', async (t) => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'practice-'));
+  const releases = path.join(data, 'releases');
+  fs.mkdirSync(releases);
+  fs.writeFileSync(path.join(releases, 'latest.json'), JSON.stringify({ version: '0.1.1', file: 'Practice-Setup-0.1.1.exe' }));
+  fs.writeFileSync(path.join(releases, 'Practice-Setup-0.1.1.exe'), 'MZ');
+  fs.writeFileSync(path.join(releases, 'secret.txt'), 'no');
+  const server = http.createServer(createApp({ catalog: path.join(ROOT, 'catalog'), data, releases }));
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => { server.close(); fs.rmSync(data, { recursive: true, force: true }); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  assert.equal((await (await fetch(`${base}/desktop/latest.json`)).json()).version, '0.1.1');
+  assert.equal(await (await fetch(`${base}/desktop/Practice-Setup-0.1.1.exe`)).text(), 'MZ');
+  assert.equal((await fetch(`${base}/desktop/secret.txt`)).status, 404);
+  assert.equal((await fetch(`${base}/desktop/..%2Fsessions.jsonl`)).status, 404);
+});
+
+test('a run from the desktop app (with its device name) is kept and listed with the phone runs', async (t) => {
+  const { base } = await run(t);
+  const phone = result();
+  const desktop = result({ id: '7d2e4c1a-1111-4c55-9a51-0d2b9d1e4f10', device: 'JPC', appVersion: '0.1.0', date: '2026-11-17T23:00:00Z' });
+  await fetch(`${base}/api/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessions: [phone, desktop] }) });
+  const list = (await (await fetch(`${base}/api/sessions`)).json()).sessions;
+  assert.equal(list.length, 2);
+  assert.equal(list[0].device, 'JPC');
+});

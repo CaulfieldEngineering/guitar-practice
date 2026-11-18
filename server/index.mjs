@@ -8,6 +8,7 @@
 //   GET  /api/stats[?exercise=id]     {bests: [{exerciseID, mode, bpm, best, runs, last}], progress: [...]}
 //   GET  /api/levels                  {levels: {<exercise id>: {max, basedOn, passes, rule}}}: his max per drill (zones are % of it)
 //   GET  /voice/index.json, /voice/pack.bin   the recorded voice (scripts/make-voice.mjs)
+//   GET  /desktop/latest.json, /desktop/Practice-Setup-<version>.exe   the desktop app's updater (desktop/scripts/build.ps1)
 //   GET  /                            a small page: the drills and the latest runs
 //
 // Runs are kept in one place, data/sessions.jsonl (one JSON object a line, never rewritten, only appended).
@@ -23,10 +24,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CATALOG = process.env.PRACTICE_CATALOG || path.join(ROOT, 'catalog');
 const DATA = process.env.PRACTICE_DATA || path.join(ROOT, 'data');
 const VOICE = process.env.PRACTICE_VOICE || path.join(ROOT, 'voice');
+// The desktop app's newest installer and its latest.json (desktop/scripts/build.ps1 writes them here; not in git).
+const RELEASES = process.env.PRACTICE_RELEASES || path.join(ROOT, 'desktop', 'release');
 const PORT = Number(process.env.PRACTICE_PORT || 4700);
 const HOSTS = (process.env.PRACTICE_HOSTS || '127.0.0.1,DRILL_SERVER_HOST').split(',').map((h) => h.trim()).filter(Boolean);
 
-export function createApp({ catalog = CATALOG, data = DATA, voice = VOICE } = {}) {
+export function createApp({ catalog = CATALOG, data = DATA, voice = VOICE, releases = RELEASES } = {}) {
   const store = createStore(path.join(data, 'sessions.jsonl'));
 
   const send = (res, status, body, type = 'application/json; charset=utf-8') => {
@@ -67,6 +70,14 @@ export function createApp({ catalog = CATALOG, data = DATA, voice = VOICE } = {}
         const file = path.join(voice, p.slice('/voice/'.length));
         if (!fs.existsSync(file)) return send(res, 404, { error: 'not found' });
         return send(res, 200, fs.readFileSync(file), p.endsWith('.json') ? 'application/json; charset=utf-8' : 'application/octet-stream');
+      }
+      // The desktop app asks every 30 seconds whether a newer build is out, and downloads it from here.
+      if (req.method === 'GET' && p.startsWith('/desktop/')) {
+        const name = p.slice('/desktop/'.length);
+        if (!/^(latest\.json|Practice-Setup-\d+\.\d+\.\d+\.exe)$/.test(name)) return send(res, 404, { error: 'not found' });
+        const file = path.join(releases, name);
+        if (!fs.existsSync(file)) return send(res, 404, { error: 'not found' });
+        return send(res, 200, fs.readFileSync(file), name.endsWith('.json') ? 'application/json; charset=utf-8' : 'application/octet-stream');
       }
       if (req.method === 'POST' && p === '/api/sessions') {
         let body;

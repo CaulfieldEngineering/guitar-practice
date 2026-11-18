@@ -4,6 +4,8 @@ Joe's guitar practice iPhone app. Joe, 2026-11-14: "Can you build me an iOS app 
 
 Install: Safari (or the Browser) on the iPhone, https://caulfieldengineering.github.io/practice-install/, Install. After that the app updates itself: an Update capsule appears at the top when a newer build is out, and Settings has the row.
 
+**Practice for Windows** (desktop/, since 2026-11-17; Joe: "Can we build a desktop version of the guitar practice app? Let them share drills and stats in a common backend"): the same app on his laptop and the mini PC, built with JUCE for ASIO and WASAPI exclusive. Same drills, same scoring (both apps pass `shared/scoring-vectors.json`), and every run from either app is in both apps' Progress through the drill server. Install from `Dropbox\Apps\Practice`; it updates itself. [desktop/README.md](desktop/README.md).
+
 ## What is in it
 
 Two tabs, Metronome and Drills (Joe, 2026-11-14: "intervals and play along can just be combined into Drills since we're covering both audio and no-audio settings"), in the house style (HQ/agent/app-design.md): dark first and light from the same tokens, the studio accent `#6FB7A0`, one primary button per screen. Progress and Settings are line icons at the top of the screen.
@@ -39,7 +41,7 @@ server/        the drill server (Node, no dependencies) and its tests
 
 - **Drills are data, not code.** A versioned JSON schema (below). Notes sit on a beat grid with string, fret, pick direction and accent, so left-hand drills and riffs fit later without a schema change. Tempo rules (start, min, max, the ladder step) and scoring rules (pass mark, tight and close windows, the match window) are per drill. Session defaults and levels are per drill.
 - **The engine is behind protocols** (Engine/Protocols.swift): `SoundBank` (the click and guide sounds; a sampled guitar drops in), `OnsetDetecting` (a better detector drops in), `NoteInput` (where played notes come from: `AudioOnsetInput` today, a MIDI guitar later). The audio thread never waits: parameters and the play-along's events cross with a try-lock (`Locked`), and the play-along keeps a second and a half queued ahead.
-- **Scoring is separate from the UI**: pure functions over note times and onset times (Scoring.swift, Session.swift), all unit tested.
+- **Scoring is separate from the UI**: pure functions over note times and onset times (Scoring.swift, Session.swift), all unit tested. The same rules are in the desktop app (desktop/src/core/Scoring.cpp) and in plain JavaScript (shared/scoring.mjs); all three pass one file of test vectors (shared/scoring-vectors.json, `node scripts/make-scoring-vectors.mjs`), so change a rule in all three together.
 - **One store for runs** (SwiftData, `SessionRecord`, the full `SessionResult` as JSON with indexed fields), with a schema version on each result. Progress per drill over time comes from it, or from the server's copy.
 
 ### Session modes
@@ -91,6 +93,7 @@ Rules the app keeps: a file whose `schema` is newer than the app knows is skippe
 | `GET /api/sessions?exercise=<id>` | every run, newest first |
 | `GET /api/levels` | his max per drill: `{levels: {<id>: {max, basedOn, passes, rule}}}` |
 | `GET /api/stats?exercise=<id>` | `bests` (best solo run per drill, mode and starting tempo: score, or seconds held for endurance) and `progress` (every run in time order) |
+| `GET /desktop/latest.json`, `GET /desktop/Practice-Setup-<version>.exe` | the desktop app's updater (from `desktop/release/`, written by `desktop/scripts/build.ps1`) |
 | `GET /` | a small page: the drills and the latest runs |
 
 Runs are kept in one place, `data/sessions.jsonl` (one run a line, appended, never rewritten; not in git). The phone queues every run (SwiftData) and sends the queue when it opens, after each run, and from Progress and Settings, until the server answers with the run's id; then it is marked sent. Away from Tailscale everything works from the phone's copy and the last catalog it pulled.

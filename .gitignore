@@ -3,3 +3,5 @@ data/
 logs/
 *.xcodeproj/
 .DS_Store
+desktop/build/
+desktop/release/
