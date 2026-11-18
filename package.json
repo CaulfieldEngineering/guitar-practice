@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.mjs",
-    "test": "node --test server/server.test.mjs",
+    "test": "node --test server/server.test.mjs shared/scoring.test.mjs",
     "check": "node server/catalog.mjs"
   }
 }
