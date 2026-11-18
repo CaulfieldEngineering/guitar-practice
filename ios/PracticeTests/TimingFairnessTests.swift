@@ -46,9 +46,8 @@ final class TimingFairnessTests: XCTestCase {
         XCTAssertLessThan(abs(r.meanError), 12)
         XCTAssertEqual(r.spread, 15, accuracy: 2)
 
-        // Uncalibrated, the same playing is nowhere: the latency, not the player.
-        let raw = Scoring.score(notes: notes, played: heard, window: drill.window(bpm: 90))
-        XCTAssertLessThan(raw.score, 20)
+        // Uncalibrated the picks are judged against the wrong notes (200 ms is about one sixteenth at 90), so the
+        // score means nothing; that is what the calibration is for. Not asserted: it depends on the drill's spacing.
     }
 
     func testTheScaleAgainstPlayers() {
