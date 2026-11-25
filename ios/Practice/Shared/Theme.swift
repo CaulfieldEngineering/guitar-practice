@@ -144,7 +144,7 @@ enum Haptics {
     private static let impact = UIImpactFeedbackGenerator(style: .medium)
     private static let light = UIImpactFeedbackGenerator(style: .light)
     private static let rigid = UIImpactFeedbackGenerator(style: .rigid)
-    private static let soft = UIImpactFeedbackGenerator(style: .soft)
+    private static let softImpact = UIImpactFeedbackGenerator(style: .soft)
     private static let notify = UINotificationFeedbackGenerator()
 
     /// A step of a value, a pick from a list.
@@ -156,7 +156,7 @@ enum Haptics {
     /// 3, 2, 1.
     static func count() { rigid.impactOccurred() }
     /// A block ends, a break begins.
-    static func soft() { soft.impactOccurred() }
+    static func soft() { softImpact.impactOccurred() }
     static func done() { notify.notificationOccurred(.success) }
     static func warning() { notify.notificationOccurred(.warning) }
 }
