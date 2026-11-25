@@ -17,8 +17,21 @@ final class ModelTests: XCTestCase {
         p.setBPM(start)
     }
 
-    func testChoosingEveryExerciseAndLevelDoesNotCrash() {
+    /// The catalog offers one drill since 2026-11-24 (the rest archived), so the tests that switch between drills add
+    /// a second one the way a user would, as a file in Documents/Exercises, and take it away after.
+    static let secondDrill = Library.userFolder.appendingPathComponent("zz-test-second-drill.json")
+    static func addSecondDrill() throws {
+        try FileManager.default.createDirectory(at: Library.userFolder, withIntermediateDirectories: true)
+        let json = #"{"schema": 1, "exercises": [{"id": "test.second", "version": 1, "name": "Test drill, eighths", "short": "Test 8ths", "category": "Picking", "detail": "Two notes a beat.", "intro": "A test drill in eighths.", "say": "Test drill. Eighths.", "groups": [2], "tempo": {"start": 120, "min": 40, "max": 260}}]}"#
+        try Data(json.utf8).write(to: secondDrill)
+    }
+    static func removeSecondDrill() { try? FileManager.default.removeItem(at: secondDrill) }
+
+    func testChoosingEveryExerciseAndLevelDoesNotCrash() throws {
+        try Self.addSecondDrill()
+        defer { Self.removeSecondDrill() }
         let pa = PlayAlong(player: Player(), history: History(inMemory: true))
+        XCTAssertGreaterThanOrEqual(pa.exercises.count, 2, "the test drill in Documents/Exercises is offered")
         XCTAssertFalse(pa.exercises.isEmpty)
         for ex in pa.exercises {
             pa.select(ex.id)
@@ -52,7 +65,9 @@ final class ModelTests: XCTestCase {
     }
 
     /// Audio input off: no interface is asked for, the input is never opened, and nothing is saved.
-    func testAudioInputOffNeverOpensTheInput() {
+    func testAudioInputOffNeverOpensTheInput() throws {
+        try Self.addSecondDrill()
+        defer { Self.removeSecondDrill() }
         let history = History(inMemory: true)
         let pa = PlayAlong(player: Player(), history: history)
         pa.allowPhoneMic = false
