@@ -38,6 +38,18 @@ final class TapThroughTests: XCTestCase {
         if b.waitForExistence(timeout: 5) { b.tap() }
     }
 
+    /// A Form toggle row: tapping the row's middle lands on its label, which does not flip it, so tap the switch itself
+    /// (the row's own switch, at its trailing edge) and check that it took.
+    private func setSwitch(_ row: XCUIElement, on: Bool) {
+        let want = on ? "1" : "0"
+        for attempt in 0..<3 where (row.value as? String) != want {
+            let inner = row.switches.firstMatch
+            if attempt == 0, inner.exists { inner.tap() } else { row.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap() }
+            for _ in 0..<10 where (row.value as? String) != want { usleep(150_000) }
+        }
+        XCTAssertEqual(row.value as? String, want, "\(row.identifier) is \(on ? "on" : "off")")
+    }
+
     private func startRun(_ app: XCUIApplication) {
         app.buttons["start"].tap()
         let skip = app.buttons["intro.skip"]
@@ -111,7 +123,7 @@ final class TapThroughTests: XCTestCase {
         // A run with the audio input off: pause, resume, stop, result.
         let input = app.switches["setup.input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
-        if (input.value as? String) == "1" { input.tap() }
+        setSwitch(input, on: false)
         startRun(app)
         let pause = app.buttons["run.pause"]
         XCTAssertTrue(pause.waitForExistence(timeout: 15))
@@ -135,7 +147,7 @@ final class TapThroughTests: XCTestCase {
         // With the audio input on and no interface: a clear message, no crash.
         drill.tap()
         XCTAssertTrue(input.waitForExistence(timeout: 5))
-        if (input.value as? String) == "0" { input.tap() }
+        setSwitch(input, on: true)
         app.buttons["start"].tap()
         XCTAssertTrue(app.staticTexts["message"].waitForExistence(timeout: 10))
         shot("14-setup-no-interface-dark")
@@ -234,7 +246,7 @@ final class TapThroughTests: XCTestCase {
         sleep(1)
         XCTAssertTrue(app.buttons["start"].exists, "the setup is still there")
         let input = app.switches["setup.input"]
-        if input.waitForExistence(timeout: 5), (input.value as? String) == "1" { input.tap() }
+        if input.waitForExistence(timeout: 5) { setSwitch(input, on: false) }
         startRun(app)
         let pause = app.buttons["run.pause"]
         XCTAssertTrue(pause.waitForExistence(timeout: 15))
