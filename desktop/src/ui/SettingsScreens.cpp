@@ -18,7 +18,7 @@ void ProgressScreen::mouseWheelMove (const juce::MouseEvent&, const juce::MouseW
     repaint();
 }
 
-static juce::String modeName (const juce::String& m)
+juce::String modeName (const juce::String& m)
 {
     if (m == "endurance") return "Endurance";
     if (m == "duration") return "Time";
@@ -85,6 +85,28 @@ void ProgressScreen::paint (juce::Graphics& g)
         Draw::hairline (g, x0, y + 35, w);
         y += 36;
     }
+    // routines, each one session
+    auto rruns = model.routines->runs();
+    if (! rruns.empty())
+    {
+        y += 24;
+        Draw::text (g, "Routines", { x0, y, w, 18 }, Theme::muted(), Theme::small);
+        y += 22;
+        int shownR = 0;
+        for (auto& rr : rruns)
+        {
+            if (++shownR > 20) break;
+            int sum = 0, n = 0;
+            for (auto& b : rr.blocks) if (b.accuracy) { sum += *b.accuracy; ++n; }
+            Draw::text (g, rr.date.formatted ("%b %e, %I:%M %p"), { x0, y, 150, 30 }, Theme::muted());
+            Draw::text (g, rr.routineName, { x0 + 150, y, 260, 30 }, Theme::text());
+            Draw::text (g, juce::String ((int) rr.blocks.size()) + " blocks, " + formatClock (rr.seconds), { x0 + 410, y, 240, 30 }, Theme::muted());
+            Draw::text (g, n > 0 ? juce::String (sum / n) + "%" : dash, { x0 + 650, y, 80, 30 }, Theme::muted(), Theme::body, false, juce::Justification::centredRight);
+            Draw::text (g, rr.device.isNotEmpty() ? rr.device : juce::String ("Phone"), { x0 + 746, y, w - 746, 30 }, Theme::muted());
+            Draw::hairline (g, x0, y + 29, w);
+            y += 30;
+        }
+    }
     y += 24;
     Draw::text (g, "Recent", { x0, y, w, 18 }, Theme::muted(), Theme::small);
     y += 22;
@@ -104,7 +126,8 @@ void ProgressScreen::paint (juce::Graphics& g)
         if (++shown > 60) break;
         cx = x0;
         const juce::String tempo = r.topBPM > r.startBPM ? juce::String (r.startBPM) + dash + juce::String (r.topBPM) : juce::String (r.startBPM);
-        const juce::String score = r.mode == "endurance" ? formatClock (r.sustainedSeconds.value_or (0)) : juce::String (r.score) + "%";
+        const juce::String score = r.mode == "endurance" ? formatClock (r.sustainedSeconds.value_or (0))
+                                 : r.mode == "challenge" ? formatClock (r.earnedSeconds.value_or (0)) : juce::String (r.score) + "%";
         const juce::String where = r.device.isNotEmpty() ? r.device : juce::String ("Phone");
         const juce::String cells[] = { r.date.formatted ("%b %e, %I:%M %p"), r.exerciseName, tempo + " bpm", modeName (r.mode) + (r.guided ? dot + "guided" : juce::String()), score, where };
         for (int i = 0; i < 6; ++i)
@@ -125,8 +148,48 @@ void ProgressScreen::paint (juce::Graphics& g)
 SettingsScreen::SettingsScreen (Model& m) : Screen (m)
 {
     for (auto* c : std::initializer_list<juce::Component*> { &type, &input, &channel, &output, &buffer, &meter, &tone, &clickTest, &sounds,
-                                                              &guitar, &hear, &cues, &appearanceDark, &calibrate, &syncNow, &server })
+                                                              &guitar, &hear, &cues, &appearanceDark, &calibrate, &syncNow, &server,
+                                                              &tuning, &clickSound, &clickLevel, &chime, &ticks })
         addAndMakeVisible (c);
+    addChildComponent (sevenStrings);
+    for (int i = 0; i < 7; ++i)
+    {
+        auto d = std::make_unique<Dropdown>();
+        juce::StringArray notes;
+        for (int m = 28; m <= 70; ++m) notes.add (Tuning::noteName (m, true));
+        d->setItems (notes, {});
+        d->onChange = [this, i] {
+            auto t = model.guitarTuning;
+            if (i >= (int) t.strings.size()) return;
+            t.strings[(size_t) i] = 28 + strings[(size_t) i]->getSelectedItemIndex();
+            model.setGuitarTuning (Tuning::custom (t.strings));
+        };
+        addChildComponent (*d);
+        strings.push_back (std::move (d));
+    }
+    {
+        juce::StringArray names;
+        for (auto& t : Tuning::presets()) names.add (t.name);
+        names.add ("Custom");
+        tuning.setItems (names, model.guitarTuning.name);
+        tuning.onChange = [this] {
+            const int i = tuning.getSelectedItemIndex();
+            if (i >= 0 && i < (int) Tuning::presets().size()) model.setGuitarTuning (Tuning::presets()[(size_t) i]);
+            else model.setGuitarTuning (Tuning::custom (model.guitarTuning.strings));
+        };
+    }
+    sevenStrings.onChange = [this] (bool on) {
+        auto s = model.guitarTuning.strings;
+        if (on && s.size() == 6) s.push_back (s.back() - 5);
+        if (! on && s.size() == 7) s.pop_back();
+        model.setGuitarTuning (Tuning::custom (s));
+    };
+    clickSound.setItems ({ "Click", "Wood block", "Beep", "Rim" }, "Click");
+    clickSound.onChange = [this] { model.setMetroSound ((SessionSettings::ClickSound) clickSound.getSelectedItemIndex()); };
+    clickLevel.setRange (0, 1, 0.01);
+    clickLevel.onValueChange = [this] { model.setMetroLevel (clickLevel.getValue()); };
+    chime.onChange = [this] (bool on) { model.settings.set ("sound.chime", on); };
+    ticks.onChange = [this] (bool on) { model.settings.set ("sound.ticks", on); };
     addChildComponent (update);
     type.onChange = [this] {
         auto s = model.deviceSetup;
@@ -205,6 +268,25 @@ void SettingsScreen::refresh()
     hear.setOn (model.engine.hearGuitar.load());
     cues.setOn (model.voiceCues);
     appearanceDark.setOn (Theme::dark());
+    {
+        juce::StringArray names;
+        for (auto& t : Tuning::presets()) names.add (t.name);
+        names.add ("Custom");
+        tuning.setItems (names, model.guitarTuning.isCustom() ? juce::String ("Custom") : model.guitarTuning.name);
+        const bool custom = model.guitarTuning.isCustom();
+        sevenStrings.setVisible (custom);
+        sevenStrings.setOn (model.guitarTuning.strings.size() == 7);
+        for (size_t i = 0; i < strings.size(); ++i)
+        {
+            const bool show = custom && i < model.guitarTuning.strings.size();
+            strings[i]->setVisible (show);
+            if (show) strings[i]->setSelectedItemIndex (juce::jlimit (0, 42, model.guitarTuning.strings[i] - 28), juce::dontSendNotification);
+        }
+    }
+    clickSound.setSelectedItemIndex ((int) model.metroSound, juce::dontSendNotification);
+    clickLevel.setValue (model.metroLevel, juce::dontSendNotification);
+    chime.setOn (model.settings.getBool ("sound.chime", true));
+    ticks.setOn (model.settings.getBool ("sound.ticks", true));
     update.setVisible (model.updateFile.existsAsFile());
     meter.push (model.meterPeak());
     resized();
@@ -213,7 +295,7 @@ void SettingsScreen::refresh()
 
 void SettingsScreen::resized()
 {
-    labels.clear(); values.clear(); groups.clear(); sectionTitles.clear();
+    labels.clear(); values.clear(); sectionTitles.clear();
     const int gap = Theme::sp8;
     auto area = getLocalBounds().reduced (Theme::sp7, Theme::sp6);
     const int colW = std::min (520, (area.getWidth() - gap) / 2);
@@ -259,6 +341,29 @@ void SettingsScreen::resized()
          c ? juce::String ((int) std::round (model.currentOffset() * 1000)) + " ms" + (c->spreadMs ? dot + "varied " + juce::String ((int) std::round (*c->spreadMs)) + " ms" : juce::String())
            : juce::String ("Not calibrated"));
 
+    section (right, "Guitar");
+    row (right, "Tuning", &tuning, 200, model.guitarTuning.lowToHigh());
+    if (model.guitarTuning.isCustom())
+    {
+        row (right, "7 strings", &sevenStrings, 44);
+        auto r = right.removeFromTop (rh);
+        labels.push_back ({ r.withWidth (labelW), "Strings, low first" });
+        auto a = r.withTrimmedLeft (labelW);
+        const int n = (int) model.guitarTuning.strings.size();
+        const int cw = std::max (40, (a.getWidth() - (n - 1) * Theme::sp2) / std::max (1, n));
+        for (int i = n - 1; i >= 0; --i)
+        {
+            strings[(size_t) i]->setBounds (a.removeFromLeft (cw).withSizeKeepingCentre (cw, Theme::ctlH));
+            a.removeFromLeft (Theme::sp2);
+        }
+    }
+    right.removeFromTop (Theme::sp7);
+    section (right, "Sound");
+    row (right, "Click sound", &clickSound, 200);
+    row (right, "Click level", &clickLevel, 200);
+    row (right, "Block chime", &chime, 44);
+    row (right, "Countdown ticks", &ticks, 44);
+    right.removeFromTop (Theme::sp7);
     section (right, "Voice");
     row (right, "Voice cues", &cues, 44, "The next pattern and tempo");
     right.removeFromTop (Theme::sp7);
@@ -268,7 +373,7 @@ void SettingsScreen::resized()
     row (right, "Status", &syncNow, syncNow.idealWidth(),
          (! sy.reachable.has_value() ? juce::String ("Syncing") : *sy.reachable ? "Synced " + sy.lastSync.formatted ("%I:%M %p") : juce::String ("Offline"))
          + (sy.pending > 0 ? dot + juce::String (sy.pending) + " pending" : juce::String()));
-    row (right, "Drills", nullptr, 0, "Catalog " + juce::String (model.catalogVersion) + dot + juce::String ((int) model.drills.size()) + " drills");
+    row (right, "Drills", nullptr, 0, "Catalog " + juce::String (model.catalogVersion) + dot + juce::String ((int) model.drills.size()) + (model.drills.size() == 1 ? " drill" : " drills"));
     right.removeFromTop (Theme::sp7);
     section (right, "Appearance");
     row (right, "Dark", &appearanceDark, 44);

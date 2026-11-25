@@ -74,14 +74,36 @@ export function accuracy(errors, gapList, extras, config) {
 
 const roundHalfAway = (x) => (x < 0 ? -Math.round(-x) : Math.round(x));
 
-/** Scores a run. notes: [{time, accent, beat}], played: [{time, strength}] (calibration applied). */
+/**
+ * Whether a heard pitch is the note asked for (Joe, 2026-11-24: "start using an X where correct note doesn't care").
+ * `expected` null is an X note: any pitch, or a muted chug, is right. `heard` null is a pick whose pitch could not be
+ * told (too short, muted): it is not held against him. Otherwise the pitch class must match within half a semitone,
+ * so the octave the detector lands in does not matter.
+ */
+export function pitchMatches(expected, heard) {
+  if (expected === null || expected === undefined || heard === null || heard === undefined) return true;
+  const d = (((heard - expected) % 12) + 12) % 12;
+  return d < 0.5 || d > 11.5;
+}
+
+/** A note's pitch (MIDI) from the tuning: `strings` is MIDI per string, high string first; null for an X note. */
+export function notePitch(tuning, string, fret) {
+  if (!Number.isInteger(string) || !Number.isInteger(fret) || !tuning?.[string - 1]) return null;
+  return tuning[string - 1] + fret;
+}
+
+/**
+ * Scores a run. notes: [{time, accent, beat, pitch?}], played: [{time, strength, pitch?}] (calibration applied).
+ * A pitched note played on the wrong pitch earns no credit (its timing still counts in the average and the spread);
+ * `wrongPitch` counts them.
+ */
 export function score(notes, played, window, rule = standardRule, config = standardConfig) {
   const exp = notes.map((n) => n.time);
   const times = played.map((p) => p.time);
   const m = match(exp, times, window);
   const gap = gaps(exp);
   const errors = [];
-  let hits = 0, w20 = 0, w40 = 0, full = 0, cr = 0, fullSum = 0, zeroSum = 0;
+  let hits = 0, w20 = 0, w40 = 0, full = 0, cr = 0, fullSum = 0, zeroSum = 0, wrongPitch = 0;
   const matched = [];
   for (let i = 0; i < m.length; i++) {
     const w = windows(config, gap[i]);
@@ -91,7 +113,9 @@ export function score(notes, played, window, rule = standardRule, config = stand
     const ms = (times[j] - exp[i]) * 1000;
     errors.push(ms); matched.push(ms); hits++;
     const a = Math.abs(ms);
-    const c = credit(config, ms, gap[i]);
+    const right = pitchMatches(notes[i].pitch ?? null, played[j].pitch ?? null);
+    if (!right) wrongPitch++;
+    const c = right ? credit(config, ms, gap[i]) : 0;
     cr += c;
     if (c >= 0.999) full++;
     if (a <= rule.tightMs) w20++;
@@ -139,7 +163,7 @@ export function score(notes, played, window, rule = standardRule, config = stand
   const s = !n || count <= 0 ? 0 : roundHalfAway((100 * cr) / count);
   const pct = (k) => (n > 0 ? roundHalfAway((100 * k) / n) : 0);
   return {
-    expected: n, hits, within20: w20, within40: w40, missed: n - hits, extra, errors, meanError: mean, spread,
+    expected: n, hits, wrongPitch, within20: w20, within40: w40, missed: n - hits, extra, errors, meanError: mean, spread,
     accentsLanded, accentBeats, score: Math.min(100, Math.max(0, s)), passMark: rule.passMark, full,
     fullMs: n ? fullSum / n : 0, zeroMs: n ? zeroSum / n : 0, extraOffsets,
     pct20: pct(w20), pct40: pct(w40), passed: Math.min(100, Math.max(0, s)) >= rule.passMark,

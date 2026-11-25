@@ -30,6 +30,11 @@ Model::Model (AppPaths p, bool offline)
     metroSub = settings.getInt ("metro.sub", 1);
     metroAccent = settings.getBool ("metro.accent", true);
     gridClicks = settings.getBool ("click", true);
+    metroSound = (SessionSettings::ClickSound) juce::jlimit (0, 3, settings.getInt ("metro.sound", 0));
+    metroLevel = settings.getDouble ("metro.level", 1.0);
+    engine.metroSound = (int) metroSound;
+    if (auto t = Tuning::fromVar (settings.get ("tuning"))) guitarTuning = *t;
+    routines = std::make_unique<RoutineStore> (paths.data, paths.catalogBundled());
     voiceCues = settings.getBool ("voiceCues", false);
     engine.clickGain = (float) settings.getDouble ("clickGain", 1.0);
     engine.guitarGain = (float) settings.getDouble ("guitarGain", 0.7);
@@ -51,6 +56,7 @@ Model::Model (AppPaths p, bool offline)
     sync = std::make_unique<SyncWorker> (history, [this] { return settings.serverBase(); }, paths, appVersion());
     sync->catalogVersion = [this] { return catalogVersion; };
     sync->voiceVersion = [this] { return voice.version(); };
+    sync->extra = [this] (const juce::String& base) { routines->sync (base); syncTuning (base); };
     syncState = sync->snapshot();
     sync->onChange = [this] {
         juce::MessageManager::callAsync ([this] {
@@ -332,6 +338,56 @@ void Model::setSoundsGain (float g)
 
 float Model::soundsGain() const { return engine.soundsGain.load(); }
 
+// ---------------------------------------------------------------- the tuning
+
+void Model::setGuitarTuning (const Tuning& t)
+{
+    {
+        std::lock_guard<std::mutex> g (tuningLock);
+        guitarTuning = t;
+        settings.set ("tuning", t.toVar());
+        settings.set ("tuning.updatedAt", SessionResult::isoDate (juce::Time::getCurrentTime()));
+    }
+    sync->kick();
+    sendChangeMessage();
+}
+
+Tuning Model::tuning() const
+{
+    if (setupSession().tuning) return *setupSession().tuning;
+    return guitarTuning;
+}
+
+/// Sends the guitar's tuning; takes the server's when it is newer (the sync worker's thread).
+void Model::syncTuning (const juce::String& base)
+{
+    juce::var body;
+    {
+        std::lock_guard<std::mutex> g (tuningLock);
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("tuning", guitarTuning.toVar());
+        auto at = settings.get ("tuning.updatedAt").toString();
+        o->setProperty ("updatedAt", at.isNotEmpty() ? at : juce::String ("1970-01-01T00:00:01Z"));
+        body = juce::var (o);
+    }
+    auto res = DrillServer::post (base + "/api/settings", juce::JSON::toString (body, true));
+    if (! res.ok()) return;
+    auto v = juce::JSON::parse (res.body);
+    auto theirs = SessionResult::parseDate (v["updatedAt"].toString());
+    auto mine = SessionResult::parseDate (body["updatedAt"].toString());
+    if (! theirs || (mine && *theirs <= *mine)) return;
+    if (auto t = Tuning::fromVar (v["tuning"]))
+    {
+        const auto at = v["updatedAt"].toString();
+        juce::MessageManager::callAsync ([this, tt = *t, at] {
+            { std::lock_guard<std::mutex> g (tuningLock); guitarTuning = tt; }
+            settings.set ("tuning", tt.toVar());
+            settings.set ("tuning.updatedAt", at);
+            sendChangeMessage();
+        });
+    }
+}
+
 // ---------------------------------------------------------------- metronome
 
 void Model::toggleMetronome()
@@ -353,6 +409,45 @@ void Model::setMetroBPM (int v)
 }
 void Model::setMetroBeats (int b) { metroBeats = juce::jlimit (2, 7, b); settings.set ("metro.beats", metroBeats); engine.setMetronome (metroBPM, metroBeats, metroSub, metroAccent); sendChangeMessage(); }
 void Model::setMetroSub (int s) { metroSub = juce::jlimit (1, 4, s); settings.set ("metro.sub", metroSub); engine.setMetronome (metroBPM, metroBeats, metroSub, metroAccent); sendChangeMessage(); }
+void Model::setMetroSound (SessionSettings::ClickSound s) { metroSound = s; engine.metroSound = (int) s; settings.set ("metro.sound", (int) s); sendChangeMessage(); }
+void Model::setMetroLevel (double v) { metroLevel = juce::jlimit (0.0, 1.0, v); settings.set ("metro.level", metroLevel); engine.clickGain = (float) metroLevel; sendChangeMessage(); }
+
+void Model::startBlockClick (int b)
+{
+    if (engine.metronomeRunning()) engine.stopMetronome();
+    blockClickOn = true;
+    engine.clickGain = (float) metroLevel;
+    engine.startMetronome (b, 4, 1, true);
+    sendChangeMessage();
+}
+
+void Model::stopBlockClick()
+{
+    if (! blockClickOn) return;
+    blockClickOn = false;
+    engine.stopMetronome();
+    sendChangeMessage();
+}
+
+void Model::playTick (bool last)
+{
+    if (! settings.getBool ("sound.ticks", true) || ! engine.running()) return;
+    AudioEngine::Event e;
+    e.frame = engine.framePosition() + (juce::int64) (0.02 * engine.sampleRate());
+    e.kind = last ? ClickKind::accent : ClickKind::countIn;
+    e.gain = 0.6f;
+    engine.push ({ e });
+}
+
+void Model::playChime()
+{
+    if (! settings.getBool ("sound.chime", true) || ! engine.running()) return;
+    AudioEngine::Event e;
+    e.frame = engine.framePosition() + (juce::int64) (0.02 * engine.sampleRate());
+    e.kind = ClickKind::chime;
+    engine.push ({ e });
+}
+
 void Model::setMetroAccent (bool a) { metroAccent = a; settings.set ("metro.accent", a); engine.setMetronome (metroBPM, metroBeats, metroSub, metroAccent); sendChangeMessage(); }
 
 void Model::tap()
@@ -366,7 +461,28 @@ void Model::tap()
 
 // ---------------------------------------------------------------- the run
 
-void Model::start() { begin (false); }
+void Model::start() { runSetup.reset(); begin (false); }
+
+void Model::startBlock (const RunSetup& s)
+{
+    if (phase != Phase::ready && phase != Phase::result) return;
+    if (phase == Phase::result) { score.reset(); saved.reset(); unscored.reset(); phase = Phase::ready; }
+    runSetup = s;
+    begin (false);
+}
+
+const Drill& Model::setupDrill() const
+{
+    if (runSetup) for (auto& d : drills) if (d.id == runSetup->drillID) return d;
+    return drill();
+}
+
+int Model::setupTempo() const
+{
+    if (! runSetup) return startTempo();
+    const auto& d = setupDrill();
+    return juce::jlimit (d.tempo.min, d.tempo.max, runSetup->bpm);
+}
 void Model::calibrate() { begin (true); }
 void Model::nowSolo() { guided = false; saveDrillSettings(); start(); }
 void Model::clearResult() { score.reset(); saved.reset(); unscored.reset(); phase = Phase::ready; sendChangeMessage(); }
@@ -381,13 +497,13 @@ bool Model::inputReady()
 void Model::begin (bool calibrating)
 {
     message = {};
-    const bool scored = audioInput || calibrating;
+    const bool scored = setupAudioInput() || calibrating;
     if (scored && ! inputReady()) { sendChangeMessage(); return; }
     if (! device.open) { message = "No audio device. Pick one in Audio settings."; sendChangeMessage(); return; }
-    if (engine.metronomeRunning()) engine.stopMetronome();
-    if (! calibrating && intro)
+    if (engine.metronomeRunning()) { engine.stopMetronome(); blockClickOn = false; }
+    if (! calibrating && setupIntro())
     {
-        auto parts = IntroText::parts (drill(), startTempo(), session, scored);
+        auto parts = IntroText::parts (setupDrill(), setupTempo(), setupSession(), scored);
         introLine = voice.line (engine, parts);
         if (introLine)
         {
@@ -428,15 +544,18 @@ void Model::pushEvents (const std::vector<TimedEvent>& list)
 {
     std::vector<AudioEngine::Event> ev;
     ev.reserve (list.size());
+    const bool calibratingNow = phase == Phase::calibrating || phase == Phase::syncing;
     for (auto& t : list)
     {
-        if (! gridClicks && phase != Phase::calibrating && phase != Phase::syncing
-            && (t.kind == ClickKind::accent || t.kind == ClickKind::beat)) continue;
+        const bool grid = t.kind == ClickKind::accent || t.kind == ClickKind::beat || t.kind == ClickKind::sub;
+        if (! gridClicks && ! calibratingNow && grid) continue;
         const auto frame = engine.frameAt (origin, t.time);
         if (t.pitch >= 0) { ev.push_back (engine.guideEvent (frame, t.pitch, t.kind == ClickKind::pluckAccent, t.up)); continue; }
         AudioEngine::Event e;
         e.frame = frame;
-        e.kind = t.kind;
+        e.kind = grid && ! calibratingNow ? voiced (t.kind, runSettings.clickSound) : t.kind;
+        if ((grid || t.kind == ClickKind::countIn) && ! calibratingNow)
+            e.gain = (float) (t.kind == ClickKind::countIn ? std::max (0.3, runSettings.clickLevel) : runSettings.clickLevel);
         ev.push_back (e);
     }
     engine.push (ev);
@@ -445,13 +564,27 @@ void Model::pushEvents (const std::vector<TimedEvent>& list)
 void Model::launch (bool calibrating)
 {
     lastCueBeat = -1; lastCueBPM = 0;
-    runDrill_ = drill();
-    runSettings = session;
-    runGuided = guided && ! calibrating;
-    runScored = audioInput || calibrating;
+    runDrill_ = calibrating ? drill() : setupDrill();
+    runSettings = calibrating ? session : setupSession();
+    runGuided = ! calibrating && setupGuided();
+    runScored = calibrating || setupAudioInput();
+    runTuning = tuning();
     lastRunWasGuided = runGuided;
     lastRunWasScored = runScored;
-    const double startBPM = calibrating ? 80.0 : (double) startTempo();
+    const double startBPM = calibrating ? 80.0 : (double) setupTempo();
+    // The tempo plan: its top and floor, the governor (by accuracy), the Challenge clock.
+    tempoChanges.clear(); breaks = 0; breakTotal = 0; breakLog.clear(); heardPitch.clear(); pendingPitch.clear();
+    governor.reset(); challenge.reset();
+    {
+        const auto plan = runSettings.tempoPlan.normalized();
+        const auto b = plan.bounds ((int) startBPM, runDrill_.tempo.min, runDrill_.tempo.max);
+        planTop = b.top; planFloor = b.floor;
+        if (! calibrating && plan.mode == TempoPlan::Mode::accuracy && runScored) governor.emplace (plan, (int) startBPM, planTop, planFloor);
+        if (! calibrating && runSettings.kind == SessionSettings::Kind::challenge && runScored)
+            challenge.emplace ((double) std::max (1, runSettings.seconds), runSettings.targetPercent, runSettings.windowCycles, (double) runSettings.capSeconds);
+    }
+    wantsPitch = ! calibrating && runDrill_.hasPitchedNotes();
+    pitchDetector.sampleRate = engine.sampleRate();
     levelUp.reset();
     runZoneMax = calibrating ? 0 : level().value_or (0);
     now = 0;
@@ -464,7 +597,7 @@ void Model::launch (bool calibrating)
     doneScheduling = false;
     plannedEnd.reset();
     const int beats = runDrill_.beatsPerBar;
-    auto counted = RunBuilder::countIn (beats, startBPM);
+    auto counted = RunBuilder::countIn (beats * (calibrating ? 1 : juce::jlimit (0, 4, runSettings.countInBars)), startBPM);
     countInEnd = counted.end;
     countInUntil = counted.end;
     introEvents = counted.events;
@@ -515,6 +648,13 @@ void Model::scheduleAhead()
             case SessionSettings::Kind::cycles: stopNow = (int) k >= std::max (1, runSettings.cycles); break;
             case SessionSettings::Kind::duration: stopNow = scheduledUntil >= plannedEnd.value_or (0) - 1e-6; break;
             case SessionSettings::Kind::endurance: stopNow = scheduledUntil - countInEnd >= SessionSettings::enduranceCap; break;
+            case SessionSettings::Kind::challenge:
+            {
+                const double cap = runSettings.capSeconds > 0 ? (double) runSettings.capSeconds : SessionSettings::enduranceCap;
+                stopNow = scheduledUntil - countInEnd >= cap - 1e-6
+                       || (! runScored && scheduledUntil - countInEnd >= runSettings.seconds - 1e-6);
+                break;
+            }
         }
         if (stopNow)
         {
@@ -523,11 +663,20 @@ void Model::scheduleAhead()
             pushEvents ({ { scheduledUntil + 0.05, ClickKind::done } });
             break;
         }
-        const double bpmNow = k == 0 ? currentBPM
-            : RunBuilder::nextBPM (slots[k - 1].bpm, lastPassed, runSettings.ladderStep, runDrill_.tempo.max);
+        const double bpmNow = tempoForLoop (k);
         std::optional<double> limit;
         if (runSettings.kind == SessionSettings::Kind::duration) limit = plannedEnd;
-        auto slot = RunBuilder::cycle (runDrill_, (int) k, scheduledUntil, bpmNow, runGuided, limit);
+        RunBuilder::ClickOptions opts;
+        opts.accent = runSettings.accent;
+        opts.gapEvery = runSettings.gapEvery;
+        opts.tuning = runTuning;
+        opts.pitchFree = runDrill_.pitchFree;
+        auto slot = RunBuilder::cycle (runDrill_, (int) k, scheduledUntil, bpmNow, runGuided, limit, opts);
+        if (k > 0 && (int) slots[k - 1].bpm != (int) bpmNow && runSettings.tempoPlan.mode == TempoPlan::Mode::perLoop)
+        {
+            const int from = (int) slots[k - 1].bpm, to = (int) bpmNow;
+            tempoChanges.push_back ({ scheduledUntil - countInEnd, from, to, to > from ? TempoChange::Kind::up : TempoChange::Kind::loop });
+        }
         slots.push_back (slot);
         noteStart.push_back ((int) notes.size());
         notes.insert (notes.end(), slot.notes.begin(), slot.notes.end());
@@ -543,6 +692,23 @@ void Model::scheduleAhead()
         for (auto& n : notes) t.push_back (n.time);
         gaps = Scoring::gaps (t);
     }
+}
+
+double Model::tempoForLoop (size_t k) const
+{
+    const int start = slots.empty() ? (int) currentBPM : (int) slots.front().bpm;
+    switch (runSettings.tempoPlan.mode)
+    {
+        case TempoPlan::Mode::perLoop:
+            return runSettings.tempoPlan.normalized().perLoopBPM (start, planTop, (int) k, scheduledUntil - countInEnd);
+        case TempoPlan::Mode::accuracy:
+            if (governor) return governor->target();
+            return k == 0 ? currentBPM : slots[k - 1].bpm;
+        case TempoPlan::Mode::off:
+            if (k == 0) return currentBPM;
+            return RunBuilder::nextBPM (slots[k - 1].bpm, lastPassed, runSettings.ladderStep, runDrill_.tempo.max);
+    }
+    return currentBPM;
 }
 
 double Model::window() const
@@ -640,6 +806,13 @@ void Model::timerCallback()
         sendChangeMessage();
         return;
     }
+    if (phase == Phase::resting)
+    {
+        breakLeft = std::max (0.0, breakLength - (juce::Time::getMillisecondCounterHiRes() - breakStartMs) / 1000.0);
+        if (breakLeft <= 0) endBreak();
+        sendChangeMessage();
+        return;
+    }
     // the Audio screen's meter
     engine.setListening (false);
     if (meterListening || engine.metronomeRunning()) sendChangeMessage();
@@ -664,8 +837,31 @@ void Model::frame()
     {
         const double within = window();
         const double base = (double) origin / sr + shift();
-        for (auto& o : engine.drainOnsets())
-            if (o.time > 0 && ! Scoring::addPick ({ o.time - base, o.strength }, played, within)) ++doubles;
+        auto found = engine.drainOnsets();
+        if (wantsPitch)
+        {
+            // Each pick waits a few tens of ms for the samples that tell its pitch.
+            pendingPitch.insert (pendingPitch.end(), found.begin(), found.end());
+            found.clear();
+            const int need = pitchDetector.needed();
+            std::vector<float> buf ((size_t) need);
+            for (auto it = pendingPitch.begin(); it != pendingPitch.end();)
+            {
+                const auto from = (juce::int64) std::llround (it->time * sr);
+                if (engine.inputFrames() < from + need) { ++it; continue; }
+                Onset o = *it;
+                if (engine.readInput (from, need, buf.data()))
+                    o.pitch = pitchDetector.midi (buf.data() + pitchDetector.skip(), need - pitchDetector.skip());
+                found.push_back (o);
+                it = pendingPitch.erase (it);
+            }
+        }
+        for (auto& o : found)
+            if (o.time > 0)
+            {
+                Onset x { o.time - base, o.strength, o.pitch };
+                if (! Scoring::addPick (x, played, within)) ++doubles;
+            }
     }
     if (phase == Phase::running) scheduleAhead();
     if (auto* s = currentSlot())
@@ -701,6 +897,12 @@ void Model::updateStates()
         {
             usedPlayed[(size_t) *m[i]] = 1;
             errors[i] = (pl[(size_t) *m[i]] - exp[i]) * 1000;
+            if (! Scoring::pitchMatches (notes[i].pitch, played[(size_t) *m[i]].pitch))
+            {
+                states[i] = NoteState::wrong;
+                if (! heardPitch.count ((int) i) && played[(size_t) *m[i]].pitch) heardPitch[(int) i] = *played[(size_t) *m[i]].pitch;
+                continue;
+            }
             const double c = scoring.credit (*errors[i], i < gaps.size() ? gaps[i] : 1.0);
             states[i] = c >= 0.999 ? NoteState::tight : (c >= 0.5 ? NoteState::close : NoteState::loose);
         }
@@ -748,7 +950,163 @@ void Model::evaluateCycles()
             }
             else if (passed) sustained = s.end() - countInEnd;
         }
+        if (challenge && challenge->judge (acc, s.duration) == ChallengeClock::Result::done) { finish (true); return; }
+        if (governor)
+            if (auto c = governor->judge (acc, s.duration, (int) s.bpm))
+            {
+                tempoChanges.push_back ({ s.end() - countInEnd, c->from, c->to, c->kind });
+                if (c->kind == TempoChange::Kind::rest) { takeBreak (k, c->to); return; }
+            }
     }
+}
+
+// ---------------------------------------------------------------- breaks the accuracy calls for
+
+void Model::takeBreak (size_t judged, int resumeAt)
+{
+    stopRunAudio();
+    engine.drainOnsets();
+    pendingPitch.clear();
+    const size_t keep = judged + 1;
+    if (slots.size() > keep)
+    {
+        const int cut = noteStart[keep];
+        slots.erase (slots.begin() + (long) keep, slots.end());
+        noteStart.erase (noteStart.begin() + (long) keep, noteStart.end());
+        notes.erase (notes.begin() + cut, notes.end());
+        if ((int) states.size() > cut) states.erase (states.begin() + cut, states.end());
+        if ((int) errors.size() > cut) errors.erase (errors.begin() + cut, errors.end());
+        std::vector<double> t;
+        for (auto& n : notes) t.push_back (n.time);
+        gaps = Scoring::gaps (t);
+    }
+    scheduledUntil = slots.empty() ? countInEnd : slots.back().end();
+    const double cutAt = scheduledUntil - 0.02;
+    played.erase (std::remove_if (played.begin(), played.end(), [cutAt] (const Onset& o) { return o.time >= cutAt; }), played.end());
+    doneScheduling = false;
+    pausedAt = scheduledUntil;
+    resumeBPM = resumeAt;
+    ++breaks;
+    breakLength = runSettings.tempoPlan.normalized().breakSeconds;
+    breakLeft = breakLength;
+    breakLog.push_back ({ (int) judged, breakLength });
+    breakStartMs = juce::Time::getMillisecondCounterHiRes();
+    phase = Phase::resting;
+    sendChangeMessage();
+}
+
+void Model::endBreak()
+{
+    if (phase != Phase::resting) return;
+    const double took = std::max (0.0, breakLength - breakLeft);
+    breakTotal += took;
+    if (! breakLog.empty()) breakLog.back().seconds = took;
+    message = {};
+    if (runScored && ! inputReady()) { phase = Phase::paused; sendChangeMessage(); return; }
+    const double b = (double) resumeBPM;
+    currentBPM = b;
+    const int beats = std::max (1, runDrill_.beatsPerBar);
+    const double beat = 60 / b;
+    const double from = scheduledUntil - beats * beat;
+    std::vector<TimedEvent> lead;
+    for (int i = 0; i < beats; ++i) lead.push_back ({ from + i * beat, ClickKind::countIn, i });
+    countInUntil = scheduledUntil;
+    engine.clearAll();
+    origin = engine.framePosition() + (juce::int64) (0.12 * engine.sampleRate()) - (juce::int64) std::llround (from * engine.sampleRate());
+    runDevice = device.opened;
+    now = from;
+    phase = Phase::running;
+    pushEvents (lead);
+    engine.setListening (runScored);
+    engine.drainOnsets();
+    scheduleAhead();
+    sendChangeMessage();
+}
+
+std::optional<Model::StepInfo> Model::stepInfo() const
+{
+    if (phase != Phase::running && phase != Phase::paused && phase != Phase::resting) return std::nullopt;
+    const auto p = runSettings.tempoPlan.normalized();
+    const bool loops = p.windowUnit == TempoPlan::Unit::loops;
+    auto measure = [&] (double covered, int of) {
+        return loops ? juce::String ((int) std::round (covered)) + " of " + juce::String (of) + (of == 1 ? " loop" : " loops")
+                     : formatClock (covered) + " of " + formatClock (of);
+    };
+    StepInfo s;
+    switch (p.mode)
+    {
+        case TempoPlan::Mode::off: return std::nullopt;
+        case TempoPlan::Mode::perLoop:
+        {
+            s.target = planTop;
+            const int nowBPM = (int) currentBPM;
+            if (nowBPM >= planTop && p.atTop == TempoPlan::AtTop::hold) { s.state = StepInfo::State::top; s.fraction = 1; return s; }
+            s.state = StepInfo::State::perLoop;
+            s.next = std::min (planTop, nowBPM + p.step);
+            if (p.everyUnit == TempoPlan::Unit::loops)
+            {
+                const int k = currentSlot() ? currentSlot()->index : 0;
+                const int into = k % p.every;
+                s.fraction = (double) (into + 1) / p.every;
+                s.measure = juce::String (into + 1) + " of " + juce::String (p.every) + (p.every == 1 ? " loop" : " loops");
+            }
+            else
+            {
+                const double t = std::fmod (std::max (0.0, now - countInEnd), (double) p.every);
+                s.fraction = t / p.every;
+                s.measure = formatClock (t) + " of " + formatClock (p.every);
+            }
+            return s;
+        }
+        case TempoPlan::Mode::accuracy:
+        {
+            if (! governor) return std::nullopt;
+            s.target = governor->target();
+            if (governor->settling()) { s.state = StepInfo::State::settling; return s; }
+            const auto acc = rolling ? rolling : lastCycleAccuracy;
+            const auto zone = acc ? p.zone (*acc) : TempoPlan::Zone::hold;
+            switch (zone)
+            {
+                case TempoPlan::Zone::up:
+                    if (s.target >= planTop) { s.state = StepInfo::State::top; s.fraction = 1; return s; }
+                    s.state = StepInfo::State::up; s.fraction = governor->progress();
+                    s.measure = measure (s.fraction * p.upWindow, p.upWindow); s.next = std::min (planTop, s.target + p.step);
+                    return s;
+                case TempoPlan::Zone::down:
+                    s.state = StepInfo::State::down; s.fraction = governor->progressDown (false);
+                    s.measure = measure (s.fraction * p.downWindow, p.downWindow); s.next = std::max (planFloor, s.target - p.step);
+                    return s;
+                case TempoPlan::Zone::rest:
+                    s.state = StepInfo::State::rest; s.fraction = governor->progressDown (true);
+                    s.measure = measure (s.fraction * p.breakWindow, p.breakWindow);
+                    return s;
+                case TempoPlan::Zone::hold:
+                    s.state = StepInfo::State::hold;
+                    return s;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<TempoPlan::Zone> Model::accuracyZone() const
+{
+    const auto a = rolling ? rolling : lastCycleAccuracy;
+    if (! a) return std::nullopt;
+    const auto p = runSettings.tempoPlan.normalized();
+    if (p.mode == TempoPlan::Mode::accuracy) return p.zone (*a);
+    return *a * 100 >= runSettings.targetPercent ? TempoPlan::Zone::up : TempoPlan::Zone::hold;
+}
+
+std::vector<int> Model::meterLines() const
+{
+    const auto p = runSettings.tempoPlan.normalized();
+    if (p.mode != TempoPlan::Mode::accuracy) return { runSettings.targetPercent };
+    std::vector<int> out;
+    if (p.breakOn) out.push_back (p.breakPercent);
+    if (p.downOn) out.push_back (p.downPercent);
+    out.push_back (p.upPercent);
+    return out;
 }
 
 void Model::stopRunAudio()
@@ -771,18 +1129,20 @@ void Model::finishUnscored()
     score.reset(); saved.reset();
     phase = Phase::result;
     sendChangeMessage();
+    notifyEnded (nullptr);
 }
 
 void Model::finish (bool stoppedEarly)
 {
     const bool wasCalibrating = phase == Phase::calibrating;
-    const bool wasPaused = phase == Phase::paused;
+    const bool wasPaused = phase == Phase::paused || phase == Phase::resting;
+    if (phase == Phase::resting) breakTotal += std::max (0.0, breakLength - breakLeft);
     if (! wasPaused)
     {
         const double sr = engine.sampleRate(), within = window();
         const double base = (double) origin / sr + shift();
         for (auto& o : engine.drainOnsets())
-            if (o.time > 0 && ! Scoring::addPick ({ o.time - base, o.strength }, played, within)) ++doubles;
+            if (o.time > 0 && ! Scoring::addPick ({ o.time - base, o.strength, std::nullopt }, played, within)) ++doubles;
     }
     stopRunAudio();
     if (wasCalibrating)
@@ -810,7 +1170,8 @@ void Model::finish (bool stoppedEarly)
         return;
     }
     const bool isEndurance = runSettings.kind == SessionSettings::Kind::endurance;
-    const size_t judged = isEndurance || stoppedEarly ? accuracies.size() : slots.size();
+    const bool isChallenge = runSettings.kind == SessionSettings::Kind::challenge;
+    const size_t judged = isEndurance || isChallenge || stoppedEarly ? accuracies.size() : slots.size();
     const size_t upto = judged < noteStart.size() ? (size_t) noteStart[judged] : notes.size();
     std::vector<Note> counted (notes.begin(), notes.begin() + (long) std::min (upto, notes.size()));
     auto r = Scoring::score (counted, played, window(), runDrill_.scoring, scoring);
@@ -839,7 +1200,7 @@ void Model::finish (bool stoppedEarly)
     s.accuracyPercent = r.score;
     if (isEndurance) s.sustainedSeconds = sustained;
     s.score = r.score;
-    s.passed = isEndurance ? sustained > 0 : r.passed();
+    s.passed = isEndurance ? sustained > 0 : (challenge ? challenge->earned >= challenge->target - 1e-9 : r.passed());
     if (r.accentBeats && *r.accentBeats > 0) s.accentsPercent = (int) std::round (100.0 * r.accentsLanded.value_or (0) / *r.accentBeats);
     s.offsetMs = currentOffset() * 1000;
     s.appVersion = "desktop " + appVersion();
@@ -848,6 +1209,19 @@ void Model::finish (bool stoppedEarly)
     s.doubles = doubles;
     for (size_t i = 0; i < r.extraOffsets.size() && i < 400; ++i) s.extraOffsetsMs.push_back ((int) std::round (r.extraOffsets[i]));
     s.device = computerName();
+    if (runSettings.tempoPlan.mode != TempoPlan::Mode::off) s.tempoMode = TempoPlan::modeName (runSettings.tempoPlan.mode);
+    s.tempoChanges = tempoChanges;
+    if (breaks > 0) { s.breaks = breaks; s.breakSeconds = breakTotal; }
+    if (challenge) { s.earnedSeconds = challenge->earned; s.elapsedSeconds = challenge->elapsed; s.bestStreakSeconds = challenge->bestStreak; }
+    if (runDrill_.hasPitchedNotes()) { s.wrongPitch = r.wrongPitch; s.tuning = runTuning.name; }
+    s.routineRunID = routineRunID;
+    {
+        std::vector<TempoStep::Loop> loops;
+        for (size_t k = 0; k < std::min (judged, slots.size()); ++k)
+            loops.push_back ({ (int) slots[k].bpm, slots[k].duration, k < accuracies.size() ? std::optional<double> (accuracies[k]) : std::nullopt });
+        auto steps = TempoStep::from (loops, breakLog);
+        if (steps.size() > 1) s.tempoSteps = steps;
+    }
 
     newBest = false;
     auto before = allRuns();
@@ -860,13 +1234,14 @@ void Model::finish (bool stoppedEarly)
     saved = s;
     phase = Phase::result;
     sendChangeMessage();
+    notifyEnded (r.expected > 0 ? &*saved : nullptr);
 }
 
 void Model::stop()
 {
     if (phase == Phase::intro) { engine.stopVoices(); introLine.reset(); phase = Phase::ready; sendChangeMessage(); return; }
     if (phase == Phase::syncing) { endSync(); return; }
-    if (phase == Phase::running || phase == Phase::paused) { endRun(); return; }
+    if (phase == Phase::running || phase == Phase::paused || phase == Phase::resting) { endRun(); return; }
     if (phase != Phase::calibrating) return;
     stopRunAudio();
     phase = Phase::ready;
@@ -924,7 +1299,7 @@ void Model::resumeRun()
 
 void Model::endRun()
 {
-    if (phase != Phase::running && phase != Phase::paused) return;
+    if (phase != Phase::running && phase != Phase::paused && phase != Phase::resting) return;
     if (! runScored) { finishUnscored(); return; }
     if (! accuracies.empty()) { finish (true); return; }
     stopRunAudio();
@@ -937,7 +1312,7 @@ void Model::leave()
     switch (phase)
     {
         case Phase::intro: case Phase::syncing: case Phase::calibrating: stop(); break;
-        case Phase::running: case Phase::paused: endRun(); break;
+        case Phase::running: case Phase::paused: case Phase::resting: endRun(); break;
         default: break;
     }
     engine.stopVoices();
@@ -1096,6 +1471,24 @@ void Model::debugSeed (int which)
     }
     updateStates();
     rolling = 0.91; sustained = 72;
+    governor.reset(); challenge.reset();
+    if (which == 5 || which == 6)
+    {
+        runSettings.kind = SessionSettings::Kind::duration;
+        runSettings.tempoPlan.mode = TempoPlan::Mode::accuracy;
+        runSettings.tempoPlan.breakOn = true;
+        planTop = 160; planFloor = 112;
+        governor.emplace (runSettings.tempoPlan, 128, planTop, planFloor);
+        for (int k = 0; k < 2; ++k) governor->judge (0.93, 3.75, 128);
+        rolling = 0.93;
+        plannedEnd = countInEnd + 300;
+    }
+    if (which == 6)
+    {
+        breakLength = 25; breakLeft = 18; resumeBPM = 124;
+        phase = Phase::resting;
+        return;
+    }
     phase = which == 2 ? Phase::paused : Phase::running;
 }
 

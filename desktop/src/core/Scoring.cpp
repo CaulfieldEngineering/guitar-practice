@@ -93,6 +93,14 @@ double accuracy (const std::vector<std::optional<double>>& errors, const std::ve
     return count > 0 ? std::min (1.0, c / count) : 1.0;
 }
 
+bool pitchMatches (std::optional<int> expected, std::optional<double> heard)
+{
+    if (! expected || ! heard) return true;
+    double d = std::fmod (*heard - (double) *expected, 12.0);
+    if (d < 0) d += 12;
+    return d < 0.5 || d > 11.5;
+}
+
 ScoreResult score (const std::vector<Note>& notes, const std::vector<Onset>& played, double window,
                    const ScoringRule& rule, const ScoringConfig& config)
 {
@@ -103,6 +111,7 @@ ScoreResult score (const std::vector<Note>& notes, const std::vector<Onset>& pla
     const auto gap = gaps (exp);
     ScoreResult r;
     r.passMark = rule.passMark;
+    r.wrongNotes.assign (notes.size(), 0);
     double credit = 0, fullSum = 0, zeroSum = 0;
     std::vector<double> matched;
     for (size_t i = 0; i < m.size(); ++i)
@@ -116,7 +125,9 @@ ScoreResult score (const std::vector<Note>& notes, const std::vector<Onset>& pla
         matched.push_back (ms);
         r.hits++;
         const double a = std::abs (ms);
-        const double c = config.credit (ms, gap[i]);
+        const bool right = pitchMatches (notes[i].pitch, played[(size_t) *m[i]].pitch);
+        if (! right) { r.wrongPitch++; r.wrongNotes[i] = 1; }
+        const double c = right ? config.credit (ms, gap[i]) : 0.0;
         credit += c;
         if (c >= 0.999) r.full++;
         if (a <= rule.tightMs) r.within20++;

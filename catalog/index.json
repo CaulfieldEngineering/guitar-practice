@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": 6,
-  "updated": "2026-11-14",
+  "version": 7,
+  "updated": "2026-11-24",
   "files": [
     {
       "path": "exercises/right-hand.json",
@@ -18,6 +18,10 @@
     {
       "path": "scoring.json",
       "kind": "scoring"
+    },
+    {
+      "path": "starter-routines.json",
+      "kind": "starter-routines"
     }
   ]
 }

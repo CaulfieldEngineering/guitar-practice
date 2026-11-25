@@ -62,7 +62,7 @@ final class SchemaTests: XCTestCase {
         XCTAssertEqual(c.exercises.first?.notes.count, 28)
         XCTAssertEqual(c.exercises.first?.session.kind, .endurance)
         XCTAssertFalse(c.exercises.first!.intro.isEmpty)
-        XCTAssertTrue(c.exercises.contains { $0.id == "gallop" && $0.notes.count == 3 && $0.notes[0].accent })
+        XCTAssertEqual(c.exercises.map(\.id), ["trip16x4"], "the archived drills are not read")
         XCTAssertTrue(c.routines.contains { $0.name == "Starting Protocol" && $0.intervals.count == 8 })
         XCTAssertEqual(Set(c.exercises.map(\.id)).count, c.exercises.count, "ids are unique")
     }

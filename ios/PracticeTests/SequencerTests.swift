@@ -120,7 +120,7 @@ final class SequencerTests: XCTestCase {
     }
 
     func testSoundsAreMadeForEveryKind() {
-        for raw in 0...ClickKind.pluckAccent.rawValue {
+        for raw in 0...ClickKind.last.rawValue {
             let s = ClickSounds.make(ClickKind(rawValue: raw)!, sampleRate: 48000)
             XCTAssertGreaterThan(s.count, 100)
             XCTAssertLessThanOrEqual(s.map(abs).max()!, 1.0)

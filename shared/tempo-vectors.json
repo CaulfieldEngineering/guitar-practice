@@ -1,0 +1,3193 @@
+{
+ "comment": "Made by scripts/make-tempo-vectors.mjs from shared/tempo-plan.mjs. Do not edit by hand.",
+ "perLoop": [
+  {
+   "name": "every 2 loops, hold at the top",
+   "plan": {
+    "mode": "perLoop",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 100,
+   "top": 112,
+   "loops": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     2.4
+    ],
+    [
+     2,
+     4.8
+    ],
+    [
+     3,
+     7.199999999999999
+    ],
+    [
+     4,
+     9.6
+    ],
+    [
+     5,
+     12
+    ],
+    [
+     6,
+     14.399999999999999
+    ],
+    [
+     7,
+     16.8
+    ],
+    [
+     8,
+     19.2
+    ],
+    [
+     9,
+     21.599999999999998
+    ],
+    [
+     10,
+     24
+    ],
+    [
+     11,
+     26.4
+    ]
+   ],
+   "expect": [
+    100,
+    100,
+    104,
+    104,
+    108,
+    108,
+    112,
+    112,
+    112,
+    112,
+    112,
+    112
+   ]
+  },
+  {
+   "name": "every loop, restart at the top",
+   "plan": {
+    "mode": "perLoop",
+    "endBPM": 0,
+    "step": 5,
+    "every": 1,
+    "everyUnit": "loops",
+    "atTop": "restart",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 90,
+   "top": 100,
+   "loops": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     2.6
+    ],
+    [
+     2,
+     5.2
+    ],
+    [
+     3,
+     7.800000000000001
+    ],
+    [
+     4,
+     10.4
+    ],
+    [
+     5,
+     13
+    ],
+    [
+     6,
+     15.600000000000001
+    ],
+    [
+     7,
+     18.2
+    ],
+    [
+     8,
+     20.8
+    ]
+   ],
+   "expect": [
+    90,
+    95,
+    100,
+    90,
+    95,
+    100,
+    90,
+    95,
+    100
+   ]
+  },
+  {
+   "name": "every 10 seconds",
+   "plan": {
+    "mode": "perLoop",
+    "endBPM": 0,
+    "step": 3,
+    "every": 10,
+    "everyUnit": "seconds",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 80,
+   "top": 200,
+   "loops": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     2.9
+    ],
+    [
+     2,
+     5.8
+    ],
+    [
+     3,
+     8.7
+    ],
+    [
+     4,
+     11.6
+    ],
+    [
+     5,
+     14.5
+    ],
+    [
+     6,
+     17.4
+    ],
+    [
+     7,
+     20.3
+    ],
+    [
+     8,
+     23.2
+    ],
+    [
+     9,
+     26.099999999999998
+    ],
+    [
+     10,
+     29
+    ],
+    [
+     11,
+     31.9
+    ],
+    [
+     12,
+     34.8
+    ],
+    [
+     13,
+     37.699999999999996
+    ]
+   ],
+   "expect": [
+    80,
+    80,
+    80,
+    80,
+    83,
+    83,
+    83,
+    86,
+    86,
+    86,
+    86,
+    89,
+    89,
+    89
+   ]
+  },
+  {
+   "name": "a step past the top lands on the top",
+   "plan": {
+    "mode": "perLoop",
+    "endBPM": 0,
+    "step": 7,
+    "every": 1,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 100,
+   "top": 110,
+   "loops": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     3,
+     6
+    ],
+    [
+     4,
+     8
+    ]
+   ],
+   "expect": [
+    100,
+    107,
+    110,
+    110,
+    110
+   ]
+  },
+  {
+   "name": "top at the start",
+   "plan": {
+    "mode": "perLoop",
+    "endBPM": 0,
+    "step": 4,
+    "every": 1,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 120,
+   "top": 120,
+   "loops": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     3,
+     6
+    ]
+   ],
+   "expect": [
+    120,
+    120,
+    120,
+    120
+   ]
+  }
+ ],
+ "governor": [
+  {
+   "name": "up after 4 loops at 90 or more, then again",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 100,
+   "top": 140,
+   "floor": 100,
+   "loops": [
+    [
+     0.93,
+     4.8,
+     100
+    ],
+    [
+     0.93,
+     4.8,
+     100
+    ],
+    [
+     0.93,
+     4.8,
+     100
+    ],
+    [
+     0.93,
+     4.8,
+     100
+    ],
+    [
+     0.93,
+     4.8,
+     100
+    ],
+    [
+     0.93,
+     4.615385,
+     104
+    ],
+    [
+     0.93,
+     4.615385,
+     104
+    ],
+    [
+     0.93,
+     4.615385,
+     104
+    ],
+    [
+     0.93,
+     4.615385,
+     104
+    ],
+    [
+     0.93,
+     4.615385,
+     104
+    ],
+    [
+     0.93,
+     4.615385,
+     104
+    ],
+    [
+     0.93,
+     4.444444,
+     108
+    ],
+    [
+     0.93,
+     4.444444,
+     108
+    ],
+    [
+     0.93,
+     4.444444,
+     108
+    ]
+   ],
+   "expect": [
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0.25,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0.5,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0.75,
+     "zone": "up"
+    },
+    {
+     "change": {
+      "kind": "up",
+      "from": 100,
+      "to": 104
+     },
+     "target": 104,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0.25,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0.5,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0.75,
+     "zone": "up"
+    },
+    {
+     "change": {
+      "kind": "up",
+      "from": 104,
+      "to": 108
+     },
+     "target": 108,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0.25,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0.5,
+     "zone": "up"
+    }
+   ]
+  },
+  {
+   "name": "hold between the thresholds",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 3,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 3,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 100,
+   "top": 140,
+   "floor": 96,
+   "loops": [
+    [
+     0.82,
+     4.8,
+     100
+    ],
+    [
+     0.82,
+     4.8,
+     100
+    ],
+    [
+     0.82,
+     4.8,
+     100
+    ],
+    [
+     0.82,
+     4.8,
+     100
+    ],
+    [
+     0.82,
+     4.8,
+     100
+    ],
+    [
+     0.82,
+     4.8,
+     100
+    ],
+    [
+     0.82,
+     4.8,
+     100
+    ],
+    [
+     0.82,
+     4.8,
+     100
+    ],
+    [
+     0.82,
+     4.8,
+     100
+    ],
+    [
+     0.82,
+     4.8,
+     100
+    ]
+   ],
+   "expect": [
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    }
+   ]
+  },
+  {
+   "name": "down when under 75 for 3 loops, not under the floor",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 3,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 3,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 112,
+   "top": 140,
+   "floor": 104,
+   "loops": [
+    [
+     0.6,
+     4.285714,
+     112
+    ],
+    [
+     0.6,
+     4.285714,
+     112
+    ],
+    [
+     0.6,
+     4.285714,
+     112
+    ],
+    [
+     0.6,
+     4.285714,
+     112
+    ],
+    [
+     0.6,
+     4.444444,
+     108
+    ],
+    [
+     0.6,
+     4.444444,
+     108
+    ],
+    [
+     0.6,
+     4.444444,
+     108
+    ],
+    [
+     0.6,
+     4.444444,
+     108
+    ],
+    [
+     0.6,
+     4.444444,
+     108
+    ],
+    [
+     0.6,
+     4.615385,
+     104
+    ],
+    [
+     0.6,
+     4.615385,
+     104
+    ],
+    [
+     0.6,
+     4.615385,
+     104
+    ],
+    [
+     0.6,
+     4.615385,
+     104
+    ],
+    [
+     0.6,
+     4.615385,
+     104
+    ],
+    [
+     0.6,
+     4.615385,
+     104
+    ],
+    [
+     0.6,
+     4.615385,
+     104
+    ]
+   ],
+   "expect": [
+    {
+     "change": null,
+     "target": 112,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 112,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": {
+      "kind": "down",
+      "from": 112,
+      "to": 108
+     },
+     "target": 108,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": {
+      "kind": "down",
+      "from": 108,
+      "to": 104
+     },
+     "target": 104,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "down"
+    }
+   ]
+  },
+  {
+   "name": "break under 50 for 2 loops, a step slower after",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 2,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 120,
+   "top": 160,
+   "floor": 100,
+   "loops": [
+    [
+     0.9,
+     4,
+     120
+    ],
+    [
+     0.4,
+     4,
+     120
+    ],
+    [
+     0.3,
+     4,
+     120
+    ],
+    [
+     0.92,
+     4,
+     120
+    ],
+    [
+     0.95,
+     4.137931,
+     116
+    ]
+   ],
+   "expect": [
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0.25,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0,
+     "zone": "break"
+    },
+    {
+     "change": {
+      "kind": "break",
+      "from": 120,
+      "to": 116
+     },
+     "target": 116,
+     "progress": 0,
+     "zone": "break"
+    },
+    {
+     "change": null,
+     "target": 116,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 116,
+     "progress": 0,
+     "zone": "up"
+    }
+   ]
+  },
+  {
+   "name": "break, same tempo after",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 2,
+    "breakSeconds": 25,
+    "slowerAfterBreak": false,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 120,
+   "top": 160,
+   "floor": 100,
+   "loops": [
+    [
+     0.3,
+     4,
+     120
+    ],
+    [
+     0.2,
+     4,
+     120
+    ],
+    [
+     0.6,
+     4,
+     120
+    ]
+   ],
+   "expect": [
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0,
+     "zone": "break"
+    },
+    {
+     "change": {
+      "kind": "break",
+      "from": 120,
+      "to": 120
+     },
+     "target": 120,
+     "progress": 0,
+     "zone": "break"
+    },
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0,
+     "zone": "down"
+    }
+   ]
+  },
+  {
+   "name": "hysteresis: near the up line it does not flip",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 2,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 2,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 100,
+   "top": 140,
+   "floor": 92,
+   "loops": [
+    [
+     0.91,
+     4.8,
+     100
+    ],
+    [
+     0.91,
+     4.8,
+     100
+    ],
+    [
+     0.89,
+     4.8,
+     100
+    ],
+    [
+     0.88,
+     4.615385,
+     104
+    ],
+    [
+     0.9,
+     4.615385,
+     104
+    ],
+    [
+     0.91,
+     4.615385,
+     104
+    ],
+    [
+     0.89,
+     4.615385,
+     104
+    ],
+    [
+     0.9,
+     4.444444,
+     108
+    ]
+   ],
+   "expect": [
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0.5,
+     "zone": "up"
+    },
+    {
+     "change": {
+      "kind": "up",
+      "from": 100,
+      "to": 104
+     },
+     "target": 104,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0.5,
+     "zone": "up"
+    },
+    {
+     "change": {
+      "kind": "up",
+      "from": 104,
+      "to": 108
+     },
+     "target": 108,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 108,
+     "progress": 0,
+     "zone": "up"
+    }
+   ]
+  },
+  {
+   "name": "cooldown: 2 loops after a change are not counted",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 2,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 1,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 2,
+    "minBPM": 0
+   },
+   "start": 100,
+   "top": 140,
+   "floor": 100,
+   "loops": [
+    [
+     0.95,
+     4.8,
+     100
+    ],
+    [
+     0.95,
+     4.8,
+     100
+    ],
+    [
+     0.95,
+     4.705882,
+     102
+    ],
+    [
+     0.95,
+     4.705882,
+     102
+    ],
+    [
+     0.95,
+     4.705882,
+     102
+    ],
+    [
+     0.95,
+     4.705882,
+     102
+    ],
+    [
+     0.95,
+     4.615385,
+     104
+    ],
+    [
+     0.95,
+     4.615385,
+     104
+    ],
+    [
+     0.95,
+     4.615385,
+     104
+    ],
+    [
+     0.95,
+     4.615385,
+     104
+    ]
+   ],
+   "expect": [
+    {
+     "change": {
+      "kind": "up",
+      "from": 100,
+      "to": 102
+     },
+     "target": 102,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 102,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 102,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 102,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": {
+      "kind": "up",
+      "from": 102,
+      "to": 104
+     },
+     "target": 104,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 104,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": {
+      "kind": "up",
+      "from": 104,
+      "to": 106
+     },
+     "target": 106,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 106,
+     "progress": 0,
+     "zone": "up"
+    }
+   ]
+  },
+  {
+   "name": "windows in seconds",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 5,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "seconds",
+    "upPercent": 85,
+    "upWindow": 10,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 10,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 100,
+   "top": 140,
+   "floor": 100,
+   "loops": [
+    [
+     0.9,
+     4.8,
+     100
+    ],
+    [
+     0.9,
+     4.8,
+     100
+    ],
+    [
+     0.9,
+     4.8,
+     100
+    ],
+    [
+     0.9,
+     4.8,
+     100
+    ],
+    [
+     0.9,
+     4.571429,
+     105
+    ],
+    [
+     0.9,
+     4.571429,
+     105
+    ],
+    [
+     0.9,
+     4.571429,
+     105
+    ],
+    [
+     0.9,
+     4.571429,
+     105
+    ],
+    [
+     0.9,
+     4.571429,
+     105
+    ],
+    [
+     0.9,
+     4.363636,
+     110
+    ],
+    [
+     0.9,
+     4.363636,
+     110
+    ],
+    [
+     0.9,
+     4.363636,
+     110
+    ]
+   ],
+   "expect": [
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0.48,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0.96,
+     "zone": "up"
+    },
+    {
+     "change": {
+      "kind": "up",
+      "from": 100,
+      "to": 105
+     },
+     "target": 105,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 105,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 105,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 105,
+     "progress": 0.457143,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 105,
+     "progress": 0.914286,
+     "zone": "up"
+    },
+    {
+     "change": {
+      "kind": "up",
+      "from": 105,
+      "to": 110
+     },
+     "target": 110,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 110,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 110,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 110,
+     "progress": 0.436364,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 110,
+     "progress": 0.872727,
+     "zone": "up"
+    }
+   ]
+  },
+  {
+   "name": "thresholds too close are pulled apart",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 80,
+    "upWindow": 2,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 2,
+    "breakOn": true,
+    "breakPercent": 70,
+    "breakWindow": 2,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 100,
+   "top": 140,
+   "floor": 90,
+   "loops": [
+    [
+     0.76,
+     4.8,
+     100
+    ],
+    [
+     0.76,
+     4.8,
+     100
+    ],
+    [
+     0.76,
+     4.8,
+     100
+    ],
+    [
+     0.74,
+     4.8,
+     100
+    ],
+    [
+     0.7,
+     4.8,
+     100
+    ],
+    [
+     0.69,
+     4.8,
+     100
+    ]
+   ],
+   "expect": [
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "hold"
+    },
+    {
+     "change": null,
+     "target": 100,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": {
+      "kind": "down",
+      "from": 100,
+      "to": 96
+     },
+     "target": 96,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 96,
+     "progress": 0,
+     "zone": "break"
+    }
+   ]
+  },
+  {
+   "name": "holds at the top",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 10,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 1,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 0,
+    "minBPM": 0
+   },
+   "start": 100,
+   "top": 120,
+   "floor": 100,
+   "loops": [
+    [
+     0.99,
+     4.8,
+     100
+    ],
+    [
+     0.99,
+     4.8,
+     100
+    ],
+    [
+     0.99,
+     4.363636,
+     110
+    ],
+    [
+     0.99,
+     4.363636,
+     110
+    ],
+    [
+     0.99,
+     4,
+     120
+    ],
+    [
+     0.99,
+     4,
+     120
+    ]
+   ],
+   "expect": [
+    {
+     "change": {
+      "kind": "up",
+      "from": 100,
+      "to": 110
+     },
+     "target": 110,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 110,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": {
+      "kind": "up",
+      "from": 110,
+      "to": 120
+     },
+     "target": 120,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0,
+     "zone": "up"
+    }
+   ]
+  },
+  {
+   "name": "a down is the average over its whole window",
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 120,
+   "top": 140,
+   "floor": 100,
+   "loops": [
+    [
+     0.5,
+     4,
+     120
+    ],
+    [
+     0.5,
+     4,
+     120
+    ],
+    [
+     0.5,
+     4,
+     120
+    ],
+    [
+     0.95,
+     4,
+     120
+    ],
+    [
+     0.5,
+     4,
+     120
+    ],
+    [
+     0.5,
+     4.137931,
+     116
+    ]
+   ],
+   "expect": [
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 120,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": {
+      "kind": "down",
+      "from": 120,
+      "to": 116
+     },
+     "target": 116,
+     "progress": 0,
+     "zone": "up"
+    },
+    {
+     "change": null,
+     "target": 116,
+     "progress": 0,
+     "zone": "down"
+    },
+    {
+     "change": null,
+     "target": 116,
+     "progress": 0,
+     "zone": "down"
+    }
+   ]
+  }
+ ],
+ "zones": [
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 1,
+   "expect": "up"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.9,
+   "expect": "up"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.89,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.75,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.74,
+   "expect": "down"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.5,
+   "expect": "down"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.49,
+   "expect": "down"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0,
+   "expect": "down"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 1,
+   "expect": "up"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.9,
+   "expect": "up"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.89,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.75,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.74,
+   "expect": "down"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.5,
+   "expect": "down"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.49,
+   "expect": "break"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0,
+   "expect": "break"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 1,
+   "expect": "up"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.9,
+   "expect": "up"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.89,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.75,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.74,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.5,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.49,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 1,
+   "expect": "up"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.9,
+   "expect": "up"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.89,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.75,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.74,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.5,
+   "expect": "hold"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0.49,
+   "expect": "break"
+  },
+  {
+   "plan": {
+    "mode": "accuracy",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": false,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": true,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "accuracy": 0,
+   "expect": "break"
+  }
+ ],
+ "bounds": [
+  {
+   "plan": {
+    "mode": "off",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 100,
+   "rule": {
+    "min": 40,
+    "max": 200
+   },
+   "expect": {
+    "top": 200,
+    "floor": 100
+   }
+  },
+  {
+   "plan": {
+    "mode": "off",
+    "endBPM": 150,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 0
+   },
+   "start": 100,
+   "rule": {
+    "min": 40,
+    "max": 200
+   },
+   "expect": {
+    "top": 150,
+    "floor": 100
+   }
+  },
+  {
+   "plan": {
+    "mode": "off",
+    "endBPM": 250,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 80
+   },
+   "start": 100,
+   "rule": {
+    "min": 40,
+    "max": 200
+   },
+   "expect": {
+    "top": 200,
+    "floor": 80
+   }
+  },
+  {
+   "plan": {
+    "mode": "off",
+    "endBPM": 90,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 120
+   },
+   "start": 100,
+   "rule": {
+    "min": 40,
+    "max": 200
+   },
+   "expect": {
+    "top": 100,
+    "floor": 100
+   }
+  },
+  {
+   "plan": {
+    "mode": "off",
+    "endBPM": 0,
+    "step": 4,
+    "every": 2,
+    "everyUnit": "loops",
+    "atTop": "hold",
+    "windowUnit": "loops",
+    "upPercent": 90,
+    "upWindow": 4,
+    "downOn": true,
+    "downPercent": 75,
+    "downWindow": 4,
+    "breakOn": false,
+    "breakPercent": 50,
+    "breakWindow": 4,
+    "breakSeconds": 25,
+    "slowerAfterBreak": true,
+    "cooldownLoops": 1,
+    "minBPM": 20
+   },
+   "start": 100,
+   "rule": {
+    "min": 40,
+    "max": 200
+   },
+   "expect": {
+    "top": 200,
+    "floor": 40
+   }
+  }
+ ],
+ "challenge": [
+  {
+   "name": "earns only in the zone, pauses under it",
+   "opts": {
+    "targetSeconds": 20,
+    "percent": 90,
+    "window": 1
+   },
+   "loops": [
+    [
+     0.95,
+     4
+    ],
+    [
+     0.95,
+     4
+    ],
+    [
+     0.8,
+     4
+    ],
+    [
+     0.85,
+     4
+    ],
+    [
+     0.92,
+     4
+    ],
+    [
+     0.97,
+     4
+    ],
+    [
+     0.99,
+     4
+    ],
+    [
+     0.99,
+     4
+    ]
+   ],
+   "expect": [
+    {
+     "result": "earned",
+     "earned": 4,
+     "elapsed": 4,
+     "inZone": true,
+     "bestStreak": 4,
+     "share": 1
+    },
+    {
+     "result": "earned",
+     "earned": 8,
+     "elapsed": 8,
+     "inZone": true,
+     "bestStreak": 8,
+     "share": 1
+    },
+    {
+     "result": "held",
+     "earned": 8,
+     "elapsed": 12,
+     "inZone": false,
+     "bestStreak": 8,
+     "share": 0.666667
+    },
+    {
+     "result": "held",
+     "earned": 8,
+     "elapsed": 16,
+     "inZone": false,
+     "bestStreak": 8,
+     "share": 0.5
+    },
+    {
+     "result": "earned",
+     "earned": 12,
+     "elapsed": 20,
+     "inZone": true,
+     "bestStreak": 8,
+     "share": 0.6
+    },
+    {
+     "result": "earned",
+     "earned": 16,
+     "elapsed": 24,
+     "inZone": true,
+     "bestStreak": 8,
+     "share": 0.666667
+    },
+    {
+     "result": "done",
+     "earned": 20,
+     "elapsed": 28,
+     "inZone": true,
+     "bestStreak": 12,
+     "share": 0.714286
+    },
+    {
+     "result": "done",
+     "earned": 20,
+     "elapsed": 28,
+     "inZone": true,
+     "bestStreak": 12,
+     "share": 0.714286
+    }
+   ]
+  },
+  {
+   "name": "the rolling window smooths one bad loop",
+   "opts": {
+    "targetSeconds": 12,
+    "percent": 90,
+    "window": 2
+   },
+   "loops": [
+    [
+     0.96,
+     3
+    ],
+    [
+     0.86,
+     3
+    ],
+    [
+     0.96,
+     3
+    ],
+    [
+     0.6,
+     3
+    ],
+    [
+     0.6,
+     3
+    ],
+    [
+     0.97,
+     3
+    ],
+    [
+     0.97,
+     3
+    ],
+    [
+     0.97,
+     3
+    ],
+    [
+     0.97,
+     3
+    ]
+   ],
+   "expect": [
+    {
+     "result": "earned",
+     "earned": 3,
+     "elapsed": 3,
+     "inZone": true,
+     "bestStreak": 3,
+     "share": 1
+    },
+    {
+     "result": "earned",
+     "earned": 6,
+     "elapsed": 6,
+     "inZone": true,
+     "bestStreak": 6,
+     "share": 1
+    },
+    {
+     "result": "earned",
+     "earned": 9,
+     "elapsed": 9,
+     "inZone": true,
+     "bestStreak": 9,
+     "share": 1
+    },
+    {
+     "result": "held",
+     "earned": 9,
+     "elapsed": 12,
+     "inZone": false,
+     "bestStreak": 9,
+     "share": 0.75
+    },
+    {
+     "result": "held",
+     "earned": 9,
+     "elapsed": 15,
+     "inZone": false,
+     "bestStreak": 9,
+     "share": 0.6
+    },
+    {
+     "result": "held",
+     "earned": 9,
+     "elapsed": 18,
+     "inZone": false,
+     "bestStreak": 9,
+     "share": 0.5
+    },
+    {
+     "result": "done",
+     "earned": 12,
+     "elapsed": 21,
+     "inZone": true,
+     "bestStreak": 9,
+     "share": 0.571429
+    },
+    {
+     "result": "done",
+     "earned": 12,
+     "elapsed": 21,
+     "inZone": true,
+     "bestStreak": 9,
+     "share": 0.571429
+    },
+    {
+     "result": "done",
+     "earned": 12,
+     "elapsed": 21,
+     "inZone": true,
+     "bestStreak": 9,
+     "share": 0.571429
+    }
+   ]
+  },
+  {
+   "name": "the cap ends it before the target",
+   "opts": {
+    "targetSeconds": 60,
+    "percent": 90,
+    "window": 1,
+    "capSeconds": 15
+   },
+   "loops": [
+    [
+     0.95,
+     5
+    ],
+    [
+     0.5,
+     5
+    ],
+    [
+     0.95,
+     5
+    ],
+    [
+     0.95,
+     5
+    ]
+   ],
+   "expect": [
+    {
+     "result": "earned",
+     "earned": 5,
+     "elapsed": 5,
+     "inZone": true,
+     "bestStreak": 5,
+     "share": 1
+    },
+    {
+     "result": "held",
+     "earned": 5,
+     "elapsed": 10,
+     "inZone": false,
+     "bestStreak": 5,
+     "share": 0.5
+    },
+    {
+     "result": "done",
+     "earned": 10,
+     "elapsed": 15,
+     "inZone": true,
+     "bestStreak": 5,
+     "share": 0.666667
+    },
+    {
+     "result": "done",
+     "earned": 10,
+     "elapsed": 15,
+     "inZone": true,
+     "bestStreak": 5,
+     "share": 0.666667
+    }
+   ]
+  },
+  {
+   "name": "best streak is the longest run in the zone",
+   "opts": {
+    "targetSeconds": 100,
+    "percent": 85,
+    "window": 1
+   },
+   "loops": [
+    [
+     0.9,
+     2
+    ],
+    [
+     0.9,
+     2
+    ],
+    [
+     0.8,
+     2
+    ],
+    [
+     0.9,
+     2
+    ],
+    [
+     0.9,
+     2
+    ],
+    [
+     0.9,
+     2
+    ],
+    [
+     0.7,
+     2
+    ]
+   ],
+   "expect": [
+    {
+     "result": "earned",
+     "earned": 2,
+     "elapsed": 2,
+     "inZone": true,
+     "bestStreak": 2,
+     "share": 1
+    },
+    {
+     "result": "earned",
+     "earned": 4,
+     "elapsed": 4,
+     "inZone": true,
+     "bestStreak": 4,
+     "share": 1
+    },
+    {
+     "result": "held",
+     "earned": 4,
+     "elapsed": 6,
+     "inZone": false,
+     "bestStreak": 4,
+     "share": 0.666667
+    },
+    {
+     "result": "earned",
+     "earned": 6,
+     "elapsed": 8,
+     "inZone": true,
+     "bestStreak": 4,
+     "share": 0.75
+    },
+    {
+     "result": "earned",
+     "earned": 8,
+     "elapsed": 10,
+     "inZone": true,
+     "bestStreak": 4,
+     "share": 0.8
+    },
+    {
+     "result": "earned",
+     "earned": 10,
+     "elapsed": 12,
+     "inZone": true,
+     "bestStreak": 6,
+     "share": 0.833333
+    },
+    {
+     "result": "held",
+     "earned": 10,
+     "elapsed": 14,
+     "inZone": false,
+     "bestStreak": 6,
+     "share": 0.714286
+    }
+   ]
+  }
+ ]
+}

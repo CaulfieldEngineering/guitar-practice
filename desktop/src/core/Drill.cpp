@@ -29,7 +29,87 @@ SessionSettings::Kind SessionSettings::kindFrom (const juce::String& s)
 {
     if (s == "duration") return Kind::duration;
     if (s == "endurance") return Kind::endurance;
+    if (s == "challenge") return Kind::challenge;
     return Kind::cycles;
+}
+
+// ---- the tuning ----
+
+const std::vector<Tuning>& Tuning::presets()
+{
+    static const std::vector<Tuning> list {
+        { "e", "E standard", { 64, 59, 55, 50, 45, 40 } },
+        { "eb", "Eb standard", { 63, 58, 54, 49, 44, 39 } },
+        { "dropD", "Drop D", { 64, 59, 55, 50, 45, 38 } },
+        { "d", "D standard", { 62, 57, 53, 48, 43, 38 } },
+        { "dropC", "Drop C", { 62, 57, 53, 48, 43, 36 } },
+        { "c", "C standard", { 60, 55, 51, 46, 41, 36 } },
+        { "b", "B standard", { 59, 54, 50, 45, 40, 35 } },
+        { "seven", "7-string B", { 64, 59, 55, 50, 45, 40, 35 } },
+        { "dropA", "Drop A", { 64, 59, 55, 50, 45, 40, 33 } },
+    };
+    return list;
+}
+
+std::optional<Tuning> Tuning::preset (const juce::String& id)
+{
+    for (auto& t : presets()) if (t.id == id) return t;
+    return std::nullopt;
+}
+
+Tuning Tuning::custom (std::vector<int> s) { Tuning t; t.id = "custom"; t.name = "Custom"; t.strings = std::move (s); return t; }
+
+std::optional<int> Tuning::pitch (int string, int fret) const
+{
+    if (string < 1 || string > (int) strings.size() || fret < 0) return std::nullopt;
+    return strings[(size_t) string - 1] + fret;
+}
+
+juce::String Tuning::noteName (int midi, bool octave, bool flats)
+{
+    static const char* sharpNames[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    static const char* flatNames[] = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" };
+    const int pc = ((midi % 12) + 12) % 12;
+    juce::String n = flats ? flatNames[pc] : sharpNames[pc];
+    return octave ? n + juce::String (midi / 12 - 1) : n;
+}
+
+juce::String Tuning::lowToHigh() const
+{
+    const bool flats = id == "eb" || id == "c";
+    juce::StringArray a;
+    for (auto it = strings.rbegin(); it != strings.rend(); ++it) a.add (noteName (*it, false, flats));
+    return a.joinIntoString (" ");
+}
+
+juce::String Tuning::stringName (int s) const
+{
+    if (s < 1 || s > (int) strings.size()) return {};
+    const auto n = noteName (strings[(size_t) s - 1], false, id == "eb" || id == "c");
+    return s == 1 ? n.toLowerCase() : n;
+}
+
+juce::var Tuning::toVar() const
+{
+    auto* o = new juce::DynamicObject();
+    o->setProperty ("id", id);
+    o->setProperty ("name", name);
+    juce::Array<juce::var> a;
+    for (int x : strings) a.add (x);
+    o->setProperty ("strings", a);
+    return juce::var (o);
+}
+
+std::optional<Tuning> Tuning::fromVar (const juce::var& v)
+{
+    if (! v.isObject() || ! v["strings"].isArray()) return std::nullopt;
+    Tuning t;
+    t.id = strOr (v, "id", "custom");
+    t.name = strOr (v, "name", "Custom");
+    t.strings.clear();
+    for (auto& x : *v["strings"].getArray()) t.strings.push_back ((int) x);
+    if (t.strings.size() < 4 || t.strings.size() > 8) return std::nullopt;
+    return t;
 }
 
 SessionSettings SessionSettings::fromVar (const juce::var& v, SessionSettings s)
@@ -42,6 +122,14 @@ SessionSettings SessionSettings::fromVar (const juce::var& v, SessionSettings s)
     s.toleranceMs = numOr (v, "toleranceMs", s.toleranceMs);
     s.windowCycles = intOr (v, "windowCycles", s.windowCycles);
     s.ladderStep = intOr (v, "ladderStep", s.ladderStep);
+    if (v["tempoPlan"].isObject()) s.tempoPlan = TempoPlan::fromVar (v["tempoPlan"]);
+    s.capSeconds = intOr (v, "capSeconds", s.capSeconds);
+    s.countInBars = intOr (v, "countInBars", s.countInBars);
+    if (v.hasProperty ("accent")) { auto a = v["accent"].toString(); s.accent = a == "groups" ? Accent::groups : a == "off" ? Accent::off : Accent::one; }
+    if (v.hasProperty ("clickSound")) { auto c = v["clickSound"].toString(); s.clickSound = c == "wood" ? ClickSound::wood : c == "beep" ? ClickSound::beep : c == "rim" ? ClickSound::rim : ClickSound::click; }
+    s.clickLevel = numOr (v, "clickLevel", s.clickLevel);
+    s.gapEvery = intOr (v, "gapEvery", s.gapEvery);
+    if (v.hasProperty ("tuning")) s.tuning = Tuning::fromVar (v["tuning"]);
     return s;
 }
 
@@ -55,13 +143,20 @@ juce::var SessionSettings::toVar() const
     o->setProperty ("toleranceMs", toleranceMs);
     o->setProperty ("windowCycles", windowCycles);
     o->setProperty ("ladderStep", ladderStep);
+    o->setProperty ("tempoPlan", tempoPlan.toVar());
+    o->setProperty ("capSeconds", capSeconds);
+    o->setProperty ("countInBars", countInBars);
+    o->setProperty ("accent", accent == Accent::groups ? "groups" : accent == Accent::off ? "off" : "one");
+    o->setProperty ("clickSound", clickSound == ClickSound::wood ? "wood" : clickSound == ClickSound::beep ? "beep" : clickSound == ClickSound::rim ? "rim" : "click");
+    o->setProperty ("clickLevel", clickLevel);
+    o->setProperty ("gapEvery", gapEvery);
+    if (tuning) o->setProperty ("tuning", tuning->toVar());
     return juce::var (o);
 }
 
 bool SessionSettings::operator== (const SessionSettings& o) const
 {
-    return kind == o.kind && cycles == o.cycles && seconds == o.seconds && targetPercent == o.targetPercent
-        && windowCycles == o.windowCycles && ladderStep == o.ladderStep;
+    return juce::JSON::toString (toVar(), true) == juce::JSON::toString (o.toVar(), true);
 }
 
 std::vector<NoteSpec> Drill::expand (const std::vector<int>& groups, bool accentFirst)
@@ -92,6 +187,8 @@ std::optional<Drill> Drill::fromVar (const juce::var& v)
     d.detail = strOr (v, "detail");
     d.shortName = strOr (v, "short");
     d.say = strOr (v, "say");
+    d.archived = v["archived"].isBool() && (bool) v["archived"];
+    d.pitchFree = strOr (v, "pitch").toLowerCase() == "x";
     d.timedBlocks = v["segments"].isArray() && v["segments"].size() > 0;
     d.category = strOr (v, "category", d.timedBlocks ? "Timed routines" : "Right hand");
     d.beatsPerBar = intOr (v, "beatsPerBar", 4);
@@ -134,6 +231,8 @@ std::optional<Drill> Drill::fromVar (const juce::var& v)
             s.at = { intOr (at, "beat", 0), intOr (at, "step", 0), intOr (at, "of", 1) };
             s.string = intOr (n, "string", 0);
             s.fret = intOr (n, "fret", -1);
+            const bool marked = n["fret"].isString() && n["fret"].toString().toLowerCase() == "x";
+            s.x = (n["x"].isBool() && (bool) n["x"]) || marked || s.fret < 0;
             auto p = strOr (n, "pick");
             s.pick = p == "down" ? Pick::down : p == "up" ? Pick::up : Pick::none;
             s.accent = n["accent"].isBool() ? (bool) n["accent"] : false;
@@ -154,6 +253,26 @@ std::optional<Drill> Drill::fromVar (const juce::var& v)
         return std::nullopt;
     if (d.cycleBeats <= 0) return std::nullopt;
     return d;
+}
+
+bool Drill::hasPitchedNotes() const
+{
+    if (pitchFree) return false;
+    for (auto& n : notes) if (! n.x) return true;
+    return false;
+}
+
+ClickKind voiced (ClickKind k, SessionSettings::ClickSound s)
+{
+    int i;
+    switch (k) { case ClickKind::accent: i = 0; break; case ClickKind::beat: i = 1; break; case ClickKind::sub: i = 2; break; default: return k; }
+    switch (s)
+    {
+        case SessionSettings::ClickSound::wood: return (ClickKind) ((int) ClickKind::woodAccent + i);
+        case SessionSettings::ClickSound::beep: return (ClickKind) ((int) ClickKind::beepAccent + i);
+        case SessionSettings::ClickSound::rim: return (ClickKind) ((int) ClickKind::rimAccent + i);
+        default: return k;
+    }
 }
 
 std::vector<int> Drill::groupSizes() const
@@ -200,6 +319,7 @@ std::vector<Note> Drill::runNotes (double bpm, double start, double seconds) con
             x.pick = n.pick;
             x.string = n.string;
             x.fret = n.fret;
+            x.x = pitchFree || n.x;
             out.push_back (x);
         }
     }
@@ -224,8 +344,10 @@ double Drill::window (double bpm) const
 Drill Drill::fallback()
 {
     Drill d;
-    d.id = "alt8"; d.name = "Alternate picking, eighths"; d.detail = "Two notes a beat, down up.";
-    d.cycleBeats = 1; d.notes = expand ({ 2 }, false); d.tempo = { 120, 30, 300, 4 };
+    d.id = "trip16x4"; d.name = "Triplets to sixteenths, 4 and 4"; d.shortName = "Triplets to 16ths, 4+4";
+    d.detail = "Four beats of triplets, then four beats of sixteenths.";
+    d.cycleBeats = 8; d.notes = expand ({ 3, 3, 3, 3, 4, 4, 4, 4 }, false); d.tempo = { 80, 40, 200, 4 };
+    d.pitchFree = true;
     return d;
 }
 
@@ -247,7 +369,9 @@ CountIn countIn (int beats, double bpm)
     return c;
 }
 
-CycleSlot cycle (const Drill& d, int index, double start, double bpm, bool guided, std::optional<double> limit)
+bool isGap (int bar, int every) { return every >= 2 && bar >= 0 && (bar + 1) % every == 0; }
+
+CycleSlot cycle (const Drill& d, int index, double start, double bpm, bool guided, std::optional<double> limit, const ClickOptions& options)
 {
     const double beat = 60 / std::max (1.0, bpm);
     const double duration = d.cycleBeats * beat;
@@ -256,26 +380,45 @@ CycleSlot cycle (const Drill& d, int index, double start, double bpm, bool guide
     CycleSlot s;
     s.index = index; s.start = start; s.duration = seconds; s.bpm = bpm;
     s.notes = d.runNotes (bpm, start, seconds);
-    for (auto& n : s.notes) n.beat += index * d.cycleBeats;
+    for (auto& n : s.notes)
+    {
+        n.beat += index * d.cycleBeats;
+        n.pitch = options.pitchFree || n.x ? std::nullopt : options.tuning.pitch (n.string, n.fret);
+    }
     const int beatsInRun = (int) std::ceil (seconds / beat - 1e-9);
+    auto sizes = d.groupSizes();
+    const int count = (int) sizes.size();
+    const int perBar = std::max (1, d.beatsPerBar);
     for (int b = 0; b < std::max (0, beatsInRun); ++b)
     {
         const int global = index * d.cycleBeats + b;
-        const int inBar = global % std::max (1, d.beatsPerBar);
-        s.events.push_back ({ start + b * beat, inBar == 0 ? ClickKind::accent : ClickKind::beat, inBar });
+        const int inBar = global % perBar;
+        if (isGap (global / perBar, options.gapEvery)) continue;
+        bool accented = false;
+        switch (options.accent)
+        {
+            case SessionSettings::Accent::one: accented = inBar == 0; break;
+            case SessionSettings::Accent::off: accented = false; break;
+            case SessionSettings::Accent::groups:
+            {
+                const int local = b % count;
+                accented = sizes[(size_t) local] != sizes[(size_t) ((local - 1 + count) % count)] || (count == 1 && inBar == 0);
+                break;
+            }
+        }
+        s.events.push_back ({ start + b * beat, accented ? ClickKind::accent : ClickKind::beat, inBar });
     }
     if (guided)
     {
-        auto sizes = d.groupSizes();
-        const int count = (int) sizes.size();
         for (auto& n : s.notes)
         {
+            if (isGap (n.beat / perBar, options.gapEvery)) continue;
             const int local = n.beat - index * d.cycleBeats;
             const int prev = sizes[(size_t) (((local - 1) % count + count) % count)];
             const bool first = n.time - start - local * beat < 1e-6;
             const bool changed = first && sizes[(size_t) (local % count)] != prev && prev > 0;
             TimedEvent e { n.time, n.accent || changed ? ClickKind::pluckAccent : ClickKind::pluck, -1,
-                           guitarPitch (n.string, n.fret), n.pick == Pick::up };
+                           n.pitch ? *n.pitch : guitarPitch (n.string, n.fret), n.pick == Pick::up };
             s.events.push_back (e);
         }
     }

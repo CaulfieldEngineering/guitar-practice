@@ -40,6 +40,9 @@ struct EngineParams {
     var gridClicks = true
     /// Raised by one to play a second of test tone (the Audio screen).
     var toneSerial = 0
+    /// The click's sound and level (0.3.0, set on a drill before Start).
+    var clickSound: SessionSettings.ClickSound = .click
+    var clickLevel: Float = 1
 }
 
 /// What the audio thread reports back.
@@ -71,6 +74,7 @@ final class RenderState {
     private var vSound = [Int](repeating: -1, count: voices)
     private var vPos = [Int](repeating: 0, count: voices)
     private var vDelay = [Int](repeating: 0, count: voices)
+    private var vGain = [Float](repeating: 1, count: voices)
     private var lastBeat = -1
     private var lastBeatFrame: Int64 = 0
 
@@ -101,7 +105,7 @@ final class RenderState {
         self.params = params.current
         lastToneSerial = self.params.toneSerial
         var ptrs: [UnsafeMutablePointer<Float>] = [], lens: [Int] = []
-        for raw in 0...ClickKind.pluckAccent.rawValue {
+        for raw in 0...ClickKind.last.rawValue {
             let s = sounds.samples(for: ClickKind(rawValue: raw)!, sampleRate: sampleRate)
             let p = UnsafeMutablePointer<Float>.allocate(capacity: max(1, s.count))
             s.withUnsafeBufferPointer { p.initialize(from: $0.baseAddress!, count: s.count) }
@@ -113,9 +117,9 @@ final class RenderState {
 
     deinit { for p in soundPtrs { p.deallocate() } }
 
-    private func start(_ sound: ClickKind, delay: Int) {
+    private func start(_ sound: ClickKind, delay: Int, gain: Float = 1) {
         for v in 0..<RenderState.voices where vSound[v] < 0 {
-            vSound[v] = sound.rawValue; vPos[v] = 0; vDelay[v] = delay
+            vSound[v] = sound.rawValue; vPos[v] = 0; vDelay[v] = delay; vGain[v] = gain
             return
         }
     }
@@ -125,10 +129,12 @@ final class RenderState {
         if e.beat >= 0 { lastBeat = e.beat; lastBeatFrame = e.frame }
         switch e.kind {
         case .accent, .beat, .sub:
-            if params.gridClicks { start(e.kind, delay: delay) }
+            if params.gridClicks { start(e.kind.voiced(params.clickSound), delay: delay, gain: params.clickLevel) }
+        case .countIn:
+            start(.countIn, delay: delay, gain: max(0.3, params.clickLevel))
         case .change:
             start(.change, delay: delay)
-            if params.gridClicks { start(.accent, delay: delay) }
+            if params.gridClicks { start(ClickKind.accent.voiced(params.clickSound), delay: delay, gain: params.clickLevel) }
         default:
             if e.sample >= 0, let g = guitar, e.sample < g.ptrs.count {
                 pluck(e, delay: delay)
@@ -166,7 +172,8 @@ final class RenderState {
         for v in 0..<RenderState.voices where vSound[v] >= 0 {
             let s = vSound[v], p = soundPtrs[s], len = soundLens[s]
             var pos = vPos[v], i = vDelay[v]
-            while i < n && pos < len { out[i] += p[pos]; i += 1; pos += 1 }
+            let g = vGain[v]
+            while i < n && pos < len { out[i] += p[pos] * g; i += 1; pos += 1 }
             vDelay[v] = 0; vPos[v] = pos
             if pos >= len { vSound[v] = -1 }
         }

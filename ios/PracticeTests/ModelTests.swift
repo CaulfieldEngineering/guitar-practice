@@ -200,16 +200,13 @@ final class ModelTests: XCTestCase {
     func testPatternGlyphsAndShortNames() throws {
         let pa = PlayAlong(player: Player(), history: History(inMemory: true))
         func glyph(_ id: String) -> String? { pa.exercises.first { $0.id == id }?.glyph }
+        // 2026-11-24: only the triplets drill is offered; the others are archived in the catalog.
+        XCTAssertEqual(pa.exercises.map(\.id), ["trip16x4"])
         XCTAssertEqual(glyph("trip16x4"), "3→4")
-        XCTAssertEqual(glyph("alt8"), "8")
-        XCTAssertEqual(glyph("alt3"), "3")
-        XCTAssertEqual(glyph("alt16"), "16")
-        XCTAssertEqual(glyph("burst"), "16·rest")
-        XCTAssertEqual(glyph("gallop"), "mix")
-        let alt = try XCTUnwrap(pa.exercises.first { $0.id == "alt16" })
-        XCTAssertEqual(alt.short, "Alternate 16ths")
-        XCTAssertEqual(alt.category, "Picking")
-        XCTAssertFalse(pa.exercises.contains { $0.isRoutine }, "no drill of timed blocks in 0.1.7")
+        let t = try XCTUnwrap(pa.exercises.first)
+        XCTAssertEqual(t.short, "Triplets to 16ths, 4+4")
+        XCTAssertTrue(t.pitchFree, "a rhythm drill: every note is an X")
+        XCTAssertFalse(pa.exercises.contains { $0.isRoutine })
     }
 
     /// The groundwork for bringing the timed routines back as drills: the data reads, and nothing else changes.

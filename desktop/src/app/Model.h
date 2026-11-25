@@ -6,6 +6,8 @@
 #include "Store.h"
 #include "Sync.h"
 #include "Voice.h"
+#include "Routines.h"
+#include "../core/PitchDetector.h"
 #include "../engine/AudioEngine.h"
 #include "../engine/DeviceController.h"
 
@@ -13,8 +15,22 @@ namespace practice {
 
 class Model : public juce::ChangeBroadcaster, private juce::Timer {
 public:
-    enum class Phase { ready, intro, syncing, calibrating, running, paused, result };
-    enum class NoteState { waiting, tight, close, loose, missed };
+    /// `resting`: a break the accuracy called for (the tempo plan's Break); a countdown, then the run goes on.
+    enum class Phase { ready, intro, syncing, calibrating, running, paused, resting, result };
+    /// `wrong`: on time, on the wrong pitch (a pitched note only).
+    enum class NoteState { waiting, tight, close, loose, missed, wrong };
+
+    /// A run set up from a routine's drill block: used for that run only, never saved as the drill's own.
+    struct RunSetup { juce::String drillID; int bpm = 100; bool guided = false, audioInput = true; SessionSettings session; };
+    /// The tempo plan's progress for the run screen.
+    struct StepInfo {
+        enum class State { perLoop, up, hold, down, rest, settling, top };
+        State state = State::hold;
+        double fraction = 0;
+        juce::String measure;
+        int target = 0;
+        std::optional<int> next;
+    };
 
     explicit Model (AppPaths paths, bool offline = false);
     ~Model() override;
@@ -58,6 +74,31 @@ public:
     // ---- the metronome ----
     int metroBPM = 100, metroBeats = 4, metroSub = 1;
     bool metroAccent = true;
+    SessionSettings::ClickSound metroSound = SessionSettings::ClickSound::click;
+    double metroLevel = 1;
+    void setMetroSound (SessionSettings::ClickSound s);
+    void setMetroLevel (double v);
+    /// A routine's warm-up or open practice with a click: the metronome at the block's tempo, nothing of its own
+    /// settings changed.
+    void startBlockClick (int bpm);
+    void stopBlockClick();
+    bool blockClickOn = false;
+    /// The routine's sounds between blocks: a tick (the last one accented) and the block chime.
+    void playTick (bool last);
+    void playChime();
+
+    // ---- the guitar's tuning (kept here and on the drill server) ----
+    Tuning guitarTuning;
+    void setGuitarTuning (const Tuning& t);
+    Tuning tuning() const;   // the drill's (or block's) own, else the guitar's
+
+    // ---- routines ----
+    std::unique_ptr<RoutineStore> routines;
+    std::optional<RunSetup> runSetup;
+    std::function<void (const SessionResult*)> onRunEnded;
+    juce::String routineRunID;
+    void startBlock (const RunSetup& s);
+    void endBlockSetup() { runSetup.reset(); routineRunID = {}; onRunEnded = nullptr; }
     bool metronomeRunning() const { return engine.metronomeRunning(); }
     int metronomeBeat() const { return engine.metronomeBeat(); }
     void toggleMetronome();
@@ -109,6 +150,19 @@ public:
     bool newBest = false;
     std::optional<std::pair<int, int>> levelUp;
     int doubles = 0;
+    // the tempo plan of the run going on, breaks, Challenge, pitches heard
+    std::vector<TempoChange> tempoChanges;
+    int breaks = 0, resumeBPM = 0, planTop = 0, planFloor = 0;
+    double breakLeft = 0, breakLength = 0;
+    std::optional<TempoGovernor> governor;
+    std::optional<ChallengeClock> challenge;
+    std::map<int, double> heardPitch;
+    Tuning runTuning;
+    void endBreak();
+    std::optional<StepInfo> stepInfo() const;
+    std::optional<TempoPlan::Zone> accuracyZone() const;
+    std::vector<int> meterLines() const;
+    const SessionSettings& runSettingsNow() const { return runSettings; }
 
     void start();
     void calibrate();
@@ -183,6 +237,22 @@ private:
     double window() const;
     double shift() const;
     int noteEnd (size_t i) const;
+    double tempoForLoop (size_t k) const;
+    void takeBreak (size_t judged, int resumeAt);
+    void notifyEnded (const SessionResult* r) { if (onRunEnded) { auto f = onRunEnded; f (r); } }
+    const Drill& setupDrill() const;
+    const SessionSettings& setupSession() const { return runSetup ? runSetup->session : session; }
+    bool setupGuided() const { return runSetup ? runSetup->guided : guided; }
+    bool setupAudioInput() const { return runSetup ? runSetup->audioInput : audioInput; }
+    bool setupIntro() const { return runSetup ? false : intro; }
+    int setupTempo() const;
+    void syncTuning (const juce::String& base);
+    PitchDetector pitchDetector;
+    std::vector<Onset> pendingPitch;   // engine seconds; waiting for the samples that tell their pitch
+    bool wantsPitch = false;
+    double breakStartMs = 0, breakTotal = 0;
+    std::vector<TempoStep::Break> breakLog;
+    mutable std::mutex tuningLock;
 
     std::unique_ptr<DeviceController> deviceController;
     std::unique_ptr<SyncWorker> sync;

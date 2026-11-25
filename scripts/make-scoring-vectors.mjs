@@ -157,11 +157,37 @@ const maxCases = [];
   for (const c of maxCases) if (S.learnedTempo(c.runs, 'trip16x4') !== c.expect) throw new Error(`max case ${c.name}`);
 }
 
+// Pitch (2026-11-24): an X note scores on timing only, whatever the pitch; a pitched note checks the pitch in the
+// tuning. Notes are [time, accent, beat, pitch or null], picks [time, strength, pitch or null].
+const pitchCases = [];
+{
+  const E = [64, 59, 55, 50, 45, 40];            // E standard, high string first
+  const dropD = [64, 59, 55, 50, 45, 38];
+  const times = Array.from({ length: 8 }, (_, i) => q(1 + i * 0.125));
+  const mk = (pitches) => times.map((t, i) => [t, 0, Math.floor(i / 4), pitches[i]]);
+  const picks = (pitches) => times.map((t, i) => [q(t + (i % 2 ? 0.004 : -0.003)), 1, pitches[i]]);
+  const run = (name, notes, played, tuningName) => {
+    const r = S.score(notes.map(([time, accent, beat, pitch]) => ({ time, accent: !!accent, beat, pitch })),
+      played.map(([time, strength, pitch]) => ({ time, strength, pitch })), 0.05, S.standardRule, config);
+    pitchCases.push({ name, tuning: tuningName, notes, played, expect: { score: r.score, hits: r.hits, wrongPitch: r.wrongPitch } });
+  };
+  const xs = Array(8).fill(null);
+  run('X notes: any pitch is right', mk(xs), picks([40, 47, 52, 61, 33, 70, 45, 58]), 'E standard');
+  run('X notes: muted chugs with no pitch are right', mk(xs), picks(Array(8).fill(null)), 'E standard');
+  const low = S.notePitch(E, 6, 3);               // G on the low E string: 43
+  const lowD = S.notePitch(dropD, 6, 3);          // F on the low D string: 41
+  run('pitched: right notes in E standard', mk(Array(8).fill(low)), picks(Array(8).fill(43)), 'E standard');
+  run('pitched: two wrong notes in E standard', mk(Array(8).fill(low)), picks([43, 43, 44, 43, 43, 41, 43, 43]), 'E standard');
+  run('pitched: the same fret in drop D is a different note', mk(Array(8).fill(lowD)), picks(Array(8).fill(43)), 'Drop D');
+  run('pitched: an octave off still counts; an unknown pitch is not held against him', mk(Array(8).fill(low)), picks([55, 31, null, 43, 43, 43, 43, 43.3]), 'E standard');
+  if (low !== 43 || lowD !== 41) throw new Error('notePitch');
+}
+
 const out = {
   about: 'Shared scoring test vectors. Every app (iPhone: ios/PracticeTests/ScoringVectorTests.swift; desktop: desktop/tests; npm test) must give these answers. Made by scripts/make-scoring-vectors.mjs from shared/scoring.mjs with the numbers in catalog/scoring.json. Times in seconds, errors in ms; notes are [time, accent, beat], picks [time, strength].',
   config, tolerance: 1e-6,
   score: scoreCases, doubles: doubleCases, accuracy: accuracyCases, credit: creditCases, calibration: calibrationCases,
-  grid: gridCases, max: maxCases,
+  grid: gridCases, max: maxCases, pitch: pitchCases,
 };
 const file = path.join(ROOT, 'shared', 'scoring-vectors.json');
 fs.writeFileSync(file, JSON.stringify(out, null, 0).replace(/\{"name"/g, '\n{"name"') + '\n');

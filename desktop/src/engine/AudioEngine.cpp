@@ -107,8 +107,39 @@ std::vector<float> AudioEngine::makeClick (ClickKind kind) const
         }
         case ClickKind::pluck:       return pluckTone (sr, 0.45);
         case ClickKind::pluckAccent: return pluckTone (sr, 0.8);
+        // The other click sounds (0.3.0), the same as the phone's ClickSounds.swift.
+        case ClickKind::woodAccent: return tone (sr, { { 1050, 1 }, { 2730, 0.35 }, { 4200, 0.12 } }, 55, 0.07, 0.95);
+        case ClickKind::woodBeat:   return tone (sr, { { 820, 1 }, { 2130, 0.3 }, { 3500, 0.1 } }, 60, 0.065, 0.72);
+        case ClickKind::woodSub:    return tone (sr, { { 700, 1 }, { 1820, 0.2 } }, 80, 0.04, 0.35);
+        case ClickKind::beepAccent: return tone (sr, { { 1760, 1 } }, 30, 0.08, 0.8);
+        case ClickKind::beepBeat:   return tone (sr, { { 880, 1 } }, 30, 0.08, 0.65);
+        case ClickKind::beepSub:    return tone (sr, { { 660, 1 } }, 45, 0.05, 0.3);
+        case ClickKind::rimAccent:  return tone (sr, { { 3200, 1 }, { 5300, 0.6 }, { 7400, 0.3 } }, 120, 0.04, 0.95);
+        case ClickKind::rimBeat:    return tone (sr, { { 2600, 1 }, { 4500, 0.5 }, { 6800, 0.25 } }, 130, 0.035, 0.72);
+        case ClickKind::rimSub:     return tone (sr, { { 2200, 1 }, { 3900, 0.3 } }, 160, 0.025, 0.32);
+        case ClickKind::chime:
+        {
+            std::vector<float> out ((size_t) (0.5 * sr), 0.0f);
+            const double notes[] = { 880.0, 1320.0 };
+            for (int i = 0; i < 2; ++i)
+            {
+                auto t = tone (sr, { { notes[i], 1 }, { notes[i] * 2, 0.2 } }, 9, 0.28, 0.3);
+                const size_t at = (size_t) (i * 0.11 * sr);
+                for (size_t k = 0; k < t.size() && at + k < out.size(); ++k) out[at + k] += t[k];
+            }
+            return out;
+        }
     }
     return {};
+}
+
+bool AudioEngine::readInput (juce::int64 from, int count, float* out) const
+{
+    const auto h = (juce::int64) history.size();
+    const juce::int64 end = historyEnd.load();
+    if (h == 0 || from < 0 || from + count > end || from < end - h + 4800) return false;
+    for (int i = 0; i < count; ++i) out[i] = history[(size_t) ((from + i) % h)];
+    return true;
 }
 
 std::shared_ptr<SoundBuffer> AudioEngine::makeTone (double hz, double seconds, float dbfs) const
@@ -169,7 +200,9 @@ void AudioEngine::setResources (const juce::File& guitarFolder) { guitar.load (g
 void AudioEngine::buildSounds (double sr)
 {
     rate = sr;
-    for (int k = 0; k < 9; ++k) clicks[(size_t) k] = makeClick ((ClickKind) k);
+    for (int k = 0; k < clickKindCount; ++k) clicks[(size_t) k] = makeClick ((ClickKind) k);
+    history.assign ((size_t) (2 * sr), 0.0f);
+    historyEnd = 0;
 }
 
 double AudioEngine::nowFrames() const
@@ -353,7 +386,8 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* in, int 
         else
         {
             const auto& c = clicks[(size_t) e.kind];
-            const bool isClick = e.kind == ClickKind::accent || e.kind == ClickKind::beat || e.kind == ClickKind::sub || e.kind == ClickKind::countIn;
+            const bool isClick = e.kind == ClickKind::accent || e.kind == ClickKind::beat || e.kind == ClickKind::sub || e.kind == ClickKind::countIn
+                              || (e.kind >= ClickKind::woodAccent && e.kind <= ClickKind::rimSub);
             startVoice (c.data(), (int) c.size(), 1, sounds * e.gain * (isClick ? click : 1.0f), offset,
                         e.kind == ClickKind::pluck || e.kind == ClickKind::pluckAccent, nullptr);
         }
@@ -376,7 +410,8 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* in, int 
             const int offset = (int) std::max (0.0, metroNextFrame - (double) start);
             const bool onBeat = metroTick % sub == 0;
             const int beat = (int) ((metroTick / sub) % beats);
-            const ClickKind k = ! onBeat ? ClickKind::sub : (beat == 0 && metroAccent.load() ? ClickKind::accent : ClickKind::beat);
+            const ClickKind k = voiced (! onBeat ? ClickKind::sub : (beat == 0 && metroAccent.load() ? ClickKind::accent : ClickKind::beat),
+                                        (SessionSettings::ClickSound) metroSound.load());
             const auto& c = clicks[(size_t) k];
             startVoice (c.data(), (int) c.size(), 1, sounds * click, offset, false, nullptr);
             if (onBeat) { metroBeatFrame = (juce::int64) metroNextFrame; metroBeatIndex = beat; }
@@ -396,6 +431,13 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* in, int 
         for (int c = 0; c < numIn; ++c)
             if (in[c]) for (int i = 0; i < n; ++i) m[i] += in[c][i];
         for (int i = 0; i < n; ++i) pk = std::max (pk, std::abs (m[i]));
+        if (! history.empty())
+        {
+            const auto h = (juce::int64) history.size();
+            const juce::int64 base = historyEnd.load();
+            for (int i = 0; i < n; ++i) history[(size_t) ((base + i) % h)] = m[i];
+            historyEnd = base + n;
+        }
         if (resetRequest.load() != resetSeen) { resetSeen = resetRequest.load(); detector->reset(); }
         if (listening.load() && ! testPicks.load())
             detector->process (m, n, (double) start / sr, [this] (const Onset& o) {

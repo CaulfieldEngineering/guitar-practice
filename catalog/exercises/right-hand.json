@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "about": "Every drill but trip16x4 is archived (Joe, 2026-11-24: \"Let's remove all drills for now except for Triplets to 16th's, 4+4\"): \"archived\": true keeps its definition and his runs, and the drill server and the apps leave it out. Take the flag off to bring one back, and bump catalog/index.json.",
   "exercises": [
     {
       "id": "trip16x4",
@@ -87,7 +88,8 @@
             "ladderStep": 4
           }
         }
-      ]
+      ],
+      "pitch": "x"
     },
     {
       "id": "alt8",
@@ -105,7 +107,8 @@
         "start": 120,
         "min": 40,
         "max": 260
-      }
+      },
+      "archived": true
     },
     {
       "id": "alt3",
@@ -123,7 +126,8 @@
         "start": 100,
         "min": 40,
         "max": 240
-      }
+      },
+      "archived": true
     },
     {
       "id": "alt16",
@@ -141,7 +145,8 @@
         "start": 90,
         "min": 40,
         "max": 220
-      }
+      },
+      "archived": true
     },
     {
       "id": "3to4",
@@ -161,7 +166,8 @@
         "min": 40,
         "max": 200,
         "stepOnPass": 6
-      }
+      },
+      "archived": true
     },
     {
       "id": "burst",
@@ -186,7 +192,8 @@
         "start": 110,
         "min": 40,
         "max": 240
-      }
+      },
+      "archived": true
     },
     {
       "id": "accent16",
@@ -205,7 +212,8 @@
         "start": 80,
         "min": 40,
         "max": 200
-      }
+      },
+      "archived": true
     },
     {
       "id": "accent3",
@@ -224,7 +232,8 @@
         "start": 90,
         "min": 40,
         "max": 220
-      }
+      },
+      "archived": true
     },
     {
       "id": "gallop",
@@ -267,7 +276,8 @@
         "start": 100,
         "min": 40,
         "max": 220
-      }
+      },
+      "archived": true
     }
   ]
 }

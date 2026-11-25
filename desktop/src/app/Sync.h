@@ -47,6 +47,8 @@ public:
     Snapshot snapshot() const;
     std::function<void()> onChange;    // from the worker
     std::function<int()> catalogVersion, voiceVersion;   // what the app has now
+    /// More to do on each pass once the server answered (routines, routine runs, settings), on this thread.
+    std::function<void (const juce::String& base)> extra;
     void runOnceForTest();             // one pass on the calling thread (the sync test)
 
 private:

@@ -2,12 +2,19 @@
 
 namespace practice::ui {
 
-static const juce::String dot = juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 "));
 static const juce::String dash = juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x93"));
+static const juce::String times = juce::String (juce::CharPointer_UTF8 ("\xc3\x97"));
 
 static juce::String groupWord (int n)
 {
-    switch (n) { case 0: return "Rest"; case 2: return "Eighths"; case 3: return "Triplets"; case 4: return "Sixteenths"; default: return juce::String (n) + " per beat"; }
+    switch (n) { case 0: return "Rest"; case 2: return "Eighths"; case 3: return "Triplets"; case 4: return "16ths"; default: return juce::String (n) + " per beat"; }
+}
+
+static juce::String averageText (double e)
+{
+    if (std::abs (e) < 3) return "On the beat";
+    const int ms = (int) std::round (std::abs (e));
+    return juce::String (ms) + (e > 0 ? " ms late" : " ms early");
 }
 
 // ================================================================ the lane
@@ -15,11 +22,12 @@ static juce::String groupWord (int n)
 void TabLane::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
-    g.setColour (Theme::side());
-    g.fillRoundedRectangle (bounds, Theme::rLg);
     juce::Graphics::ScopedSaveState clip (g);
     g.reduceClipRegion (getLocalBounds());
-    const double past = 0.8, ahead = 2.4;
+    g.setColour (Theme::line());
+    g.fillRect (0.0f, 0.0f, bounds.getWidth(), 1.0f);
+    g.fillRect (0.0f, bounds.getHeight() - 1, bounds.getWidth(), 1.0f);
+    const double past = calibrationMarks ? 1.5 : 1.2, ahead = calibrationMarks ? 1.5 : 2.4;
     const float w = bounds.getWidth(), h = bounds.getHeight();
     const float hitX = w * (float) (past / (past + ahead));
     const float pps = w / (float) (past + ahead);
@@ -30,27 +38,34 @@ void TabLane::paint (juce::Graphics& g)
 
     if (calibrationMarks)
     {
-        g.setColour (Theme::muted());
-        g.fillRoundedRectangle (hitX - 1.5f, 4, 3, h - 8, 1.5f);
         for (size_t i = 0; i < notes.size(); ++i)
         {
             const auto& n = notes[i];
             if (n.time < now - past - 0.1 || n.time > now + ahead + 0.1) continue;
-            juce::Colour c = Theme::text();
-            if (i < states.size())
-                switch (states[i]) { case Model::NoteState::tight: c = Theme::accent(); break; case Model::NoteState::close: c = Theme::accent().withAlpha (0.6f); break;
-                                     case Model::NoteState::loose: c = Theme::warn(); break; case Model::NoteState::missed: c = Theme::danger(); break; default: break; }
-            g.setColour (c);
-            g.fillRoundedRectangle (x (n.time) - 3, h * 0.25f, 6, h * 0.5f, 3);
+            const bool near = std::abs (n.time - now) < 0.045;
+            g.setColour (near ? Theme::accent() : (n.time < now ? Theme::lineStrong() : Theme::muted()));
+            const float mh = near ? h * 0.4f : h * 0.3f;
+            g.fillRoundedRectangle (x (n.time) - 3, h * 0.42f - mh / 2, 6, mh, 2);
         }
+        g.setColour (Theme::accent());
+        g.fillRect (hitX - 1, 0.0f, 2.0f, h);
+        for (size_t i = 0; i < notes.size() && i < model.errors.size(); ++i)
+            if (model.errors[i] && notes[i].time > now - past - 0.1 && notes[i].time < now + 0.2)
+            {
+                g.setColour (Theme::text());
+                g.fillEllipse (x (notes[i].time + *model.errors[i] / 1000.0) - 3, h - 19, 6, 6);
+            }
         return;
     }
 
-    const float arrowY = 14, rhythmY = 46, top = 86, dotY = h - 12;
-    const float gap = std::max (10.0f, (dotY - 22 - top) / 5);
-    auto stringY = [&] (int s) { return top + (float) juce::jlimit (0, 5, s - 1) * gap; };
+    const auto& tuning = model.runTuning;
+    const int strings = std::max (1, (int) tuning.strings.size());
+    const float arrowY = 12, rhythmY = 34, top = 62;
+    const float gap = juce::jlimit (9.0f, 36.0f, (h - 36 - top) / (float) std::max (1, strings - 1));
+    auto stringY = [&] (int s) { return top + (float) juce::jlimit (0, strings - 1, s - 1) * gap; };
+    const float bottom = stringY (strings) + 4, dotY = std::min (h - 8, bottom + 24);
     g.setColour (Theme::lineStrong());
-    for (int s = 1; s <= 6; ++s) g.fillRect (0.0f, stringY (s) - 0.5f, w, 1.0f);
+    for (int s = 1; s <= strings; ++s) g.fillRect (18.0f, stringY (s) - 0.5f, w - 18, 1.0f);
 
     int lastBeat = INT_MIN;
     const int bpb = std::max (1, model.runDrill().beatsPerBar);
@@ -60,13 +75,14 @@ void TabLane::paint (juce::Graphics& g)
         lastBeat = n.beat;
         const bool bar = n.beat % bpb == 0;
         const float bx = x (n.time) - 9;
-        g.setColour (bar ? Theme::faint() : Theme::line());
-        const float y0 = bar ? 24.0f : 32.0f;
-        g.fillRect (bx - 0.5f, y0, bar ? 1.5f : 1.0f, stringY (6) - y0);
+        g.setColour (bar ? Theme::faint().withAlpha (0.6f) : Theme::line());
+        const float y0 = bar ? 18.0f : 24.0f;
+        g.fillRect (bx - 0.5f, y0, 1.0f, stringY (strings) - y0);
     }
-    g.setColour (Theme::muted());
-    g.fillRoundedRectangle (hitX - 1.5f, 4, 3, h - 8, 1.5f);
+    g.setColour (Theme::accent());
+    g.fillRect (hitX - 1, 0.0f, 2.0f, h);
 
+    const auto glyph = Theme::ui (14, true);
     for (size_t i = 0; i < notes.size(); ++i)
     {
         const auto& n = notes[i];
@@ -80,11 +96,11 @@ void TabLane::paint (juce::Graphics& g)
             case Model::NoteState::tight: c = Theme::accent(); break;
             case Model::NoteState::close: c = Theme::accent().withAlpha (0.6f); break;
             case Model::NoteState::loose: c = Theme::warn(); break;
-            case Model::NoteState::missed: c = Theme::danger(); break;
+            case Model::NoteState::missed: case Model::NoteState::wrong: c = Theme::danger(); break;
         }
-        const float bh = n.accent ? 34.0f : 22.0f;
+        const float bh = n.accent ? 22.0f : 14.0f;
         g.setColour (st == Model::NoteState::waiting ? Theme::faint() : c);
-        g.fillRoundedRectangle (nx - 2.5f, rhythmY - bh / 2, 5, bh, 2.5f);
+        g.fillRoundedRectangle (nx - 1.5f, rhythmY - bh / 2, 3, bh, 1.5f);
         if (n.pick != Pick::none)
         {
             g.setColour (Theme::muted());
@@ -92,28 +108,34 @@ void TabLane::paint (juce::Graphics& g)
             g.drawText (juce::String (juce::CharPointer_UTF8 (n.pick == Pick::down ? "\xe2\x86\x93" : "\xe2\x86\x91")),
                         juce::Rectangle<float> (nx - 8, arrowY - 8, 16, 16), juce::Justification::centred);
         }
-        const float y = stringY (n.string > 0 ? n.string : 3);
-        const juce::String label (std::max (0, n.fret));
-        const float lw = label.length() > 1 ? 20.0f : 14.0f;
-        g.setColour (Theme::side());
-        g.fillRoundedRectangle (nx - lw / 2, y - 8, lw, 16, 4);
+        const float y = stringY (n.string > 0 ? n.string : (strings + 1) / 2);
+        const juce::String label = n.pitch ? juce::String (std::max (0, n.fret)) : times;
+        const float lw = label.length() > 1 ? 22.0f : 16.0f;
+        g.setColour (Theme::bg());
+        g.fillRoundedRectangle (nx - lw / 2, y - 9, lw, 18, 4);
+        if (st == Model::NoteState::wrong)
+        {
+            g.setColour (Theme::danger());
+            g.drawRoundedRectangle (nx - 10, y - 10, 20, 20, 4, 1.0f);
+            if (auto it = model.heardPitch.find ((int) i); it != model.heardPitch.end())
+                Draw::text (g, Tuning::noteName ((int) std::round (it->second)), juce::Rectangle<int> ((int) nx - 14, (int) bottom + 2, 28, 16), Theme::danger(),
+                            Theme::small, false, juce::Justification::centred);
+        }
         g.setColour (c);
-        g.setFont (Theme::number (11));
-        g.drawText (label, juce::Rectangle<float> (nx - lw / 2, y - 8, lw, 16), juce::Justification::centred);
+        g.setFont (glyph);
+        g.drawText (label, juce::Rectangle<float> (nx - lw / 2, y - 9, lw, 18), juce::Justification::centred);
     }
-    // the picks heard (the model's list is private; the errors place them)
     for (size_t i = 0; i < notes.size() && i < model.errors.size(); ++i)
         if (model.errors[i] && notes[i].time > now - past - 0.1 && notes[i].time < now + 0.2)
         {
-            g.setColour (Theme::text());
-            g.fillEllipse (x (notes[i].time + *model.errors[i] / 1000.0) - 3, dotY - 3, 6, 6);
+            g.setColour (Theme::muted());
+            g.fillEllipse (x (notes[i].time + *model.errors[i] / 1000.0) - 2.5f, dotY - 2.5f, 5, 5);
         }
-    g.setColour (Theme::side());
-    g.fillRect (0.0f, top - 12, 18.0f, stringY (6) - top + 24);
-    const char* names[] = { "e", "B", "G", "D", "A", "E" };
+    g.setColour (Theme::bg());
+    g.fillRect (0.0f, 1.0f, 18.0f, h - 2);
+    g.setFont (Theme::ui (11));
     g.setColour (Theme::faint());
-    g.setFont (Theme::ui (10));
-    for (int s = 1; s <= 6; ++s) g.drawText (names[s - 1], juce::Rectangle<float> (2, stringY (s) - 7, 14, 14), juce::Justification::centred);
+    for (int s = 1; s <= strings; ++s) g.drawText (tuning.stringName (s), juce::Rectangle<float> (0, stringY (s) - 7, 16, 14), juce::Justification::centred);
 }
 
 // ================================================================ a run
@@ -121,49 +143,47 @@ void TabLane::paint (juce::Graphics& g)
 RunScreen::RunScreen (Model& m) : Screen (m)
 {
     setWantsKeyboardFocus (true);
-    for (auto* c : std::initializer_list<juce::Component*> { &lane, &pause, &stop, &meter }) addAndMakeVisible (c);
+    for (auto* c : std::initializer_list<juce::Component*> { &lane, &pause, &stop }) addAndMakeVisible (c);
     addChildComponent (resume); addChildComponent (end); addChildComponent (skip);
     lane.setInterceptsMouseClicks (false, false);
     pause.setTooltip ("Space");
     pause.onClick = [this] { model.pause(); };
+    stop.setTooltip ("Esc");
     stop.onClick = [this] { model.stop(); };
     resume.onClick = [this] { model.resumeRun(); };
     end.onClick = [this] { model.endRun(); };
-    skip.onClick = [this] { model.skipIntro(); };
+    skip.onClick = [this] {
+        if (model.phase == Model::Phase::resting) model.endBreak();
+        else model.skipIntro();
+    };
 }
 
 void RunScreen::refresh()
 {
     const auto p = model.phase;
-    pause.setVisible (p == Model::Phase::running);
-    stop.setVisible (p == Model::Phase::running || p == Model::Phase::intro);
-    resume.setVisible (p == Model::Phase::paused);
-    end.setVisible (p == Model::Phase::paused);
-    skip.setVisible (p == Model::Phase::intro);
+    const bool own = ! inRoutine;
+    pause.setVisible (own && p == Model::Phase::running);
+    stop.setVisible (own && (p == Model::Phase::running || p == Model::Phase::intro || p == Model::Phase::resting));
+    resume.setVisible (own && p == Model::Phase::paused);
+    end.setVisible (own && p == Model::Phase::paused);
+    skip.setVisible (p == Model::Phase::intro || p == Model::Phase::resting);
     lane.setVisible (p != Model::Phase::intro);
-    meter.setVisible (model.lastRunWasScored && p == Model::Phase::running);
-    meter.push (model.meterPeak());
+    lane.setAlpha (p == Model::Phase::paused || p == Model::Phase::resting ? 0.4f : 1.0f);
     repaint();
 }
 
 void RunScreen::resized()
 {
-    auto r = getLocalBounds().reduced (Theme::sp7, Theme::sp6);
-    header = r.removeFromTop (22);
-    r.removeFromTop (Theme::sp5);
-    pattern = r.removeFromTop (56);
-    r.removeFromTop (Theme::sp5);
-    stats = r.removeFromTop (76);
-    r.removeFromTop (Theme::sp6);
-    buttons = r.removeFromBottom (Theme::ctlH + 20);
-    r.removeFromBottom (Theme::sp5);
-    meterArea = r.removeFromBottom (20);
-    timingArea = r.removeFromBottom (40);
-    r.removeFromBottom (Theme::sp5);
-    lane.setBounds (r);
-    meter.setBounds (meterArea.withTrimmedLeft (56));
-    auto b = buttons.removeFromTop (Theme::ctlH).withSizeKeepingCentre (2 * 140 + Theme::sp4, Theme::ctlH);
-    pause.setBounds (b.removeFromLeft (140));
+    auto r = getLocalBounds();
+    top = r.removeFromTop (Theme::rowH + Theme::sp4).reduced (Theme::sp7, 0);
+    auto body = r.reduced (Theme::sp7, Theme::sp5);
+    column = body.removeFromLeft (320);
+    body.removeFromLeft (Theme::sp8);
+    lane.setBounds (body.withHeight (std::min (body.getHeight(), 300 + 40 * std::max (0, (int) model.runTuning.strings.size() - 6))));
+    buttons = column.removeFromBottom (Theme::ctlH);
+    auto b = buttons;
+    const int bw = (b.getWidth() - Theme::sp4) / 2;
+    pause.setBounds (b.removeFromLeft (bw));
     resume.setBounds (pause.getBounds());
     skip.setBounds (pause.getBounds());
     b.removeFromLeft (Theme::sp4);
@@ -171,127 +191,153 @@ void RunScreen::resized()
     end.setBounds (b);
 }
 
+void RunScreen::paintColumn (juce::Graphics& g, Model& model, juce::Rectangle<int> c)
+{
+    const auto p = model.phase;
+    if (p == Model::Phase::resting)
+    {
+        Draw::text (g, "Break", c.removeFromTop (28), Theme::text(), 18, true);
+        const double left = model.breakLeft;
+        g.setColour (Theme::text());
+        g.setFont (Theme::number (72, true));
+        g.drawText (left <= 3 ? juce::String ((int) std::ceil (left)) : formatClock (std::ceil (left)), c.removeFromTop (90), juce::Justification::centredLeft);
+        Draw::text (g, "Rest your hand", c.removeFromTop (22), Theme::muted());
+        Draw::text (g, "Resumes at " + juce::String (model.resumeBPM) + " bpm", c.removeFromTop (20), Theme::muted(), Theme::small);
+        c.removeFromTop (Theme::sp5);
+        Draw::progress (g, c.removeFromTop (8), model.breakLength > 0 ? left / model.breakLength : 0, Theme::lineStrong(), Theme::line());
+        return;
+    }
+    if (p == Model::Phase::intro)
+    {
+        Draw::text (g, "Intro", c.removeFromTop (28), Theme::text(), 18, true);
+        return;
+    }
+    // the pattern now
+    const bool counting = model.countingIn();
+    juce::String cue = model.runDrill().tableName(), detail;
+    bool warn = false;
+    if (counting) cue = "Count-in";
+    else if (auto gc = model.groupCue())
+    {
+        cue = groupWord (gc->now);
+        detail = gc->beatsUntil == 1 ? groupWord (gc->next) + " next beat" : groupWord (gc->next) + " in " + juce::String (gc->beatsUntil);
+        warn = gc->beatsUntil == 1;
+    }
+    auto cueRow = c.removeFromTop (28);
+    Draw::text (g, detail, cueRow, Theme::muted(), Theme::small, false, juce::Justification::centredRight);
+    Draw::text (g, cue, cueRow, warn ? Theme::warn() : Theme::text(), 18, true);
+    // the tempo
+    auto tempoRow = c.removeFromTop (72);
+    auto stack = tempoRow.removeFromRight (90);
+    g.setFont (Theme::number (56, true));
+    g.setColour (counting ? Theme::muted() : Theme::text());
+    const juce::String bpmText ((int) model.currentBPM);
+    g.drawText (bpmText, tempoRow, juce::Justification::centredLeft);
+    Draw::text (g, "bpm", tempoRow.withTrimmedLeft (Theme::number (56, true).getStringWidth (bpmText) + 6).withTrimmedTop (22), Theme::muted());
+    auto step = model.stepInfo();
+    if (counting) Draw::text (g, "Count-in", stack, Theme::muted(), Theme::small, false, juce::Justification::centredRight);
+    else if (step)
+    {
+        Draw::text (g, "Target " + juce::String (step->target), stack.withHeight (stack.getHeight() / 2).withY (stack.getY() + 14), Theme::muted(), Theme::small, false, juce::Justification::centredRight);
+        if (step->next) Draw::text (g, "Next " + juce::String (*step->next), stack.withHeight (stack.getHeight() / 2).withY (stack.getCentreY()), Theme::muted(), Theme::small, false, juce::Justification::centredRight);
+    }
+    c.removeFromTop (Theme::sp2);
+    int beatNow = -1;
+    const int bpb = std::max (1, model.runDrill().beatsPerBar);
+    if (auto* sl = model.currentSlot(); sl && ! counting && model.now >= sl->start)
+        beatNow = (sl->index * model.runDrill().cycleBeats + (int) ((model.now - sl->start) / (60.0 / std::max (1.0, sl->bpm)))) % bpb;
+    Draw::beatBar (g, c.removeFromTop (12), bpb, beatNow);
+    // where the tempo is going
+    if (step)
+    {
+        c.removeFromTop (Theme::sp6);
+        auto cap = c.removeFromTop (18);
+        const char* words[] = { "Next step", "Speeding up", "Holding", "Slowing down", "Break", "Settling", "Top tempo" };
+        Draw::text (g, words[(int) step->state], cap, Theme::muted(), Theme::small);
+        Draw::text (g, step->measure, cap, Theme::muted(), Theme::small, false, juce::Justification::centredRight);
+        const auto col = step->state == Model::StepInfo::State::down ? Theme::warn() : step->state == Model::StepInfo::State::rest ? Theme::danger() : Theme::accent();
+        Draw::progress (g, c.removeFromTop (8), step->state == Model::StepInfo::State::top ? 1.0 : step->fraction, col, Theme::lineStrong());
+    }
+    // the accuracy
+    if (model.lastRunWasScored)
+    {
+        c.removeFromTop (Theme::sp6);
+        auto cap = c.removeFromTop (24);
+        const auto acc = model.rolling ? model.rolling : model.lastCycleAccuracy;
+        const auto zone = model.accuracyZone();
+        const bool zoned = model.runSettingsNow().tempoPlan.mode == TempoPlan::Mode::accuracy;
+        Draw::text (g, "Accuracy", cap, Theme::muted(), Theme::small);
+        auto right = cap.removeFromRight (130);
+        if (zoned && zone && acc)
+        {
+            const char* zw[] = { "Up", "Hold", "Down", "Break" };
+            Draw::text (g, zw[(int) *zone], right.removeFromRight (44), *zone == TempoPlan::Zone::hold ? Theme::text() : Draw::zoneColour (*zone), Theme::body, true,
+                        juce::Justification::centredRight);
+            right.removeFromRight (Theme::sp4);
+        }
+        g.setColour (Theme::text());
+        g.setFont (Theme::number (20));
+        g.drawText (acc ? juce::String ((int) std::round (*acc * 100)) + "%" : dash, right, juce::Justification::centredRight);
+        Draw::accuracyMeter (g, c.removeFromTop (20), acc, model.meterLines(), zone, zoned);
+    }
+    // the Challenge clock
+    if (model.challenge)
+    {
+        const auto& k = *model.challenge;
+        const bool running = k.inZone || k.elapsed == 0;
+        c.removeFromTop (Theme::sp6);
+        auto cap = c.removeFromTop (24);
+        Draw::text (g, "Challenge", cap, Theme::muted(), Theme::small);
+        g.setColour (running ? Theme::text() : Theme::warn());
+        g.setFont (Theme::number (20));
+        g.drawText (formatClock (k.earned) + " of " + formatClock (k.target), cap, juce::Justification::centredRight);
+        Draw::progress (g, c.removeFromTop (8), k.target > 0 ? k.earned / k.target : 0, running ? Theme::accent() : Theme::warn(), Theme::lineStrong());
+        Draw::text (g, (running ? juce::String ("Clock running") : juce::String ("Clock held, accuracy under the line")) + ", "
+                       + formatClock (k.elapsed) + " elapsed, " + juce::String ((int) std::round (k.share() * 100)) + "% in the zone",
+                    c.removeFromTop (20), running ? Theme::muted() : Theme::warn(), Theme::small);
+    }
+    // the status line
+    c.removeFromTop (Theme::sp6);
+    auto st = c.removeFromTop (20);
+    juce::String leftText, rightText;
+    if (! counting)
+        if (auto n = model.cycleNumber())
+            leftText = model.runKind() == SessionSettings::Kind::cycles ? "Loop " + juce::String (*n) + " of " + juce::String (std::max (1, model.runCycles()))
+                                                                        : "Loop " + juce::String (*n);
+    rightText = model.plannedEnd ? formatClock (std::max (0.0, *model.plannedEnd - model.now)) + " left" : formatClock (std::max (0.0, model.now - model.countInEnd));
+    Draw::text (g, leftText, st, Theme::muted(), Theme::small);
+    Draw::text (g, rightText, st, Theme::muted(), Theme::small, false, juce::Justification::centredRight);
+    if (p == Model::Phase::paused)
+    {
+        c.removeFromTop (Theme::sp7);
+        Draw::text (g, "Paused", c.removeFromTop (28), Theme::text(), 18, true);
+        Draw::text (g, model.message.isNotEmpty() ? model.message : "In " + model.routeName(), c.removeFromTop (20),
+                    model.message.isNotEmpty() ? Theme::warn() : Theme::muted(), Theme::small);
+    }
+}
+
 void RunScreen::paint (juce::Graphics& g)
 {
     g.fillAll (Theme::bg());
-    const auto& d = model.runDrill();
-    const auto p = model.phase;
-    if (p == Model::Phase::intro)
-    {
-        const auto& sd = model.drill();
-        Draw::text (g, sd.name, pattern, Theme::text(), 22, true, juce::Justification::centred);
-        Draw::text (g, juce::String (model.startTempo()) + " bpm", stats.removeFromTop (24), Theme::muted(), Theme::body, false, juce::Justification::centred);
-        return;
-    }
-    // the line on top: guided or solo, the zone and the share of his max, or not scored
-    juce::String head = model.lastRunWasGuided ? "Guided" : "Solo";
-    if (! model.lastRunWasScored) head += dot + "Not scored";
-    if (model.runZoneMax > 0)
-        if (auto* z = model.zones.zoneFor (model.currentBPM, model.runZoneMax))
-            head += dot + z->name + " " + z->title + dot + juce::String ((int) std::round (model.currentBPM / model.runZoneMax * 100)) + "% of max";
-    Draw::text (g, head, header, Theme::accentText(), Theme::body, false, juce::Justification::centred);
-
-    // the pattern now
-    juce::String big, small;
-    juce::Colour smallColour = Theme::muted();
-    if (model.countingIn()) big = "Count-in";
-    else if (auto* s = model.currentSlot(); s && model.now < s->end())
-    {
-        auto sizes = d.groupSizes();
-        const int local = juce::jlimit (0, (int) sizes.size() - 1, (int) ((model.now - s->start) / (60 / s->bpm)));
-        big = groupWord (sizes[(size_t) local]);
-        if (auto cue = model.groupCue())
-        {
-            small = cue->beatsUntil == 1 ? groupWord (cue->next) + " next beat" : groupWord (cue->next) + " in " + juce::String (cue->beatsUntil);
-            if (cue->beatsUntil == 1) smallColour = Theme::warn();
-        }
-    }
-    else big = d.tableName();
-    auto pa = pattern;
-    Draw::text (g, big, pa.removeFromTop (34), Theme::text(), 22, true, juce::Justification::centred);
-    Draw::text (g, small, pa, smallColour, Theme::body, false, juce::Justification::centred);
-
-    // bpm, accuracy, time
-    auto st = stats;
-    const int cw = std::min (200, st.getWidth() / 3);
-    auto row = st.withSizeKeepingCentre (cw * 3, st.getHeight());
-    auto stat = [&] (juce::Rectangle<int> a, const juce::String& v, const juce::String& cap, juce::Colour c) {
-        g.setColour (c);
-        g.setFont (Theme::number (36, true));
-        g.drawText (v, a.removeFromTop (56), juce::Justification::centred, false);
-        Draw::text (g, cap, a, Theme::muted(), Theme::small, false, juce::Justification::centredTop);
-    };
-    stat (row.removeFromLeft (cw), juce::String ((int) std::round (model.currentBPM)), "bpm", Theme::text());
-    if (model.lastRunWasScored)
-    {
-        auto acc = model.rolling ? juce::String ((int) std::round (*model.rolling * 100)) + "%" : juce::String (dash);
-        const bool good = model.rolling && *model.rolling * 100 >= model.runTarget();
-        stat (row.removeFromLeft (cw), acc, "accuracy", good ? Theme::accentText() : Theme::text());
-    }
-    else
-    {
-        auto c = model.cycleNumber();
-        stat (row.removeFromLeft (cw), c ? juce::String (*c) : juce::String (dash), "cycle", Theme::text());
-    }
-    const auto kind = model.runKind();
-    const double elapsed = std::max (0.0, model.now - model.countInEnd);
-    if (kind == SessionSettings::Kind::endurance && model.lastRunWasScored) stat (row, formatClock (model.sustained), "held", Theme::text());
-    else if (kind == SessionSettings::Kind::duration && model.plannedEnd) stat (row, formatClock (std::max (0.0, *model.plannedEnd - std::max (model.now, model.countInEnd))), "left", Theme::text());
-    else if (kind == SessionSettings::Kind::cycles)
-    {
-        auto c = model.cycleNumber();
-        stat (row, (c ? juce::String (std::min (*c, model.runCycles())) : juce::String ("0")) + " of " + juce::String (model.runCycles()), "cycle", Theme::text());
-    }
-    else stat (row, formatClock (elapsed), "elapsed", Theme::text());
-
-    // early / late, the latest picks
-    if (model.lastRunWasScored)
-    {
-        auto t = timingArea;
-        auto line = t.withSizeKeepingCentre (std::min (480, t.getWidth()), 20);
-        g.setColour (Theme::lineStrong());
-        g.fillRect (line.getX(), line.getCentreY(), line.getWidth(), 1);
-        g.fillRect (line.getCentreX(), line.getY(), 1, line.getHeight());
-        const double span = std::max (30.0, model.timingSpanMs());
-        auto errs = model.recentErrors();
-        for (size_t i = 0; i < errs.size(); ++i)
-        {
-            const double f = juce::jlimit (-1.0, 1.0, errs[i] / span);
-            const float px = (float) line.getCentreX() + (float) f * (float) line.getWidth() / 2;
-            const float a = 0.25f + 0.75f * (float) (i + 1) / (float) errs.size();
-            g.setColour ((std::abs (f) <= 0.35 ? Theme::accent() : std::abs (f) < 0.7 ? Theme::accent().withAlpha (0.55f) : Theme::warn()).withMultipliedAlpha (a));
-            g.fillEllipse (px - 4, (float) line.getCentreY() - 4, 8, 8);
-        }
-        Draw::text (g, "early", line.withY (line.getBottom()).withHeight (16), Theme::faint(), Theme::micro);
-        Draw::text (g, "late", line.withY (line.getBottom()).withHeight (16), Theme::faint(), Theme::micro, false, juce::Justification::centredRight);
-        Draw::text (g, "Input", meterArea.withWidth (50), Theme::faint(), Theme::micro);
-    }
-
-    if (p == Model::Phase::paused)
-    {
-        g.setColour (Theme::bg().withAlpha (0.86f));
-        g.fillRect (lane.getBounds());
-        Draw::text (g, "Paused", lane.getBounds().withSizeKeepingCentre (400, 30).translated (0, -12), Theme::text(), 17, true, juce::Justification::centred);
-        Draw::text (g, model.message.isNotEmpty() ? model.message : juce::String ("Resumes after a one-bar count-in."),
-                    lane.getBounds().withSizeKeepingCentre (600, 20).translated (0, 16), model.message.isNotEmpty() ? Theme::warn() : Theme::muted(),
-                    Theme::body, false, juce::Justification::centred);
-    }
-    else if (p == Model::Phase::running)
-        Draw::text (g, "Click anywhere or press Space to pause", buttons.withTrimmedTop (Theme::ctlH + 4), Theme::faint(), Theme::micro, false, juce::Justification::centred);
+    Draw::text (g, model.runDrill().name, top, Theme::muted(), Theme::small);
+    Draw::text (g, model.routeName(), top, Theme::muted(), Theme::small, false, juce::Justification::centredRight);
+    paintColumn (g, model, column.withTrimmedBottom (Theme::ctlH + Theme::sp5));
 }
 
 void RunScreen::mouseUp (const juce::MouseEvent& e)
 {
-    if (model.phase == Model::Phase::running && ! buttons.contains (e.getPosition())) model.pause();
+    if (! inRoutine && model.phase == Model::Phase::running && ! buttons.contains (e.getPosition())) model.pause();
 }
 
 bool RunScreen::keyPressed (const juce::KeyPress& k)
 {
+    if (inRoutine) return false;
     if (k == juce::KeyPress::spaceKey)
     {
         if (model.phase == Model::Phase::running) model.pause();
         else if (model.phase == Model::Phase::paused) model.resumeRun();
         else if (model.phase == Model::Phase::intro) model.skipIntro();
+        else if (model.phase == Model::Phase::resting) model.endBreak();
         return true;
     }
     if (k == juce::KeyPress::escapeKey) { model.stop(); return true; }
@@ -318,124 +364,116 @@ void ResultScreen::refresh()
 void ResultScreen::resized()
 {
     auto r = getLocalBounds().reduced (Theme::sp7, Theme::sp6);
-    r = r.withSizeKeepingCentre (std::min (620, r.getWidth()), r.getHeight());
-    buttons = r.removeFromBottom (Theme::ctlH);
-    r.removeFromBottom (Theme::sp6);
-    top = r.removeFromTop (196);
-    strip = r.removeFromTop (100);
-    table = r;
-    auto b = buttons.withSizeKeepingCentre (2 * 160 + Theme::sp4, Theme::ctlH);
-    again.setBounds (b.removeFromLeft (160));
+    column = r.removeFromLeft (std::min (340, r.getWidth() / 2));
+    r.removeFromLeft (Theme::sp8);
+    right = r;
+    buttons = column.removeFromBottom (Theme::ctlH);
+    auto b = buttons;
+    again.setBounds (b.removeFromLeft (140));
     b.removeFromLeft (Theme::sp4);
-    done.setBounds (b);
-}
-
-static juce::String averageText (double e)
-{
-    if (std::abs (e) < 3) return "On the beat";
-    const int ms = (int) std::round (std::abs (e));
-    return juce::String (ms) + (e > 0 ? " ms late" : " ms early");
+    done.setBounds (b.removeFromLeft (100));
 }
 
 void ResultScreen::paint (juce::Graphics& g)
 {
     g.fillAll (Theme::bg());
-    auto t = top;
+    auto c = column;
     if (auto& u = model.unscored)
     {
-        Draw::text (g, "Not scored", t.removeFromTop (22), Theme::accentText(), Theme::body, false, juce::Justification::centred);
+        Draw::text (g, "Audio input off, not scored", c.removeFromTop (20), Theme::muted(), Theme::small);
         g.setColour (Theme::text());
-        g.setFont (Theme::number (44, true));
-        g.drawText (formatClock (u->seconds), t.removeFromTop (70), juce::Justification::centred);
-        const juce::String tempo = u->topBPM > u->startBPM ? juce::String (u->startBPM) + dash + juce::String (u->topBPM) + " bpm" : juce::String (u->startBPM) + " bpm";
-        Draw::text (g, tempo + (u->cycles > 0 ? dot + juce::String (u->cycles) + " cycles" : juce::String()), t.removeFromTop (20), Theme::muted(), Theme::body, false, juce::Justification::centred);
-        const double total = model.unscoredSeconds (model.runDrill().id);
-        Draw::text (g, "Not scored" + dot + juce::String ((int) std::round (total / 60)) + " minutes total", t.removeFromTop (40), Theme::muted(), Theme::small, false, juce::Justification::centred);
+        g.setFont (Theme::number (40));
+        g.drawText (formatClock (u->seconds), c.removeFromTop (56), juce::Justification::centredLeft);
+        Draw::text (g, (u->topBPM > u->startBPM ? juce::String (u->startBPM) + " to " + juce::String (u->topBPM) : juce::String (u->startBPM)) + " bpm",
+                    c.removeFromTop (20), Theme::muted());
         return;
     }
     if (! model.score || ! model.saved) return;
     const auto& s = *model.score;
     const auto& r = *model.saved;
-    const bool endurance = r.mode == "endurance";
-    const juce::String tempo = r.topBPM > r.startBPM ? juce::String (r.startBPM) + dash + juce::String (r.topBPM) + " bpm" : juce::String (r.startBPM) + " bpm";
-    Draw::text (g, juce::String (r.guided ? "Guided" : "Solo") + dot + tempo, t.removeFromTop (22), Theme::accentText(), Theme::body, false, juce::Justification::centred);
-    g.setFont (Theme::number (44, true));
-    if (endurance)
+    const bool endurance = r.mode == "endurance", challenge = r.mode == "challenge";
+    const juce::String tempo = r.topBPM > r.startBPM ? juce::String (r.startBPM) + " to " + juce::String (r.topBPM) : juce::String (r.startBPM);
+    Draw::text (g, juce::String (r.guided ? "Guided" : "Solo") + ", " + tempo + " bpm, " + formatClock (r.seconds), c.removeFromTop (20), Theme::muted(), Theme::small);
+    c.removeFromTop (Theme::sp2);
+    auto head = c.removeFromTop (56);
+    const juce::String big = challenge ? formatClock (r.earnedSeconds.value_or (0)) : endurance ? formatClock (r.sustainedSeconds.value_or (0)) : juce::String (s.score) + "%";
+    const bool good = challenge || endurance ? r.passed : s.passed();
+    g.setFont (Theme::number (40));
+    g.setColour (good ? Theme::accentText() : Theme::text());
+    g.drawText (big, head, juce::Justification::centredLeft);
+    const int bw = Theme::number (40).getStringWidth (big);
+    Draw::text (g, challenge ? "earned at " + juce::String (r.targetPercent) + "%" : endurance ? "held at " + juce::String (r.targetPercent) + "%"
+                                                                                               : "accuracy, pass mark " + juce::String (s.passMark) + "%",
+                head.withTrimmedLeft (bw + 10).withTrimmedTop (16), Theme::muted());
+    if (auto& l = model.levelUp)
+        Draw::text (g, "New max " + juce::String (l->second) + " bpm" + (l->first > 0 ? ", up from " + juce::String (l->first) : juce::String()),
+                    c.removeFromTop (20), Theme::accentText(), Theme::body, true);
+    c.removeFromTop (Theme::sp6);
+    std::vector<std::pair<juce::String, juce::String>> rows;
+    if (endurance || challenge) rows.push_back ({ "Accuracy", juce::String (s.score) + "%" });
+    if (challenge)
     {
-        g.setColour (Theme::accentText());
-        g.drawText (formatClock (r.sustainedSeconds.value_or (0)), t.removeFromTop (70), juce::Justification::centred);
-        Draw::text (g, "Held at " + juce::String (r.targetPercent) + "% accuracy", t.removeFromTop (20), Theme::muted(), Theme::body, false, juce::Justification::centred);
+        rows.push_back ({ "Elapsed", formatClock (r.elapsedSeconds.value_or (r.seconds)) });
+        if (r.elapsedSeconds && *r.elapsedSeconds > 0) rows.push_back ({ "In the zone", juce::String ((int) std::round (r.earnedSeconds.value_or (0) / *r.elapsedSeconds * 100)) + "%" });
+        rows.push_back ({ "Best streak", formatClock (r.bestStreakSeconds.value_or (0)) });
     }
-    else
+    rows.push_back ({ "Timing", averageText (s.meanError) });
+    rows.push_back ({ "Spread", juce::String ((int) std::round (s.spread)) + " ms, " + juce::String (Scoring::band (s.spread)).toLowerCase() });
+    if (s.extra > 0) rows.push_back ({ "Extra notes", juce::String (s.extra) });
+    rows.push_back ({ "Missed", juce::String (s.missed) + " of " + juce::String (s.expected) });
+    if (r.wrongPitch) rows.push_back ({ "Wrong notes", juce::String (*r.wrongPitch) });
+    if (r.accentsPercent) rows.push_back ({ "Accents", juce::String (*r.accentsPercent) + "%" });
+    if (r.breaks && *r.breaks > 0) rows.push_back ({ "Breaks", juce::String (*r.breaks) });
+    rows.push_back ({ "Loops", juce::String (r.cycles) });
+    for (auto& [k, v] : rows)
     {
-        g.setColour (s.passed() ? Theme::accentText() : Theme::text());
-        g.drawText (juce::String (s.score) + "%", t.removeFromTop (70), juce::Justification::centred);
-        Draw::text (g, s.passed() ? juce::String ("Accuracy") + dot + "Passed" : "Accuracy" + dot + "Pass mark " + juce::String (s.passMark) + "%",
-                    t.removeFromTop (20), Theme::muted(), Theme::body, false, juce::Justification::centred);
+        if (c.getHeight() < Theme::rowH + Theme::ctlH + Theme::sp6) break;
+        auto row = c.removeFromTop (Theme::rowH);
+        Draw::text (g, k, row, Theme::text());
+        Draw::text (g, v, row, Theme::muted(), Theme::body, false, juce::Justification::centredRight);
+        Draw::hairline (g, row.getX(), row.getBottom() - 1, row.getWidth());
     }
-    t.removeFromTop (Theme::sp4);
-    Draw::text (g, averageText (s.meanError) + dot + "spread " + juce::String ((int) std::round (s.spread)) + " ms" + dot + Scoring::band (s.spread),
-                t.removeFromTop (20), Theme::text(), Theme::body, true, juce::Justification::centred);
-    int cost = 0;
-    if (s.expected > 0 && s.extra > 0)
-    {
-        const double n = s.expected, x = s.extra;
-        cost = (int) std::round (std::min (100.0, s.score * (n + x) / n) - s.score);
-    }
-    if (cost >= 5) Draw::text (g, juce::String (s.extra) + " extra notes took " + juce::String (cost) + " points off", t.removeFromTop (18), Theme::warn(), Theme::small, false, juce::Justification::centred);
-    g.setColour (Theme::faint());
-    g.setFont (Theme::ui (Theme::small));
-    g.drawFittedText (juce::String (juce::CharPointer_UTF8 ("Spread: session players 10\xe2\x80\x93" "15 ms, good amateurs 20\xe2\x80\x93" "30, beginners 40\xe2\x80\x93" "60. At 90 bpm sixteenths, 15 ms scores about 99%, 25 about 91%, 40 about 74%.")),
-                      t.removeFromTop (32), juce::Justification::centred, 2, 1.0f);
-    juce::StringArray up;
-    if (model.newBest) up.add ("New best at this tempo");
-    if (auto& l = model.levelUp) up.add ("New max: " + juce::String (l->second) + " bpm" + (l->first > 0 ? " (was " + juce::String (l->first) + ")" : juce::String()));
-    Draw::text (g, up.joinIntoString (dot), t.removeFromTop (20), Theme::accentText(), Theme::body, true, juce::Justification::centred);
 
-    // every note's timing
-    auto st = strip;
-    Draw::sectionLabel (g, "Timing per note", st.removeFromTop (18));
-    auto box = st.removeFromTop (64);
-    g.setColour (Theme::side());
-    g.fillRoundedRectangle (box.toFloat(), Theme::rMd);
+    // the right: the tempo table, then every note's timing
+    auto rr = right;
+    if (r.tempoSteps.size() > 1)
+    {
+        auto h = rr.removeFromTop (20);
+        Draw::text (g, "Accuracy", h.removeFromRight (90), Theme::faint(), Theme::small, false, juce::Justification::centredRight);
+        Draw::text (g, "Time", h.removeFromRight (80), Theme::faint(), Theme::small, false, juce::Justification::centredRight);
+        Draw::text (g, "Tempo", h, Theme::faint(), Theme::small);
+        Draw::hairline (g, rr.getX(), rr.getY(), rr.getWidth());
+        for (auto& t : r.tempoSteps)
+        {
+            auto row = rr.removeFromTop (Theme::rowH);
+            Draw::text (g, t.accuracy ? juce::String (*t.accuracy) + "%" : dash, row.removeFromRight (90), Theme::muted(), Theme::body, false, juce::Justification::centredRight);
+            Draw::text (g, formatClock (t.seconds), row.removeFromRight (80), Theme::muted(), Theme::body, false, juce::Justification::centredRight);
+            Draw::text (g, t.rest ? juce::String ("Break") : juce::String (t.bpm), row, Theme::text());
+            Draw::hairline (g, rr.getX(), row.getBottom() - 1, rr.getWidth());
+        }
+        rr.removeFromTop (Theme::sp7);
+    }
+    Draw::text (g, "Timing per note", rr.removeFromTop (18), Theme::muted(), Theme::small);
+    auto box = rr.removeFromTop (72);
     const float mid = (float) box.getCentreY();
     g.setColour (Theme::lineStrong());
     g.fillRect ((float) box.getX(), mid - 0.5f, (float) box.getWidth(), 1.0f);
     if (! s.errors.empty())
     {
-        const float step = (float) box.getWidth() / (float) s.errors.size();
+        const float stepX = (float) box.getWidth() / (float) s.errors.size();
         const double span = std::max (40.0, s.zeroMs);
         for (size_t i = 0; i < s.errors.size(); ++i)
         {
-            const float px = (float) box.getX() + ((float) i + 0.5f) * step;
+            const float px = (float) box.getX() + ((float) i + 0.5f) * stepX;
             if (! s.errors[i]) { g.setColour (Theme::danger()); g.fillEllipse (px - 1.5f, mid - 1.5f, 3, 3); continue; }
             const double f = juce::jlimit (-1.0, 1.0, *s.errors[i] / span);
             g.setColour (std::abs (f) <= 0.35 ? Theme::accent() : std::abs (f) < 0.7 ? Theme::accent().withAlpha (0.55f) : Theme::warn());
-            g.fillEllipse (px - 2, mid + (float) f * ((float) box.getHeight() / 2 - 3) - 2, 4, 4);
+            g.fillEllipse (px - 1.5f, mid + (float) f * ((float) box.getHeight() / 2 - 3) - 1.5f, 3, 3);
         }
     }
-    Draw::text (g, "early", st.removeFromTop (16), Theme::faint(), Theme::micro);
-    Draw::text (g, "late", st.withY (st.getY() - 16).withHeight (16), Theme::faint(), Theme::micro, false, juce::Justification::centredRight);
-
-    // the detail
-    std::vector<std::pair<juce::String, juce::String>> rows;
-    if (endurance) rows.push_back ({ "Accuracy", juce::String (s.score) + "%" });
-    rows.push_back ({ "On the beat", juce::String (s.pctFull()) + "%" });
-    rows.push_back ({ "Average", averageText (s.meanError) });
-    rows.push_back ({ "Spread", juce::String ((int) std::round (s.spread)) + " ms" });
-    rows.push_back ({ "Missed", juce::String (s.missed) + " of " + juce::String (s.expected) });
-    rows.push_back ({ "Extra", juce::String (s.extra) });
-    if (r.accentsPercent) rows.push_back ({ "Accents", juce::String (*r.accentsPercent) + "%" });
-    rows.push_back ({ "Duration", formatClock (r.seconds) + (r.cycles > 0 ? dot + juce::String (r.cycles) + (r.cycles == 1 ? " cycle" : " cycles") : juce::String()) });
-    auto tb = table;
-    const int rh = std::min (28, tb.getHeight() / std::max (1, (int) rows.size()));
-    for (auto& [k, v] : rows)
-    {
-        auto row = tb.removeFromTop (rh);
-        Draw::text (g, k, row, Theme::text());
-        Draw::text (g, v, row, Theme::muted(), Theme::body, false, juce::Justification::centredRight);
-        Draw::hairline (g, row.getX(), row.getBottom() - 1, row.getWidth());
-    }
+    auto lab = rr.removeFromTop (16);
+    Draw::text (g, "Early", lab, Theme::faint(), Theme::small);
+    Draw::text (g, "Late", lab, Theme::faint(), Theme::small, false, juce::Justification::centredRight);
 }
 
 // ================================================================ the calibration
@@ -460,27 +498,28 @@ void CalibrationScreen::refresh()
     const bool step1 = model.phase == Model::Phase::syncing;
     offset.setValue (std::round (model.displayOffset() * 1000), juce::dontSendNotification);
     for (auto* c : std::initializer_list<juce::Component*> { &offset, &earlier, &later, &next }) c->setVisible (step1);
+    done.setText (step1 ? "Cancel" : "Stop");
     repaint();
 }
 
 void CalibrationScreen::resized()
 {
     auto r = getLocalBounds().reduced (Theme::sp7, Theme::sp6);
-    r = r.withSizeKeepingCentre (std::min (620, r.getWidth()), r.getHeight());
-    head = r.removeFromTop (64);
+    head = r.removeFromTop (72).withWidth (std::min (560, r.getWidth()));
     r.removeFromTop (Theme::sp5);
-    lane.setBounds (r.removeFromTop (std::min (220, r.getHeight() / 2)));
+    lane.setBounds (r.removeFromTop (std::min (200, r.getHeight() / 2)));
     r.removeFromTop (Theme::sp6);
-    value = r.removeFromTop (44);
-    auto s = r.removeFromTop (Theme::ctlH);
+    auto col = r.withWidth (std::min (560, r.getWidth()));
+    value = col.removeFromTop (32);
+    auto s = col.removeFromTop (Theme::ctlH);
     earlier.setBounds (s.removeFromLeft (Theme::ctlH));
     later.setBounds (s.removeFromRight (Theme::ctlH));
     offset.setBounds (s.reduced (Theme::sp4, 0));
-    help = r.removeFromTop (28);
-    auto b = r.removeFromBottom (Theme::ctlH).withSizeKeepingCentre (2 * 140 + Theme::sp4, Theme::ctlH);
+    help = col.removeFromTop (24);
+    auto b = col.removeFromBottom (Theme::ctlH);
     next.setBounds (b.removeFromLeft (140));
     b.removeFromLeft (Theme::sp4);
-    done.setBounds (b);
+    done.setBounds (b.removeFromLeft (100));
 }
 
 void CalibrationScreen::paint (juce::Graphics& g)
@@ -488,20 +527,25 @@ void CalibrationScreen::paint (juce::Graphics& g)
     g.fillAll (Theme::bg());
     const bool step1 = model.phase == Model::Phase::syncing;
     auto h = head;
-    Draw::text (g, juce::String ("Calibration") + dot + (step1 ? "1" : "2") + " of 2", h.removeFromTop (18), Theme::muted(), Theme::small, false, juce::Justification::centred);
-    Draw::text (g, step1 ? "Display sync" : "Input", h.removeFromTop (24), Theme::text(), Theme::head, true, juce::Justification::centred);
-    Draw::text (g, step1 ? "Adjust until each mark crosses the line on the click." : "Play one note as each mark crosses the line.",
-                h, Theme::muted(), Theme::body, false, juce::Justification::centred);
+    Draw::text (g, juce::String ("Step ") + (step1 ? "1" : "2") + " of 2", h.removeFromTop (18), Theme::muted(), Theme::small);
+    Draw::text (g, step1 ? "Line up the marks" : "Play on the line", h.removeFromTop (26), Theme::text(), 18, true);
+    Draw::text (g, step1 ? "Move the slider until each mark crosses the line on the click" : "Play one note as each mark crosses the line",
+                h.removeFromTop (20), Theme::muted());
     if (step1)
     {
         const int ms = (int) std::round (model.displayOffset() * 1000);
         g.setColour (Theme::text());
-        g.setFont (Theme::number (22));
-        g.drawText ((ms >= 0 ? "+" : "") + juce::String (ms) + " ms", value, juce::Justification::centred);
-        Draw::text (g, "Output: " + model.device.opened.output, help, Theme::faint(), Theme::small, false, juce::Justification::centred);
+        g.setFont (Theme::number (20));
+        g.drawText ((ms >= 0 ? "+" : "") + juce::String (ms) + " ms", value, juce::Justification::centredLeft);
+        Draw::text (g, "Output " + model.device.opened.output, help, Theme::muted(), Theme::small);
     }
     else
-        Draw::text (g, "In: " + model.routeName(), value, Theme::muted(), Theme::body, false, juce::Justification::centred);
+    {
+        int heard = 0;
+        for (auto& e : model.errors) if (e) ++heard;
+        Draw::text (g, "Heard " + juce::String (heard) + " of " + juce::String (Model::calibrationCount), value, Theme::text());
+        Draw::text (g, "In " + model.routeName(), help, Theme::muted(), Theme::small);
+    }
 }
 
 } // namespace practice::ui

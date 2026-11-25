@@ -22,6 +22,9 @@ final class Player: ObservableObject {
     @Published var beatsPerBar: Int { didSet { pushParams(); save() } }
     @Published var subdivision: Int { didSet { pushParams(); save() } }
     @Published var accent: Bool { didSet { pushParams(); save() } }
+    /// The metronome's click sound and level (0.3.0); a drill has its own in its Options.
+    @Published var clickSound: SessionSettings.ClickSound { didSet { pushParams(); save() } }
+    @Published var clickLevel: Double { didSet { pushParams(); save() } }
     /// The app's own sounds (clicks, guide, voice, test sounds), 0 to 1, against the guitar. Remembered per output
     /// (the Shokz and the interface want different levels).
     @Published var volume: Double { didSet { audio.appVolume = Float(volume); voice.level = Float(volume); save(); saveOutputVolume() } }
@@ -53,6 +56,8 @@ final class Player: ObservableObject {
         beatsPerBar = d.object(forKey: "beatsPerBar") as? Int ?? 4
         subdivision = d.object(forKey: "subdivision") as? Int ?? 1
         accent = d.object(forKey: "accent") as? Bool ?? true
+        clickSound = d.string(forKey: "clickSound").flatMap(SessionSettings.ClickSound.init(rawValue:)) ?? .click
+        clickLevel = d.object(forKey: "clickLevel") as? Double ?? 1
         volume = d.object(forKey: "volume") as? Double ?? 1
         keepScreenOn = d.object(forKey: "keepScreenOn") as? Bool ?? true
         audio.appVolume = Float(volume)
@@ -89,11 +94,14 @@ final class Player: ObservableObject {
         let d = UserDefaults.standard
         d.set(bpm, forKey: "bpm"); d.set(beatsPerBar, forKey: "beatsPerBar"); d.set(subdivision, forKey: "subdivision")
         d.set(accent, forKey: "accent"); d.set(volume, forKey: "volume"); d.set(keepScreenOn, forKey: "keepScreenOn")
+        d.set(clickSound.rawValue, forKey: "clickSound"); d.set(clickLevel, forKey: "clickLevel")
     }
 
     private func pushParams() {
-        guard mode == .metronome || mode == .idle else { return }
-        let p = EngineParams(bpm: Double(bpm), beatsPerBar: beatsPerBar, subdivision: subdivision, accent: accent, gridClicks: true)
+        guard (mode == .metronome || mode == .idle) && blockClickBPM == nil else { return }
+        var p = EngineParams(bpm: Double(bpm), beatsPerBar: beatsPerBar, subdivision: subdivision, accent: accent, gridClicks: true)
+        p.clickSound = clickSound
+        p.clickLevel = Float(clickLevel)
         audio.params.with { $0 = p }
     }
 
@@ -116,6 +124,27 @@ final class Player: ObservableObject {
             mode = .metronome
             startTimer()
         } catch { fail(error) }
+    }
+
+    /// A routine's warm-up or open practice with a click: the metronome's sound at the block's tempo. Nothing of the
+    /// metronome's own settings changes.
+    @Published private(set) var blockClickBPM: Int?
+
+    func startBlockClick(bpm: Int, beatsPerBar: Int = 4, sound: SessionSettings.ClickSound = .click, level: Double = 1) {
+        stop()
+        blockClickBPM = bpm
+        var p = EngineParams(bpm: Double(bpm), beatsPerBar: beatsPerBar, subdivision: 1, accent: true, gridClicks: true)
+        p.clickSound = sound
+        p.clickLevel = Float(level)
+        audio.params.with { $0 = p }
+        do {
+            try audio.start(record: false) { st, lead in
+                st.free = FreeSequencer(sampleRate: st.sampleRate, bpm: Double(bpm), beatsPerBar: beatsPerBar,
+                                        subdivision: 1, accent: true, startFrame: lead)
+            }
+            mode = .metronome
+            startTimer()
+        } catch { blockClickBPM = nil; fail(error) }
     }
 
     func tap() {
@@ -264,6 +293,7 @@ final class Player: ObservableObject {
         stopTimer()
         mode = .idle
         currentBeat = -1
+        if blockClickBPM != nil { blockClickBPM = nil; pushParams() }
         if was == .routine && !keepRoutine { resumeAt = 0; paused = false; status = plan?.status(at: 0) }
         updateIdleTimer()
         if was == .playAlong { onStopped?() }

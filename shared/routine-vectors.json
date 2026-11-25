@@ -1,0 +1,1296 @@
+{
+ "comment": "Made by scripts/make-routine-vectors.mjs from shared/routine-clock.mjs. Do not edit by hand.",
+ "cases": [
+  {
+   "name": "runs straight through, countdown before each block",
+   "blocks": [
+    {
+     "seconds": 60
+    },
+    {
+     "seconds": 30
+    },
+    {
+     "seconds": 120
+    }
+   ],
+   "steps": [
+    [
+     0,
+     "start"
+    ],
+    [
+     1,
+     "tick"
+    ],
+    [
+     2.5,
+     "tick"
+    ],
+    [
+     3,
+     "tick"
+    ],
+    [
+     62.9,
+     "tick"
+    ],
+    [
+     63,
+     "tick"
+    ],
+    [
+     65,
+     "tick"
+    ],
+    [
+     66,
+     "tick"
+    ],
+    [
+     96,
+     "tick"
+    ],
+    [
+     99,
+     "tick"
+    ],
+    [
+     219,
+     "tick"
+    ],
+    [
+     220,
+     "tick"
+    ]
+   ],
+   "estimates": [],
+   "expect": [
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 219
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 2,
+      "paused": false,
+      "countdownTick": 2
+     },
+     "remaining": 218
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 0.5,
+      "paused": false,
+      "countdownTick": 1
+     },
+     "remaining": 216.5
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 0,
+      "left": 60,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 216
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "block",
+      "index": 0,
+      "left": 0.1,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 156.1
+    },
+    {
+     "events": [
+      [
+       "end",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 156
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 1,
+      "paused": false,
+      "countdownTick": 1
+     },
+     "remaining": 154
+    },
+    {
+     "events": [
+      [
+       "start",
+       1
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 1,
+      "left": 30,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 153
+    },
+    {
+     "events": [
+      [
+       "end",
+       1
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 2,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 123
+    },
+    {
+     "events": [
+      [
+       "start",
+       2
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 2,
+      "left": 120,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 120
+    },
+    {
+     "events": [
+      [
+       "end",
+       2
+      ],
+      [
+       "done"
+      ]
+     ],
+     "state": {
+      "phase": "done",
+      "index": 3,
+      "left": null,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 0
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "done",
+      "index": 3,
+      "left": null,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 0
+    }
+   ],
+   "log": [
+    {
+     "seconds": 60,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 30,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 120,
+     "skipped": false,
+     "done": true
+    }
+   ]
+  },
+  {
+   "name": "a late tick catches up on every change it missed",
+   "blocks": [
+    {
+     "seconds": 60
+    },
+    {
+     "seconds": 30
+    },
+    {
+     "seconds": 120
+    }
+   ],
+   "steps": [
+    [
+     0,
+     "start"
+    ],
+    [
+     200,
+     "tick"
+    ],
+    [
+     300,
+     "tick"
+    ]
+   ],
+   "estimates": [],
+   "expect": [
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 219
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ],
+      [
+       "end",
+       0
+      ],
+      [
+       "start",
+       1
+      ],
+      [
+       "end",
+       1
+      ],
+      [
+       "start",
+       2
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 2,
+      "left": 19,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 19
+    },
+    {
+     "events": [
+      [
+       "end",
+       2
+      ],
+      [
+       "done"
+      ]
+     ],
+     "state": {
+      "phase": "done",
+      "index": 3,
+      "left": null,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 0
+    }
+   ],
+   "log": [
+    {
+     "seconds": 60,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 30,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 120,
+     "skipped": false,
+     "done": true
+    }
+   ]
+  },
+  {
+   "name": "pause holds the block and the countdown",
+   "blocks": [
+    {
+     "seconds": 60
+    },
+    {
+     "seconds": 30
+    }
+   ],
+   "steps": [
+    [
+     0,
+     "start"
+    ],
+    [
+     1,
+     "pause"
+    ],
+    [
+     50,
+     "resume"
+    ],
+    [
+     52,
+     "tick"
+    ],
+    [
+     62,
+     "pause"
+    ],
+    [
+     100,
+     "tick"
+    ],
+    [
+     100,
+     "resume"
+    ],
+    [
+     150,
+     "tick"
+    ],
+    [
+     153,
+     "tick"
+    ]
+   ],
+   "estimates": [],
+   "expect": [
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 96
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "paused",
+      "index": 0,
+      "left": 2,
+      "paused": true,
+      "countdownTick": 2
+     },
+     "remaining": 95
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 2,
+      "paused": false,
+      "countdownTick": 2
+     },
+     "remaining": 95
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 0,
+      "left": 60,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 93
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "paused",
+      "index": 0,
+      "left": 50,
+      "paused": true,
+      "countdownTick": null
+     },
+     "remaining": 83
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "paused",
+      "index": 0,
+      "left": 50,
+      "paused": true,
+      "countdownTick": null
+     },
+     "remaining": 83
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "block",
+      "index": 0,
+      "left": 50,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 83
+    },
+    {
+     "events": [
+      [
+       "end",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 33
+    },
+    {
+     "events": [
+      [
+       "start",
+       1
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 1,
+      "left": 30,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 30
+    }
+   ],
+   "log": [
+    {
+     "seconds": 60,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 0,
+     "skipped": false,
+     "done": false
+    }
+   ]
+  },
+  {
+   "name": "skip ends a block now and keeps what it ran",
+   "blocks": [
+    {
+     "seconds": 60
+    },
+    {
+     "seconds": 30
+    },
+    {
+     "seconds": 120
+    }
+   ],
+   "steps": [
+    [
+     0,
+     "start"
+    ],
+    [
+     20,
+     "skip"
+    ],
+    [
+     21,
+     "tick"
+    ],
+    [
+     23,
+     "tick"
+    ],
+    [
+     30,
+     "skip"
+    ],
+    [
+     30,
+     "skip"
+    ],
+    [
+     40,
+     "tick"
+    ]
+   ],
+   "estimates": [],
+   "expect": [
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 219
+    },
+    {
+     "events": [
+      [
+       "end",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 156
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 2,
+      "paused": false,
+      "countdownTick": 2
+     },
+     "remaining": 155
+    },
+    {
+     "events": [
+      [
+       "start",
+       1
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 1,
+      "left": 30,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 153
+    },
+    {
+     "events": [
+      [
+       "end",
+       1
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 2,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 123
+    },
+    {
+     "events": [
+      [
+       "start",
+       2
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 2,
+      "left": 120,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 120
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "block",
+      "index": 2,
+      "left": 110,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 110
+    }
+   ],
+   "log": [
+    {
+     "seconds": 17,
+     "skipped": true,
+     "done": false
+    },
+    {
+     "seconds": 7,
+     "skipped": true,
+     "done": false
+    },
+    {
+     "seconds": 0,
+     "skipped": false,
+     "done": false
+    }
+   ]
+  },
+  {
+   "name": "a drill by reps ends when it says so",
+   "blocks": [
+    {
+     "seconds": 60
+    },
+    {
+     "seconds": null
+    },
+    {
+     "seconds": 30
+    }
+   ],
+   "steps": [
+    [
+     0,
+     "start"
+    ],
+    [
+     63,
+     "tick"
+    ],
+    [
+     66,
+     "tick"
+    ],
+    [
+     200,
+     "tick"
+    ],
+    [
+     210,
+     "blockDone"
+    ],
+    [
+     213,
+     "tick"
+    ],
+    [
+     243,
+     "tick"
+    ]
+   ],
+   "estimates": [
+    0,
+    96,
+    0
+   ],
+   "expect": [
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 195
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ],
+      [
+       "end",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 132
+    },
+    {
+     "events": [
+      [
+       "start",
+       1
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 1,
+      "left": null,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 129
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "block",
+      "index": 1,
+      "left": null,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 129
+    },
+    {
+     "events": [
+      [
+       "end",
+       1
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 2,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 33
+    },
+    {
+     "events": [
+      [
+       "start",
+       2
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 2,
+      "left": 30,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 30
+    },
+    {
+     "events": [
+      [
+       "end",
+       2
+      ],
+      [
+       "done"
+      ]
+     ],
+     "state": {
+      "phase": "done",
+      "index": 3,
+      "left": null,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 0
+    }
+   ],
+   "log": [
+    {
+     "seconds": 60,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 144,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 30,
+     "skipped": false,
+     "done": true
+    }
+   ]
+  },
+  {
+   "name": "back: early goes to the block before, later starts it again",
+   "blocks": [
+    {
+     "seconds": 60
+    },
+    {
+     "seconds": 30
+    },
+    {
+     "seconds": 120
+    }
+   ],
+   "steps": [
+    [
+     0,
+     "start"
+    ],
+    [
+     63,
+     "tick"
+    ],
+    [
+     65,
+     "tick"
+    ],
+    [
+     67,
+     "back"
+    ],
+    [
+     70,
+     "tick"
+    ],
+    [
+     100,
+     "back"
+    ],
+    [
+     103,
+     "tick"
+    ],
+    [
+     104,
+     "back"
+    ],
+    [
+     107,
+     "tick"
+    ]
+   ],
+   "estimates": [],
+   "expect": [
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 219
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ],
+      [
+       "end",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 156
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 1,
+      "paused": false,
+      "countdownTick": 1
+     },
+     "remaining": 154
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 219
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 0,
+      "left": 60,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 216
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 219
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 0,
+      "left": 60,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 216
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 219
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 0,
+      "left": 60,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 216
+    }
+   ],
+   "log": [
+    {
+     "seconds": 91,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 1,
+     "skipped": false,
+     "done": false
+    },
+    {
+     "seconds": 0,
+     "skipped": false,
+     "done": false
+    }
+   ]
+  },
+  {
+   "name": "pause in a drill by reps, then it finishes",
+   "blocks": [
+    {
+     "seconds": 60
+    },
+    {
+     "seconds": null
+    }
+   ],
+   "steps": [
+    [
+     0,
+     "start"
+    ],
+    [
+     63,
+     "tick"
+    ],
+    [
+     70,
+     "pause"
+    ],
+    [
+     90,
+     "blockDone"
+    ],
+    [
+     90,
+     "tick"
+    ]
+   ],
+   "estimates": [
+    0,
+    50
+   ],
+   "expect": [
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 116
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ],
+      [
+       "end",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 53
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "paused",
+      "index": 1,
+      "left": null,
+      "paused": true,
+      "countdownTick": null
+     },
+     "remaining": 50
+    },
+    {
+     "events": [
+      [
+       "end",
+       1
+      ],
+      [
+       "done"
+      ]
+     ],
+     "state": {
+      "phase": "done",
+      "index": 2,
+      "left": null,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 0
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "done",
+      "index": 2,
+      "left": null,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 0
+    }
+   ],
+   "log": [
+    {
+     "seconds": 60,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 4,
+     "skipped": false,
+     "done": true
+    }
+   ]
+  },
+  {
+   "name": "skip a countdown",
+   "blocks": [
+    {
+     "seconds": 60
+    },
+    {
+     "seconds": 30
+    }
+   ],
+   "steps": [
+    [
+     0,
+     "start"
+    ],
+    [
+     1,
+     "skip"
+    ],
+    [
+     61,
+     "tick"
+    ],
+    [
+     62,
+     "tick"
+    ]
+   ],
+   "estimates": [],
+   "expect": [
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 0,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 96
+    },
+    {
+     "events": [
+      [
+       "start",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "block",
+      "index": 0,
+      "left": 60,
+      "paused": false,
+      "countdownTick": null
+     },
+     "remaining": 93
+    },
+    {
+     "events": [
+      [
+       "end",
+       0
+      ]
+     ],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 3,
+      "paused": false,
+      "countdownTick": 3
+     },
+     "remaining": 33
+    },
+    {
+     "events": [],
+     "state": {
+      "phase": "countdown",
+      "index": 1,
+      "left": 2,
+      "paused": false,
+      "countdownTick": 2
+     },
+     "remaining": 32
+    }
+   ],
+   "log": [
+    {
+     "seconds": 60,
+     "skipped": false,
+     "done": true
+    },
+    {
+     "seconds": 0,
+     "skipped": false,
+     "done": false
+    }
+   ]
+  }
+ ]
+}

@@ -37,7 +37,7 @@ export function createStore(file) {
   };
 }
 
-const bestValue = (s) => (s.mode === 'endurance' ? s.sustainedSeconds || 0 : s.score || 0);
+const bestValue = (s) => (s.mode === 'endurance' ? s.sustainedSeconds || 0 : s.mode === 'challenge' ? s.earnedSeconds || 0 : s.score || 0);
 
 /** The best solo run for each exercise, kind of run and starting tempo (guided runs are not bests). */
 export function bests(list) {

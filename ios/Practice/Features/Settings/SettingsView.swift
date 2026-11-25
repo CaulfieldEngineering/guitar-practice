@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Settings, grouped: what is used often first (sound, voice, timing), then syncing, the app itself, and the
-/// rarely touched switch folded away under Advanced. The words are in Shared/Strings.swift.
+/// Settings, a sheet with Done: Audio, Guitar (the tuning), Sound, Voice, Screen, Sync, About. One helper line at
+/// most, under the group it explains. The words are in Shared/Strings.swift.
 struct SettingsView: View {
     @EnvironmentObject var player: Player
     @EnvironmentObject var updater: Updater
@@ -9,89 +9,88 @@ struct SettingsView: View {
     @EnvironmentObject var pa: PlayAlong
     @EnvironmentObject var voice: Voice
     @EnvironmentObject var audio: AudioSetup
+    @EnvironmentObject var tunings: TuningStore
+    @EnvironmentObject var routines: PracticeRoutineStore
     @Environment(\.dismiss) private var dismiss
-    @State private var advanced = false
     @AppStorage("audio.lockScreen") private var lockScreen = false
+    @AppStorage("sound.chime") private var chime = true
+    @AppStorage("sound.ticks") private var ticks = true
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    NavigationLink {
-                        AudioSettingsView()
-                    } label: {
-                        LabeledContent(L.audio, value: audio.input?.name ?? L.noInputName)
+                    NavigationLink { AudioSettingsView() } label: { LabeledContent(L.audio, value: audio.input?.name ?? L.noInputName) }
+                        .accessibilityIdentifier("settings.audio")
+                    Button { pa.startCalibration() } label: {
+                        LabeledContent(L.calibration, value: pa.calibration.map { L.ms(Int(($0.measured * 1000).rounded())) } ?? L.notYet)
                     }
-                    .accessibilityIdentifier("settings.audio")
-                    Toggle(L.keepScreenOn, isOn: $player.keepScreenOn).tint(Theme.accent)
-                    Toggle(L.lockScreenControls, isOn: $lockScreen).tint(Theme.accent)
-                } header: { Text(L.sound) } footer: { Text(L.soundFooter) }
+                    .foregroundStyle(Theme.text)
+                    .accessibilityIdentifier("settings.calibrate")
+                    Toggle(L.phoneMicrophone, isOn: $pa.allowPhoneMic).tint(Theme.accent)
+                } header: { Text(L.audio) } footer: { Text(L.phoneMicFooter) }
 
-                Section {
+                Section(L.guitar) {
+                    NavigationLink {
+                        TuningView(selection: Binding(get: { tunings.tuning }, set: { if let t = $0 { tunings.set(t) } }))
+                    } label: { LabeledContent(L.tuning, value: tunings.tuning.name) }
+                    .accessibilityIdentifier("settings.tuning")
+                }
+
+                Section(L.sound) {
+                    NavigationLink {
+                        ChoiceList(title: L.clickSound, options: SessionSettings.ClickSound.allCases.map { ($0, L.soundName($0), nil) },
+                                   selection: $player.clickSound)
+                    } label: { LabeledContent(L.clickSound, value: L.soundName(player.clickSound)) }
+                    LabeledContent(L.clickLevel) {
+                        HStack(spacing: Space.sm) {
+                            Slider(value: $player.clickLevel, in: 0...1).tint(Theme.accent).frame(maxWidth: 150)
+                            Text(L.percent(Int((player.clickLevel * 100).rounded()))).font(Typo.figure(.body)).foregroundStyle(Theme.muted)
+                                .frame(width: 48, alignment: .trailing)
+                        }
+                    }
+                    Toggle(L.blockChime, isOn: $chime).tint(Theme.accent)
+                    Toggle(L.countdownTicks, isOn: $ticks).tint(Theme.accent)
+                }
+
+                Section(L.voice) {
                     Toggle(L.voiceIntro, isOn: $voice.introOn).tint(Theme.accent)
                     Toggle(L.voiceCues, isOn: $voice.cuesOn).tint(Theme.accent)
-                    // The list of voices is read once, in the background, by Voice; this only shows what it holds
-                    // (reading it here on every redraw froze this screen in 0.1.4).
                     if voice.voices.isEmpty {
                         HStack { Text(L.voice); Spacer(); ProgressView() }
                     } else {
                         Picker(L.voice, selection: Binding(get: { voice.selectedID }, set: { voice.voiceID = $0 })) {
-                            ForEach(voice.voices) { v in Text("\(v.name), \(v.quality)").tag(v.id) }
+                            ForEach(voice.voices) { v in Text(v.name).tag(v.id) }
                         }
+                        .pickerStyle(.navigationLink)
                     }
-                    Button(L.preview) { voice.speak(parts: L.previewParts, always: true) }
-                } header: { Text(L.voice) } footer: { Text(L.voiceFooter) }
+                    Button(L.preview) { voice.speak(parts: L.previewParts, always: true) }.foregroundStyle(Theme.accentText)
+                }
 
-                Section {
-                    Button(L.calibrate) { pa.startCalibration() }
-                        .accessibilityIdentifier("settings.calibrate")
-                    if let m = pa.message { Text(m).font(Typo.foot).foregroundStyle(Theme.muted) }
-                } header: { Text(L.timing) } footer: { Text(L.timingFooter) }
+                Section(L.screen) {
+                    Toggle(L.keepScreenOn, isOn: $player.keepScreenOn).tint(Theme.accent)
+                    Toggle(L.lockScreenControls, isOn: $lockScreen).tint(Theme.accent)
+                }
 
-                Section {
-                    Button(L.updateDrills) { Task { await pa.refresh() } }
-                    if let n = pa.catalogNote { Text(n).font(Typo.foot).foregroundStyle(Theme.muted) }
-                    HStack {
-                        Text(L.pendingRuns)
-                        Spacer()
-                        Text("\(history.pendingCount)").font(Typo.figure()).foregroundStyle(Theme.muted)
+                Section(L.sync) {
+                    LabeledContent(L.drills, value: pa.catalogNote ?? L.upToDate)
+                    LabeledContent(L.runsWaiting) { Text("\(history.pendingCount)").font(Typo.figure(.body)) }
+                    Button(L.syncNow) {
+                        Task { await pa.refresh(); await routines.sync(); await tunings.sync() }
                     }
-                    if history.pendingCount > 0 {
-                        Button(L.syncNow) { Task { await history.sync() } }
-                    }
-                } header: { Text(L.sync) } footer: { Text(L.syncFooter) }
+                    .foregroundStyle(Theme.accentText)
+                }
 
-                Section {
-                    HStack {
-                        Text(L.version)
-                        Spacer()
-                        Text(updater.current).font(Typo.figure()).foregroundStyle(Theme.muted)
-                    }
+                Section(L.about) {
+                    LabeledContent(L.version) { Text(updater.current).font(Typo.figure(.body)) }
                     if let v = updater.available {
-                        Button { updater.install() } label: {
-                            HStack {
-                                Text(L.updateTo(v))
-                                Spacer()
-                                Image(systemName: "arrow.down.circle")
-                            }
-                            .foregroundStyle(Theme.accentText)
-                        }
+                        Button(L.updateTo(v)) { updater.install() }.foregroundStyle(Theme.accentText)
                     } else {
-                        Button(L.checkForUpdates) { Task { await updater.check() } }
+                        Button(L.checkForUpdates) { Task { await updater.check() } }.foregroundStyle(Theme.accentText)
                     }
-                } header: { Text(L.about) }
-
-                Section {
-                    DisclosureGroup(L.advanced, isExpanded: $advanced) {
-                        Toggle(L.useMicrophone, isOn: $pa.allowPhoneMic).tint(Theme.accent)
-                    }
-                } footer: {
-                    if advanced { Text(L.microphoneFooter) }
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(Theme.side.ignoresSafeArea())
-            .tint(Theme.accentText)
+            .houseForm()
             .navigationTitle(L.settings)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L.done) { dismiss() } } }

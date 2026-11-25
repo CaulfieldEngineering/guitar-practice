@@ -1,31 +1,19 @@
 import SwiftUI
 
-// The components every screen is built from (the tokens are in Theme.swift). Quiet chrome, hairlines instead of
-// boxes, one accent, one primary button per screen.
+// What every screen is built from (0.3.0). Forms and lists are the system's own (Form, List, LabeledContent,
+// Toggle, Stepper, Picker as a navigation list), so setup reads as an iPhone app; the pieces below are the few the
+// system has no part for: the transport buttons, the tempo block, the beat bar, the accuracy meter, the step line.
 
 /// A 1 point line between rows.
 struct Hairline: View {
     var body: some View { Rectangle().fill(Theme.line).frame(height: 1).accessibilityHidden(true) }
 }
 
-/// A section's label: small capitals in the muted colour.
-struct SectionLabel: View {
-    let text: String
-    init(_ text: String) { self.text = text }
-    var body: some View {
-        Text(text.uppercased())
-            .font(Typo.label)
-            .tracking(0.8)
-            .foregroundStyle(Theme.muted)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityAddTraits(.isHeader)
-    }
-}
-
-/// The one primary action of a screen.
+/// The one primary action of a screen: accent fill, 48 high, full width, at the bottom.
 struct PrimaryButton: View {
     let title: String
     var systemImage: String?
+    var enabled = true
     let action: () -> Void
     var body: some View {
         Button {
@@ -33,51 +21,53 @@ struct PrimaryButton: View {
             action()
         } label: {
             HStack(spacing: Space.xs) {
-                if let systemImage { Image(systemName: systemImage).imageScale(.medium) }
-                Text(title).lineLimit(1).minimumScaleFactor(0.8)
+                if let systemImage { Image(systemName: systemImage).font(.system(size: 15, weight: .semibold)) }
+                Text(title).lineLimit(1)
             }
             .font(Typo.button)
-            .frame(maxWidth: .infinity, minHeight: Control.height)
-            .padding(.horizontal, Space.md)
-            .background(Theme.accent, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-            .foregroundStyle(Theme.onAccent)
+            .frame(maxWidth: .infinity, minHeight: Control.primary)
+            .background(enabled ? Theme.accent : Theme.lineStrong, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .foregroundStyle(enabled ? Theme.onAccent : Theme.muted)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .disabled(!enabled)
     }
 }
 
-/// A quiet button: no border, a soft fill.
+/// A quiet button: a soft fill, no border, 48 high.
 struct QuietButton: View {
     let title: String
     var systemImage: String?
-    var height: CGFloat = Control.height
+    var colour: Color = Theme.text
     let action: () -> Void
     var body: some View {
-        Button(action: action) {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
             HStack(spacing: Space.xs) {
-                if let systemImage { Image(systemName: systemImage).imageScale(.medium) }
-                if !title.isEmpty { Text(title).lineLimit(1).minimumScaleFactor(0.8) }
+                if let systemImage { Image(systemName: systemImage).font(.system(size: 17, weight: .regular)) }
+                if !title.isEmpty { Text(title).lineLimit(1) }
             }
-            .font(Typo.bodyStrong)
-            .frame(maxWidth: .infinity, minHeight: height)
-            .padding(.horizontal, Space.sm)
+            .font(Typo.body)
+            .frame(maxWidth: .infinity, minHeight: Control.primary)
             .background(Theme.hover, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-            .foregroundStyle(Theme.text)
+            .foregroundStyle(colour)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
     }
 }
 
-/// A text button with no fill, for the least important action of a screen.
+/// A text button: no fill, for the least of a screen's actions.
 struct TextButton: View {
     let title: String
     var colour: Color = Theme.muted
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title).font(Typo.sub).foregroundStyle(colour)
+            Text(title).font(Typo.body).foregroundStyle(colour)
                 .frame(minHeight: Space.touch)
                 .padding(.horizontal, Space.xs)
                 .contentShape(Rectangle())
@@ -90,27 +80,25 @@ struct TextButton: View {
 struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .opacity(configuration.isPressed ? 0.7 : 1)
+            .opacity(configuration.isPressed ? 0.6 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
-/// A compact square icon button with a soft fill (what is touched is 44 points whatever its size). `repeats` keeps
-/// stepping while it is held.
+/// An icon button: a 20 point line symbol in a 44 point box, no fill. `repeats` keeps stepping while held.
 struct IconButton: View {
     let systemImage: String
-    var size: CGFloat = Control.square
     var label: String = ""
     var repeats = false
+    var colour: Color = Theme.text
+    var size: CGFloat = 20
     let action: () -> Void
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: size, height: size)
-                .background(Theme.hover, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-                .foregroundStyle(Theme.text)
-                .frame(minWidth: Space.touch, minHeight: Space.touch)
+                .font(.system(size: size, weight: .regular))
+                .foregroundStyle(colour)
+                .frame(width: Space.touch, height: Space.touch)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
@@ -119,194 +107,49 @@ struct IconButton: View {
     }
 }
 
-/// A line icon in the bar at the top of a screen: no fill, the muted colour.
-struct BarIcon: View {
-    let systemImage: String
-    let label: String
-    let action: () -> Void
+/// The settings gear, in the same place on every tab.
+struct SettingsButton: View {
+    @State private var open = false
     var body: some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 18, weight: .regular))
-                .foregroundStyle(Theme.muted)
-                .frame(width: Space.touch, height: Space.touch)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(PressStyle())
-        .accessibilityLabel(label)
+        Button { open = true } label: { Image(systemName: "gearshape") }
+            .accessibilityLabel(L.settings)
+            .accessibilityIdentifier("settings")
+            .sheet(isPresented: $open) { SettingsView() }
     }
 }
 
-/// One row: a label on the left, the control on the right, at least 44 points high, a hairline under it.
-struct Row<Content: View>: View {
-    let label: String
-    var detail: String? = nil
-    var divider = true
-    @ViewBuilder var content: Content
+/// The beats of the bar as equal segments across the width; the one playing is lit, the accented one is taller.
+/// It lights with no animation, so it is on the click.
+struct BeatBar: View {
+    let beats: Int
+    let current: Int
+    var accented: Int = 0
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: Space.sm) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label).font(Typo.body).foregroundStyle(Theme.text)
-                    if let detail {
-                        Text(detail).font(Typo.foot).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                Spacer(minLength: Space.sm)
-                content
-            }
-            .padding(.vertical, Space.xxs)
-            .frame(minHeight: Control.row)
-            if divider { Hairline() }
-        }
-    }
-}
-
-/// A row whose value steps down and up: "Cycles   −  8  +". Holding a button keeps stepping. VoiceOver reads it as
-/// one adjustable value.
-struct StepperRow: View {
-    let label: String
-    var detail: String? = nil
-    let value: String
-    var canDecrement = true
-    var canIncrement = true
-    var divider = true
-    let onStep: (Int) -> Void
-
-    var body: some View {
-        Row(label: label, detail: detail, divider: divider) {
-            HStack(spacing: Space.xs) {
-                Text(value)
-                    .font(Typo.figure(.body))
-                    .foregroundStyle(Theme.muted)
-                    .lineLimit(1)
-                // A compact stepper: minus and plus as one small control, a hairline between them.
-                HStack(spacing: 0) {
-                    step("minus", -1, enabled: canDecrement)
-                    Rectangle().fill(Theme.lineStrong).frame(width: 1, height: 16)
-                    step("plus", 1, enabled: canIncrement)
-                }
-                .background(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).fill(Theme.hover).frame(height: Control.square))
+        HStack(alignment: .center, spacing: Space.xxs) {
+            ForEach(0..<max(1, beats), id: \.self) { i in
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(i == current ? Theme.accent : Theme.lineStrong)
+                    .frame(height: i == accented ? 10 : 6)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .sensoryFeedback(.selection, trigger: value)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(label)
-        .accessibilityValue(value)
-        .accessibilityAdjustableAction { direction in
-            switch direction {
-            case .increment: if canIncrement { onStep(1) }
-            case .decrement: if canDecrement { onStep(-1) }
-            @unknown default: break
-            }
-        }
-    }
-
-    private func step(_ image: String, _ by: Int, enabled: Bool) -> some View {
-        Button { onStep(by) } label: {
-            Image(systemName: image)
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 40, height: Space.touch)
-                .foregroundStyle(enabled ? Theme.text : Theme.faint)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(PressStyle())
-        .buttonRepeatBehavior(.enabled)
-        .disabled(!enabled)
+        .frame(height: 10)
+        .accessibilityHidden(true)
     }
 }
 
-/// A row with a switch.
-struct ToggleRow: View {
-    let label: String
-    var detail: String? = nil
-    var divider = true
-    @Binding var isOn: Bool
-    var body: some View {
-        Row(label: label, detail: detail, divider: divider) {
-            Toggle(label, isOn: $isOn).labelsHidden().tint(Theme.accent)
-        }
-    }
-}
-
-/// Segmented choice: one track, the chosen segment lifted, no lines between segments.
-struct Segmented<T: Hashable>: View {
-    let options: [(T, String)]
-    @Binding var selection: T
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(options.indices, id: \.self) { i in
-                let value = options[i].0
-                let title = options[i].1
-                let on = selection == value
-                Button {
-                    if selection != value { selection = value }
-                } label: {
-                    Text(title)
-                        .font(on ? Typo.subStrong : Typo.sub)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .frame(maxWidth: .infinity, minHeight: 30)
-                        .background(on ? Theme.raised : Color.clear, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).stroke(on ? Theme.lineStrong : Color.clear, lineWidth: 1))
-                        .foregroundStyle(on ? Theme.text : Theme.muted)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(on ? [.isSelected] : [])
-            }
-        }
-        .padding(2)
-        .background(Theme.hover, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-        .sensoryFeedback(.selection, trigger: selection)
-    }
-}
-
-/// A line that names a state ("Solo · Z3 Tempo"): plain text in the accent, no pill around it.
-struct Chip: View {
-    let text: String
-    var body: some View {
-        Text(text)
-            .font(Typo.subStrong)
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-            .frame(minHeight: 24)
-            .foregroundStyle(Theme.accentText)
-    }
-}
-
-/// A number with a small label under it, to be read at a glance.
-struct BigStat: View {
-    let value: String
-    let label: String
-    var colour: Color = Theme.text
-    var size: CGFloat = 28
-    var body: some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(Typo.number(size))
-                .foregroundStyle(colour)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-            Text(label).font(Typo.foot).foregroundStyle(Theme.muted).lineLimit(1).minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(label)
-        .accessibilityValue(value)
-    }
-}
-
-/// A thin bar that fills from the left.
+/// A thin line that fills from the left.
 struct ProgressLine: View {
     let fraction: Double
     var colour: Color = Theme.accent
+    var track: Color = Theme.lineStrong
     var height: CGFloat = 4
     var body: some View {
         GeometryReader { g in
             ZStack(alignment: .leading) {
-                Capsule().fill(Theme.line)
-                Capsule().fill(colour).frame(width: g.size.width * CGFloat(min(1, max(0, fraction))))
+                RoundedRectangle(cornerRadius: 2).fill(track)
+                RoundedRectangle(cornerRadius: 2).fill(colour)
+                    .frame(width: g.size.width * CGFloat(min(1, max(0, fraction))))
             }
         }
         .frame(height: height)
@@ -314,66 +157,41 @@ struct ProgressLine: View {
     }
 }
 
-/// The beats of the bar as dots; the one playing is lit.
-struct BeatDots: View {
-    let beats: Int
-    let current: Int
-    var body: some View {
-        HStack(spacing: Space.sm) {
-            ForEach(0..<max(1, beats), id: \.self) { i in
-                Circle()
-                    .fill(i == current ? Theme.accent : Theme.lineStrong)
-                    .frame(width: i == 0 ? 14 : 10, height: i == 0 ? 14 : 10)
-                    .animation(.easeOut(duration: 0.06), value: current)
-            }
-        }
-        .frame(height: 16)
-        .accessibilityHidden(true)
-    }
-}
-
-/// The tempo, big, with a minus and a plus. Drag on the number to scrub it (sideways, and up and down too where the
-/// screen does not scroll); each step ticks. Holding the minus or the plus keeps stepping. The value is never set
-/// here: every change goes out through `onChange`, and the owner clamps it (setting a tempo inside its own change
-/// handler is what crashed 0.1.4).
-struct TempoDial: View {
+/// The tempo, big, left-aligned, with "bpm" on its baseline and minus and plus at the right. Drag sideways on the
+/// number to scrub it. Every change goes out through `onChange`; the owner keeps it in range.
+struct TempoBlock: View {
     let value: Int
-    var caption: String = L.bpm
-    var size: CGFloat = 96
-    var step: Int = 1
-    /// Off inside a scrolling screen, where an up and down drag belongs to the scroll.
-    var vertical = true
+    var font: Font = Typo.tempoHero
+    var muted = false
+    var step = 1
     let onChange: (Int) -> Void
     @State private var dragStart: Int?
 
     var body: some View {
-        HStack(spacing: Space.md) {
-            IconButton(systemImage: "minus", size: 40, label: L.slower, repeats: true) { onChange(value - step) }
-            VStack(spacing: 0) {
+        HStack(alignment: .center, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.tiny) {
                 Text("\(value)")
-                    .font(Typo.number(size))
-                    .foregroundStyle(Theme.text)
+                    .font(font)
+                    .foregroundStyle(muted ? Theme.muted : Theme.text)
                     .contentTransition(.numericText())
                     .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                Text(caption)
-                    .font(Typo.foot)
-                    .foregroundStyle(Theme.muted)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.6)
+                Text(L.bpm).font(Typo.body).foregroundStyle(Theme.muted)
             }
-            .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
             .gesture(scrub)
-            IconButton(systemImage: "plus", size: 40, label: L.faster, repeats: true) { onChange(value + step) }
+            Spacer(minLength: Space.xs)
+            IconButton(systemImage: "minus", label: L.slower, repeats: true) { onChange(value - step) }
+                .accessibilityIdentifier("tempo.minus")
+            IconButton(systemImage: "plus", label: L.faster, repeats: true) { onChange(value + step) }
+                .accessibilityIdentifier("tempo.plus")
         }
         .sensoryFeedback(.selection, trigger: value)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L.tempo)
         .accessibilityValue(L.beatsPerMinute(value))
-        .accessibilityAdjustableAction { direction in
-            switch direction {
+        .accessibilityAdjustableAction { d in
+            switch d {
             case .increment: onChange(value + step)
             case .decrement: onChange(value - step)
             @unknown default: break
@@ -385,128 +203,242 @@ struct TempoDial: View {
         DragGesture(minimumDistance: 8)
             .onChanged { g in
                 if dragStart == nil { dragStart = value }
-                let travel = vertical ? g.translation.width - g.translation.height : g.translation.width
-                let target = (dragStart ?? value) + Int((travel / 5).rounded())
+                let target = (dragStart ?? value) + Int((g.translation.width / 6).rounded())
                 if target != value { onChange(target) }
             }
             .onEnded { _ in dragStart = nil }
     }
 }
 
-/// The top of a tab's screen: its name, the Update capsule when there is one, the screen's own icons, Settings.
-struct ScreenHeader<Trailing: View>: View {
-    let title: String
-    let trailing: Trailing
-    @EnvironmentObject var updater: Updater
-    @State private var settings = false
+/// The accuracy meter: one bar, 12 high, from 50% at the left to 100% at the right, its background the bands split
+/// at the thresholds (break, down, hold, up; or under and over the pass mark), and a mark at the accuracy now.
+struct AccuracyMeter: View {
+    /// 0 to 1, nil before a loop is judged.
+    let accuracy: Double?
+    /// The thresholds, in percent, low to high: [break, down, up], or [pass mark].
+    let lines: [Int]
+    let zone: TempoPlan.Zone?
+    /// Whether the plan has zones (By accuracy); otherwise two bands and no zone word.
+    var zoned = true
 
-    init(title: String, @ViewBuilder trailing: () -> Trailing) {
-        self.title = title
-        self.trailing = trailing()
-    }
+    private func x(_ pct: Double, _ w: CGFloat) -> CGFloat { w * CGFloat(min(1, max(0, (pct - 50) / 50))) }
 
     var body: some View {
-        HStack(spacing: 0) {
-            Text(title).font(Typo.screen).foregroundStyle(Theme.text).lineLimit(1).minimumScaleFactor(0.7)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: Space.xs)
-            if updater.available != nil {
-                Button { updater.install() } label: {
-                    Text(L.update).font(Typo.subStrong)
-                        .padding(.horizontal, Space.sm).frame(height: 28)
-                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)).foregroundStyle(Theme.onAccent)
+        VStack(alignment: .leading, spacing: Space.tiny) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                Text(L.accuracy).font(Typo.foot).foregroundStyle(Theme.muted)
+                Spacer(minLength: Space.xs)
+                Text(accuracy.map { L.percent(Int(($0 * 100).rounded())) } ?? "–").font(Typo.stat).foregroundStyle(Theme.text)
+                if zoned, let zone, accuracy != nil {
+                    Text(L.zoneWord(zone)).font(Typo.subStrong).foregroundStyle(Theme.zoneMark(zone))
+                        .frame(minWidth: 44, alignment: .leading)
                 }
-                .buttonStyle(PressStyle())
-                .padding(.trailing, Space.xxs)
             }
-            trailing
-            BarIcon(systemImage: "gearshape", label: L.settings) { settings = true }
-        }
-        .padding(.leading, Space.page)
-        .padding(.trailing, Space.xxs)
-        .frame(minHeight: 48)
-        .sheet(isPresented: $settings) { SettingsView() }
-    }
-}
-
-extension ScreenHeader where Trailing == EmptyView {
-    init(title: String) { self.init(title: title) { EmptyView() } }
-}
-
-/// The top of a pushed screen: back, its name, its own icons.
-struct NavBar<Trailing: View>: View {
-    let title: String
-    var backEnabled = true
-    let onBack: () -> Void
-    let trailing: Trailing
-
-    init(title: String, backEnabled: Bool = true, onBack: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
-        self.title = title
-        self.backEnabled = backEnabled
-        self.onBack = onBack
-        self.trailing = trailing()
-    }
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(Theme.muted)
-                    .frame(width: Space.touch, height: Space.touch)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(PressStyle())
-            .opacity(backEnabled ? 1 : 0.3)
-            .disabled(!backEnabled)
-            .accessibilityLabel(L.back)
-            Text(title).font(Typo.title).foregroundStyle(Theme.text).lineLimit(1).minimumScaleFactor(0.75)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: Space.xs)
-            trailing
-        }
-        .padding(.horizontal, Space.xxs)
-        .frame(minHeight: 44)
-    }
-}
-
-extension NavBar where Trailing == EmptyView {
-    init(title: String, backEnabled: Bool = true, onBack: @escaping () -> Void) {
-        self.init(title: title, backEnabled: backEnabled, onBack: onBack) { EmptyView() }
-    }
-}
-
-/// A group of rows that stays folded until it is asked for: "Options   Ladder off, click on  ⌄".
-struct Disclosure<Content: View>: View {
-    let title: String
-    var summary: String = ""
-    @Binding var open: Bool
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Button {
-                withAnimation(.easeOut(duration: 0.18)) { open.toggle() }
-            } label: {
-                HStack(spacing: Space.sm) {
-                    Text(title).font(Typo.body).foregroundStyle(Theme.text)
-                    Spacer(minLength: Space.sm)
-                    if !open && !summary.isEmpty {
-                        Text(summary).font(Typo.sub).foregroundStyle(Theme.muted).lineLimit(1).minimumScaleFactor(0.8)
+            GeometryReader { g in
+                let w = g.size.width
+                let bands = bandEdges
+                ZStack(alignment: .leading) {
+                    ForEach(bands.indices, id: \.self) { i in
+                        let b = bands[i]
+                        Rectangle().fill(Theme.zone(b.zone).opacity(0.22))
+                            .frame(width: max(0, x(b.hi, w) - x(b.lo, w)))
+                            .offset(x: x(b.lo, w))
                     }
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.faint)
-                        .rotationEffect(.degrees(open ? 180 : 0))
+                    if let a = accuracy {
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(zone.map(Theme.zoneMark) ?? Theme.text)
+                            .frame(width: 3, height: 20)
+                            .offset(x: max(0, min(w - 3, x(a * 100, w) - 1.5)))
+                            .animation(.easeOut(duration: 0.12), value: a)
+                    }
                 }
-                .frame(minHeight: Control.row)
-                .contentShape(Rectangle())
+                .frame(height: 20)
             }
-            .buttonStyle(PressStyle())
-            .accessibilityLabel(title)
-            .accessibilityValue(summary)
-            Hairline()
-            if open { content }
+            .frame(height: 20)
+            .clipShape(RoundedRectangle(cornerRadius: 2))
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L.accuracy)
+        .accessibilityValue(accuracy.map { L.percent(Int(($0 * 100).rounded())) } ?? L.none)
+    }
+
+    private struct Band { var lo: Double; var hi: Double; var zone: TempoPlan.Zone }
+
+    private var bandEdges: [Band] {
+        let l = lines.map(Double.init)
+        if !zoned || l.count == 1 {
+            let p = l.first ?? 85
+            return [Band(lo: 0, hi: p, zone: .hold), Band(lo: p, hi: 100, zone: .up)]
+        }
+        // [break, down, up], [down, up] or [break, up]
+        var out: [Band] = []
+        var lo = 0.0
+        let zones: [TempoPlan.Zone] = l.count == 3 ? [.rest, .down, .hold] : [.down, .hold]
+        for (i, edge) in l.dropLast().enumerated() {
+            out.append(Band(lo: lo, hi: edge, zone: zones[i]))
+            lo = edge
+        }
+        out.append(Band(lo: lo, hi: l.last!, zone: .hold))
+        out.append(Band(lo: l.last!, hi: 100, zone: .up))
+        return out
+    }
+}
+
+/// Where the tempo is going next: a caption line and a thin line filling toward the next step.
+struct StepProgress: View {
+    let info: PlayAlong.StepInfo
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.tiny) {
+            HStack {
+                Text(L.stepState(info.state)).font(Typo.foot).foregroundStyle(Theme.muted)
+                Spacer()
+                Text(info.measure).font(Typo.figure(.footnote)).foregroundStyle(Theme.muted)
+            }
+            ProgressLine(fraction: info.state == .top ? 1 : info.fraction, colour: colour)
+        }
+        .accessibilityElement(children: .combine)
+    }
+    private var colour: Color {
+        switch info.state {
+        case .down: return Theme.warn
+        case .rest: return Theme.danger
+        default: return Theme.accent
+        }
+    }
+}
+
+/// A table's column heads: small, faint, one line, 28 high.
+struct ColumnHeads: View {
+    let first: String
+    let columns: [(String, CGFloat)]
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            Text(first).frame(maxWidth: .infinity, alignment: .leading)
+            ForEach(columns.indices, id: \.self) { i in
+                Text(columns[i].0).frame(width: columns[i].1, alignment: .trailing)
+            }
+        }
+        .font(Typo.foot)
+        .foregroundStyle(Theme.faint)
+        .lineLimit(1)
+        .frame(height: 28)
+        .padding(.horizontal, Space.page)
+        .accessibilityHidden(true)
+    }
+}
+
+/// One row of a table: the name takes what is left, the values are fixed, right-aligned, in monospaced digits.
+struct TableRow: View {
+    let name: String
+    var detail: String? = nil
+    let values: [(String, CGFloat)]
+    var faintValues = false
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name).font(Typo.body).foregroundStyle(Theme.text).lineLimit(1).truncationMode(.tail)
+                if let detail { Text(detail).font(Typo.foot).foregroundStyle(Theme.faint).lineLimit(1) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            ForEach(values.indices, id: \.self) { i in
+                Text(values[i].0).font(Typo.figure(.body))
+                    .foregroundStyle(i == 0 && !faintValues ? Theme.text : Theme.muted)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                    .frame(width: values[i].1, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, Space.page)
+        .frame(minHeight: Control.row)
+        .contentShape(Rectangle())
+    }
+}
+
+/// A list of choices with a checkmark on the chosen one, pushed from a value row.
+struct ChoiceList<T: Hashable>: View {
+    let title: String
+    let options: [(T, String, String?)]
+    @Binding var selection: T
+    var footer: String? = nil
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(options.indices, id: \.self) { i in
+                    let o = options[i]
+                    Button {
+                        Haptics.tick()
+                        selection = o.0
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Text(o.1).foregroundStyle(Theme.text)
+                            Spacer()
+                            if let v = o.2 { Text(v).font(Typo.figure(.body)).foregroundStyle(Theme.muted) }
+                            if selection == o.0 {
+                                Image(systemName: "checkmark").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.accentText)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .accessibilityAddTraits(selection == o.0 ? [.isSelected] : [])
+                }
+            } footer: { if let footer { Text(footer) } }
+        }
+        .houseForm()
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+extension View {
+    /// A system Form in the house colours: groups on `side`, rows on `raised`.
+    func houseForm() -> some View {
+        self.scrollContentBackground(.hidden)
+            .background(Theme.side.ignoresSafeArea())
+            .tint(Theme.accentText)
+    }
+}
+
+/// A quiet bar under the title when something is playing on another tab, with Stop.
+struct RunningBar: View {
+    @EnvironmentObject var player: Player
+    @EnvironmentObject var pa: PlayAlong
+    @EnvironmentObject var runner: RoutineRunner
+    /// The mode this screen makes itself; its own sound needs no bar.
+    var own: Player.Mode = .idle
+
+    private var drill: Bool { pa.runSetup == nil && (player.mode == .playAlong || pa.phase == .paused || pa.phase == .resting) }
+    private var shows: Bool {
+        if runner.active { return true }
+        if drill { return own != .playAlong }
+        return player.mode == .metronome && own != .metronome
+    }
+
+    var body: some View {
+        if shows {
+            HStack(spacing: Space.sm) {
+                Circle().fill(Theme.accent).frame(width: 6, height: 6).accessibilityHidden(true)
+                Text(text).font(Typo.sub).foregroundStyle(Theme.text).lineLimit(1)
+                Spacer(minLength: Space.xs)
+                if !runner.active {
+                    Button {
+                        Haptics.tap()
+                        pa.leave()
+                        player.stop()
+                    } label: { Text(L.stop).font(Typo.subStrong).foregroundStyle(Theme.accentText).frame(minHeight: Space.touch) }
+                    .accessibilityIdentifier("running.stop")
+                }
+            }
+            .padding(.horizontal, Space.page)
+            .frame(minHeight: Space.touch)
+            .background(Theme.accentSoft)
+        }
+    }
+
+    private var text: String {
+        if runner.active { return L.routineRunning }
+        if drill { return pa.phase == .paused ? L.drillPaused : L.drillRunning }
+        return L.metronomeAt(player.bpm)
     }
 }

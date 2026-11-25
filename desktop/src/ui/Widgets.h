@@ -3,6 +3,7 @@
 // text, icon), a segmented control, a switch, a compact stepper, the big tempo with drag-to-scrub, a slider, a
 // dropdown, the input meter, and a few drawing helpers.
 #include "Theme.h"
+#include "../core/TempoPlan.h"
 #include <functional>
 
 namespace practice::ui {
@@ -117,7 +118,57 @@ private:
     double holdAt = 0, clipAt = -10, loudest = 0, loudestAt = 0;
 };
 
+/// The tempo, big and left-aligned, "bpm" on its baseline, minus and plus at the right (0.3.0). Drag sideways on
+/// the number or use the wheel to change it.
+class TempoBlock : public juce::Component {
+public:
+    TempoBlock();
+    void setValue (int v) { if (v != value) { value = v; repaint(); } }
+    int value = 100, minimum = 20, maximum = 400;
+    float numberSize = 72;
+    bool muted = false;
+    std::function<void (int)> onChange;
+    void resized() override;
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+private:
+    void set (int v);
+    Button minus { Button::Kind::square, {}, "minus" }, plus { Button::Kind::square, {}, "plus" };
+    int dragStart = 0;
+    float wheelRest = 0;
+};
+
+/// A form: rows of a label and a control (or a value), in sections, down a column; the controls on its right edge.
+/// The rows are given again on each refresh; the controls are the owner's children, shown or hidden by the form.
+class Form : public juce::Component {
+public:
+    struct Row { juce::String label; juce::Component* control = nullptr; int width = 0; juce::String value; bool section = false;
+                 bool note = false; juce::Colour colour; };
+    void begin();
+    void section (const juce::String& title);
+    void row (const juce::String& label, juce::Component& control, int width, const juce::String& value = {});
+    void value (const juce::String& label, const juce::String& v);
+    void note (const juce::String& text, juce::Colour colour);
+    /// Lays the rows out from the form's own top left (set its position first); returns the height used.
+    int layout (int width);
+    void paint (juce::Graphics&) override;
+    std::vector<juce::Component*> managed;   // every control this form may show; the ones not in a row are hidden
+private:
+    std::vector<Row> rows;
+    std::vector<juce::Rectangle<int>> areas;
+};
+
 namespace Draw {
+    /// The beats of the bar as equal segments across `r`; the one playing lit, the accented one taller.
+    void beatBar (juce::Graphics&, juce::Rectangle<int> r, int beats, int current, int accented = 0);
+    /// A thin line filling from the left.
+    void progress (juce::Graphics&, juce::Rectangle<int> r, double fraction, juce::Colour fill, juce::Colour track);
+    /// The accuracy meter: bands split at the thresholds (break, down, hold, up), and a mark at the accuracy.
+    void accuracyMeter (juce::Graphics&, juce::Rectangle<int> r, std::optional<double> accuracy, const std::vector<int>& lines,
+                        std::optional<TempoPlan::Zone> zone, bool zoned);
+    juce::Colour zoneColour (TempoPlan::Zone z);
     void text (juce::Graphics&, const juce::String&, juce::Rectangle<int>, juce::Colour, float size = Theme::body,
                bool semibold = false, juce::Justification j = juce::Justification::centredLeft);
     void hairline (juce::Graphics&, int x, int y, int w);

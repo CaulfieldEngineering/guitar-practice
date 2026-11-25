@@ -31,8 +31,10 @@ const result = (over = {}) => ({
 test('the repo catalog is valid', () => {
   const c = checkCatalog(path.join(ROOT, 'catalog'));
   assert.deepEqual(c.errors, []);
-  assert.ok(c.drills >= 9);
+  assert.equal(c.drills, 1);
+  assert.equal(c.archived, 8);
   assert.equal(c.list[0].id, 'trip16x4');
+  assert.equal(c.starters.length, 1);
 });
 
 test('the scoring numbers are in the catalog, and nonsense is refused', () => {

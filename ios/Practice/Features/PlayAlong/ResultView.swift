@@ -1,125 +1,142 @@
 import SwiftUI
 
-/// After a scored run: the accuracy (or the time held) big, what it means in a line, every note's timing as a
-/// strip, and the detail in rows. The run is already saved; the buttons are Again (or Play Solo after a guided
-/// run) and Done.
+/// After a scored run: one line of what it was, the number big (accuracy, the time held, or the time earned in a
+/// Challenge), a new max when there is one, the tempo table when the tempo moved, every note's timing as a strip,
+/// then the detail as rows. Left-aligned; the run is already saved. Again at the bottom; Done in the bar.
 struct ResultView: View {
     let score: ScoreResult
     let saved: SessionResult
     let guided: Bool
-    let newBest: Bool
     let maxUp: (Int, Int)?
     let primaryTitle: String
     let primaryImage: String
     let onPrimary: () -> Void
-    let onDone: () -> Void
+    @State private var about = false
 
     private var endurance: Bool { saved.mode == "endurance" }
+    private var challenge: Bool { saved.mode == "challenge" }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: Space.lg) {
-                    Chip(text: L.chip(guided: guided, tempo: L.tempoRange(saved.startBPM, saved.topBPM))).padding(.top, Space.xs)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(L.resultSummary(guided: guided, start: saved.startBPM, top: saved.topBPM, seconds: saved.seconds))
+                    .font(Typo.sub).foregroundStyle(Theme.muted)
+                    .padding(.top, Space.sm)
 
-                    VStack(spacing: Space.xxs) {
-                        if endurance {
-                            Text(formatClock(saved.sustainedSeconds ?? 0))
-                                .font(Typo.number(44)).foregroundStyle(Theme.accentText)
-                                .lineLimit(1).minimumScaleFactor(0.5)
-                            Text(L.heldAt(saved.targetPercent)).font(Typo.callout).foregroundStyle(Theme.muted)
-                        } else {
-                            Text(L.percent(score.score))
-                                .font(Typo.number(44)).foregroundStyle(score.passed ? Theme.accentText : Theme.text)
-                                .lineLimit(1).minimumScaleFactor(0.5)
-                            Text(score.passed ? L.accuracyPassed : L.accuracyPassMark(score.passMark))
-                                .font(Typo.callout).foregroundStyle(Theme.muted)
-                        }
-                    }
-                    .accessibilityElement(children: .combine)
-
-                    // The timing apart from the score (0.2.2): how far off on average, which the calibration owns,
-                    // and how steady, which is his; then what the extra notes cost.
-                    VStack(spacing: Space.xxs) {
-                        Text(L.resultTiming(average: averageText(score.meanError), spread: Int(score.spread.rounded()),
-                                          band: Scoring.band(spreadMs: score.spread)))
-                            .font(Typo.subStrong).foregroundStyle(Theme.text)
-                        if score.extra > 0, extraCost >= 5 {
-                            Text(L.extraCost(score.extra, points: extraCost)).font(Typo.caption).foregroundStyle(Theme.warn)
-                        }
-                        Text(L.timingAnchors).font(Typo.caption).foregroundStyle(Theme.faint)
-                    }
-                    .multilineTextAlignment(.center)
-                    .accessibilityElement(children: .combine)
-
-                    if newBest || maxUp != nil {
-                        VStack(spacing: Space.xxs) {
-                            if newBest { Text(L.newBest) }
-                            if let up = maxUp { Text(L.newMax(up.1, from: up.0)) }
-                        }
-                        .font(Typo.subStrong).foregroundStyle(Theme.accentText)
-                        .multilineTextAlignment(.center)
-                    }
-
-                    VStack(alignment: .leading, spacing: Space.xs) {
-                        SectionLabel(L.timingPerNote)
-                        ErrorStrip(errors: score.errors, spanMs: max(40, score.zeroMs))
-                            .frame(height: 64)
-                        HStack {
-                            Text(L.early)
-                            Spacer()
-                            Text(L.late)
-                        }
-                        .font(Typo.caption).foregroundStyle(Theme.faint)
-                        .accessibilityHidden(true)
-                    }
-
-                    VStack(spacing: 0) {
-                        Hairline()
-                        ForEach(stats.indices, id: \.self) { i in
-                            Row(label: stats[i].0) {
-                                Text(stats[i].1).font(Typo.figure(.body)).foregroundStyle(Theme.muted)
-                            }
-                            .accessibilityElement(children: .combine)
-                        }
-                    }
+                HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                    Text(headline).font(Typo.statLarge).foregroundStyle(good ? Theme.accentText : Theme.text)
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                    Text(headlineCaption).font(Typo.body).foregroundStyle(Theme.muted).lineLimit(1)
                 }
-                .padding(.horizontal, Space.page)
-                .padding(.bottom, Space.lg)
-            }
-            VStack(spacing: 0) {
-                PrimaryButton(title: primaryTitle, systemImage: primaryImage, action: onPrimary)
-                    .accessibilityIdentifier("result.primary")
-                TextButton(title: L.done, action: onDone)
-                    .accessibilityIdentifier("result.done")
+                .padding(.top, Space.xs)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("result.headline")
+
+                if let up = maxUp {
+                    Text(L.newMax(up.1, from: up.0)).font(Typo.subStrong).foregroundStyle(Theme.accentText).padding(.top, Space.xs)
+                }
+
+                if let steps = saved.tempoSteps, steps.count > 1 {
+                    VStack(spacing: 0) {
+                        ColumnHeads(first: L.tempo, columns: [(L.time, 64), (L.accuracy, 72)]).padding(.horizontal, -Space.page)
+                        Hairline()
+                        ForEach(steps.indices, id: \.self) { i in
+                            let s = steps[i]
+                            TableRow(name: s.rest == true ? L.breakTitle : "\(s.bpm)",
+                                     values: [(formatClock(s.seconds), 64), (s.accuracy.map { L.percent($0) } ?? "–", 72)], faintValues: true)
+                                .padding(.horizontal, -Space.page)
+                            Hairline()
+                        }
+                    }
+                    .padding(.top, Space.lg)
+                }
+
+                Text(L.timingPerNote).font(Typo.foot).foregroundStyle(Theme.muted).padding(.top, Space.lg)
+                ErrorStrip(errors: score.errors, spanMs: max(40, score.zeroMs))
+                    .frame(height: 56).padding(.top, Space.xs)
+                HStack { Text(L.early); Spacer(); Text(L.late) }
+                    .font(Typo.caption).foregroundStyle(Theme.faint).accessibilityHidden(true)
+
+                VStack(spacing: 0) {
+                    ForEach(rows.indices, id: \.self) { i in
+                        HStack {
+                            Text(rows[i].0).font(Typo.body).foregroundStyle(Theme.text)
+                            Spacer()
+                            Text(rows[i].1).font(Typo.figure(.body)).foregroundStyle(Theme.muted)
+                        }
+                        .frame(minHeight: Control.row)
+                        .overlay(alignment: .bottom) { Hairline() }
+                        .accessibilityElement(children: .combine)
+                    }
+                    Button { about = true } label: {
+                        HStack {
+                            Text(L.aboutNumbers).font(Typo.body).foregroundStyle(Theme.text)
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.faint)
+                        }
+                        .frame(minHeight: Control.row)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressStyle())
+                }
+                .padding(.top, Space.lg)
             }
             .padding(.horizontal, Space.page)
-            .padding(.top, Space.sm)
-            .background(alignment: .top) { Hairline() }
+            .padding(.bottom, Space.lg)
+        }
+        .safeAreaInset(edge: .bottom) {
+            PrimaryButton(title: primaryTitle, systemImage: primaryImage, action: onPrimary)
+                .accessibilityIdentifier("result.primary")
+                .padding(.horizontal, Space.page).padding(.top, Space.sm).padding(.bottom, Space.xs)
+                .background(Theme.bg.overlay(alignment: .top) { Hairline() }.ignoresSafeArea(edges: .bottom))
+        }
+        .background(Theme.bg)
+        .sheet(isPresented: $about) {
+            NavigationStack {
+                ScrollView {
+                    Text(L.timingAnchorsLong).font(Typo.body).foregroundStyle(Theme.text)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(Space.page)
+                }
+                .navigationTitle(L.aboutNumbers)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L.done) { about = false } } }
+            }
+            .presentationDetents([.medium])
         }
     }
 
-    /// The points the extra notes took off the accuracy.
-    private var extraCost: Int {
-        guard score.expected > 0, score.extra > 0 else { return 0 }
-        let n = Double(score.expected), x = Double(score.extra)
-        let withExtras = Double(score.score)
-        // The score is credit over notes plus extras (extraWeight is 1 unless the catalog says otherwise; close enough).
-        let without = min(100, withExtras * (n + x) / n)
-        return Int((without - withExtras).rounded())
+    private var good: Bool { challenge ? saved.passed : (endurance ? (saved.sustainedSeconds ?? 0) > 0 : score.passed) }
+
+    private var headline: String {
+        if challenge { return formatClock(saved.earnedSeconds ?? 0) }
+        if endurance { return formatClock(saved.sustainedSeconds ?? 0) }
+        return L.percent(score.score)
     }
 
-    /// The detail, most telling first.
-    private var stats: [(String, String)] {
+    private var headlineCaption: String {
+        if challenge { return L.earnedAt(saved.targetPercent) }
+        if endurance { return L.heldAt(saved.targetPercent) }
+        return L.accuracyPassMarkLine(score.passMark)
+    }
+
+    private var rows: [(String, String)] {
         var out: [(String, String)] = []
-        if endurance { out.append((L.statAccuracy, L.percent(score.score))) }
-        out.append((L.statOnBeat, L.percent(score.pctFull)))
-        out.append((L.statAverage, averageText(score.meanError)))
-        out.append((L.statSpread, L.ms(Int(score.spread.rounded()))))
-        out.append((L.statMissed, L.ofTotal(score.missed, score.expected)))
-        out.append((L.statExtra, "\(score.extra)"))
-        if let a = saved.accentsPercent { out.append((L.statAccents, L.percent(a))) }
-        out.append((L.statDuration, L.durationAndCycles(formatClock(saved.seconds), saved.cycles)))
+        if endurance || challenge { out.append((L.accuracy, L.percent(score.score))) }
+        if challenge {
+            out.append((L.elapsed, formatClock(saved.elapsedSeconds ?? saved.seconds)))
+            if let e = saved.elapsedSeconds, e > 0 { out.append((L.inZone, L.percent(Int(((saved.earnedSeconds ?? 0) / e * 100).rounded())))) }
+            out.append((L.bestStreak, formatClock(saved.bestStreakSeconds ?? 0)))
+        }
+        out.append((L.timing, averageText(score.meanError)))
+        out.append((L.spread, L.spreadValue(Int(score.spread.rounded()), Scoring.band(spreadMs: score.spread))))
+        if score.extra > 0 { out.append((L.extraNotes, "\(score.extra)")) }
+        out.append((L.missed, L.ofTotal(score.missed, score.expected)))
+        if let w = saved.wrongPitch { out.append((L.wrongNotes, "\(w)")) }
+        if let a = saved.accentsPercent { out.append((L.accents, L.percent(a))) }
+        if saved.topBPM > saved.startBPM { out.append((L.topTempo, L.bpmValue(saved.topBPM))) }
+        if let b = saved.breaks, b > 0 { out.append((L.breaksRow, "\(b)")) }
+        out.append((L.loopsTitle, "\(saved.cycles)"))
         return out
     }
 
@@ -130,40 +147,28 @@ struct ResultView: View {
     }
 }
 
-/// After a run with the audio input off: how long it went, and that it was not scored.
+/// After a run with the audio input off: how long it went and at what tempo; nothing was scored.
 struct UnscoredResultView: View {
     let run: PlayAlong.UnscoredRun
-    /// Minutes on this drill with the audio input off, in all (this run included).
     let total: Double
-    let againTitle: String
     let onAgain: () -> Void
-    let onDone: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            VStack(spacing: Space.xxs) {
-                Text(formatClock(run.seconds))
-                    .font(Typo.number(44)).foregroundStyle(Theme.text)
-                    .lineLimit(1).minimumScaleFactor(0.5)
-                Text(L.durationAndCycles(L.tempoRange(run.startBPM, run.topBPM), run.cycles))
-                    .font(Typo.callout).foregroundStyle(Theme.muted)
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Text(L.notScoredLine).font(Typo.sub).foregroundStyle(Theme.muted).padding(.top, Space.sm)
+            HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                Text(formatClock(run.seconds)).font(Typo.statLarge).foregroundStyle(Theme.text)
+                Text(L.tempoRange(run.startBPM, run.topBPM) + " " + L.bpm).font(Typo.body).foregroundStyle(Theme.muted)
             }
-            .accessibilityElement(children: .combine)
-            Text(L.unscoredTotal(formatMinutes(total)))
-                .font(Typo.sub).foregroundStyle(Theme.muted)
-                .multilineTextAlignment(.center)
-                .padding(.top, Space.lg)
-                .padding(.horizontal, Space.xl)
+            Text(L.unscoredTotal(formatMinutes(total))).font(Typo.sub).foregroundStyle(Theme.muted).padding(.top, Space.xs)
             Spacer()
-            VStack(spacing: 0) {
-                PrimaryButton(title: againTitle, systemImage: "arrow.clockwise", action: onAgain)
-                    .accessibilityIdentifier("result.primary")
-                TextButton(title: L.done, action: onDone)
-                    .accessibilityIdentifier("result.done")
-            }
-            .padding(.horizontal, Space.page)
+            PrimaryButton(title: L.again, systemImage: "arrow.clockwise", action: onAgain)
+                .accessibilityIdentifier("result.primary")
+                .padding(.bottom, Space.xs)
         }
+        .padding(.horizontal, Space.page)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(Theme.bg)
     }
 }
 
@@ -188,10 +193,9 @@ struct ErrorStrip: View {
                 let f = Swift.max(-1, Swift.min(1, e / span))
                 let y = mid + CGFloat(f) * (mid - 3)
                 let c = abs(f) <= 0.35 ? Theme.accent : (abs(f) < 0.7 ? Theme.accent.opacity(0.55) : Theme.warn)
-                ctx.fill(Path(ellipseIn: CGRect(x: x - 2, y: y - 2, width: 4, height: 4)), with: .color(c))
+                ctx.fill(Path(ellipseIn: CGRect(x: x - 1.5, y: y - 1.5, width: 3, height: 3)), with: .color(c))
             }
         }
-        .background(Theme.side, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .accessibilityHidden(true)
     }
 }

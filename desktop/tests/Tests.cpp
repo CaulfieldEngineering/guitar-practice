@@ -112,7 +112,7 @@ static void scoringParity()
         else CHECK (r && near (r->offset, num (c["expect"]["offset"]), tol) && near (r->spread, num (c["expect"]["spread"]), tol)
                     && r->hits == (int) c["expect"]["hits"], "calibration: " + c["name"].toString().toStdString());
     }
-    auto drills = Library::decodeDrills (juce::JSON::parse (repo().getChildFile ("catalog/exercises/right-hand.json")));
+    auto drills = Library::decodeDrills (juce::JSON::parse (repo().getChildFile ("catalog/exercises/right-hand.json")), true);   // the archived ones too
     CHECK (drills && drills->size() >= 9, "the catalog's drills decode");
     for (auto& c : *V["grid"].getArray())
     {
@@ -391,6 +391,9 @@ static void syncTests()
     scratch.deleteRecursively();
 }
 
+void planTests();
+extern int planFailures, planChecks;
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI init;   // the real-device part needs the message manager
@@ -398,6 +401,8 @@ int main()
     detector();
     deviceStress();
     syncTests();
+    planTests();
+    failures += planFailures; checks += planChecks;
     std::cout << "\n" << (checks - failures) << " of " << checks << " checks passed" << (failures ? ", FAILED\n" : "\n");
     return failures ? 1 : 0;
 }

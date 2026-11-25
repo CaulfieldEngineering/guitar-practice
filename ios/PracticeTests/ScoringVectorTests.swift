@@ -120,7 +120,8 @@ final class ScoringVectorTests: XCTestCase {
         let v = try vectors()
         let tol = num(v["tolerance"])
         let data = try Data(contentsOf: root.appendingPathComponent("catalog/exercises/right-hand.json"))
-        let drills = try Library.decodeExercises(data)
+        // Every drill's grid, the archived ones too (they come back one day).
+        let drills = try Library.decodeExercises(data, includeArchived: true)
         for case let c as [String: Any] in list(v["grid"]) {
             let id = c["drill"] as? String ?? ""
             let ex = try XCTUnwrap(drills.first(where: { $0.id == id }), id)

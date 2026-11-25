@@ -14,8 +14,33 @@ import SwiftUI
 final class PlayAlong: ObservableObject {
     /// `syncing` and `calibrating` are the two steps of the calibration: sight against sound, then the guitar.
     /// `paused` is a run held still: the sound is off and the clock stopped, until it is resumed or ended.
-    enum Phase: Equatable { case ready, intro, syncing, calibrating, running, paused, result }
-    enum NoteState { case waiting, tight, close, loose, missed }
+    /// `resting` is a break the accuracy called for (the tempo plan's Break): the sound is off, a countdown runs,
+    /// and the run goes on by itself (2026-11-24).
+    enum Phase: Equatable { case ready, intro, syncing, calibrating, running, paused, resting, result }
+    /// `wrong`: played on time but on the wrong pitch (a pitched note only).
+    enum NoteState { case waiting, tight, close, loose, missed, wrong }
+
+    /// A run set up from outside the drill's screen (a routine's drill block): its drill and setup, used for that run
+    /// only, never saved as the drill's own settings.
+    struct RunSetup: Equatable {
+        var exerciseID: String
+        var bpm: Int
+        var guided: Bool
+        var audioInput: Bool
+        var session: SessionSettings
+        var intro = false
+    }
+
+    /// What the run screen shows about the tempo plan: the tempo it is heading for, the next step, how far to it.
+    struct StepInfo: Equatable {
+        enum State: Equatable { case perLoop, up, hold, down, rest, settling, top }
+        var state: State
+        var fraction: Double
+        /// "1 of 2 loops", "0:18 of 0:30"
+        var measure: String
+        var target: Int
+        var next: Int?
+    }
 
     /// A run with the audio input off: how long, and at what tempo. Never part of the scores or his max.
     struct UnscoredRun: Equatable {
@@ -91,6 +116,30 @@ final class PlayAlong: ObservableObject {
     @Published private(set) var lastCycleAccuracy: Double?
     @Published private(set) var currentBPM: Double = 0
     @Published private(set) var sustained: Double = 0
+    /// The tempo plan of the run going on: the changes so far (the tempo curve), and the breaks.
+    @Published private(set) var tempoChanges: [TempoChange] = []
+    @Published private(set) var breaks = 0
+    /// A break going on: seconds left, the tempo it goes on at, and its whole length.
+    @Published private(set) var breakLeft: Double = 0
+    @Published private(set) var breakLength: Double = 0
+    @Published private(set) var resumeBPM: Int = 0
+    /// Challenge: the clock of the run going on.
+    @Published private(set) var challenge: ChallengeClock?
+    /// The run's setup when it came from a routine (nil: the drill's own screen).
+    @Published private(set) var runSetup: RunSetup?
+    /// Called when a run ends with its result (a routine moves on).
+    var onRunEnded: ((SessionResult?) -> Void)?
+    /// A routine run this run is a block of; kept on the result.
+    var routineRunID: UUID?
+    private var governor: TempoGovernor?
+    private var planTop = 0
+    private var planFloor = 0
+    private var breakTimer: Timer?
+    private var breakTotal: Double = 0
+    /// Each break: after which loop, and how long it was.
+    private var breakLog: [(after: Int, seconds: Double)] = []
+    /// The pitch heard on each note played on the wrong pitch, by note, for the lane.
+    @Published private(set) var heardPitch: [Int: Double] = [:]
 
     private(set) var notes: [Exercise.Note] = []
     private(set) var played: [Onset] = []       // plan time, calibration applied
@@ -134,6 +183,31 @@ final class PlayAlong: ObservableObject {
     private var ownRoutines: [Routine] = []
 
     var exercise: Exercise { exercises.first { $0.id == exerciseID } ?? exercises.first ?? .fallback }
+
+    /// The drill, setup and tuning a run starts with: a routine block's when one is set, else the drill's own.
+    private var setupExercise: Exercise {
+        guard let r = runSetup else { return exercise }
+        return exercises.first { $0.id == r.exerciseID } ?? exercise
+    }
+    private var setupSession: SessionSettings { runSetup?.session ?? session }
+    private var setupGuided: Bool { runSetup?.guided ?? guided }
+    private var setupAudioInput: Bool { runSetup?.audioInput ?? audioInput }
+    private var setupIntro: Bool { runSetup?.intro ?? intro }
+    private var setupTempo: Int {
+        guard let r = runSetup else { return startTempo }
+        return min(max(r.bpm, setupExercise.tempo.min), setupExercise.tempo.max)
+    }
+    /// The tuning of the run: the drill's (or block's) own, else the guitar's.
+    var tuning: Tuning { setupSession.tuning ?? TuningStore.shared.tuning }
+    private(set) var runTuning: Tuning = .standard
+
+    /// Starts a run for a routine's drill block. Nothing of the drill's own settings changes.
+    func startBlock(_ setup: RunSetup) {
+        guard phase == .ready || phase == .result else { return }
+        if phase == .result { clearResult() }
+        runSetup = setup
+        begin(calibrating: false)
+    }
 
     init(player: Player, history: History, input: NoteInput = AudioOnsetInput()) {
         self.player = player
@@ -369,15 +443,18 @@ final class PlayAlong: ObservableObject {
 
     // MARK: Runs
 
-    func start() { begin(calibrating: false) }
+    func start() { runSetup = nil; begin(calibrating: false) }
     func calibrate() { begin(calibrating: true) }
     func nowSolo() { guided = false; start() }
+
+    /// Leaves the routine's setup behind (the routine ended).
+    func endBlockSetup() { runSetup = nil; routineRunID = nil; onRunEnded = nil }
     func clearResult() { score = nil; saved = nil; unscored = nil; phase = .ready }
 
     func stop() {
         if phase == .intro { player.voice.stop(); phase = .ready; return }
         if phase == .syncing { endSync(); return }
-        if phase == .running || phase == .paused { endRun(); return }
+        if phase == .running || phase == .paused || phase == .resting { endRun(); return }
         guard phase == .calibrating else { return }
         player.stop()
         phase = .ready
@@ -428,7 +505,9 @@ final class PlayAlong: ObservableObject {
         let q = EventQueue()
         queue = q
         if runScored { input.attach(to: player.audio) }
-        let params = EngineParams(bpm: currentBPM, beatsPerBar: beats, subdivision: 1, accent: true, gridClicks: gridClicks)
+        var params = EngineParams(bpm: currentBPM, beatsPerBar: beats, subdivision: 1, accent: true, gridClicks: gridClicks)
+        params.clickSound = runSettings.clickSound
+        params.clickLevel = Float(runSettings.clickLevel)
         do {
             try player.startPlayAlong(record: runScored, setup: { st, leadIn in
                 origin = leadIn - from * st.sampleRate
@@ -448,7 +527,8 @@ final class PlayAlong: ObservableObject {
 
     /// Ends the run where it is: a scored one keeps the cycles already judged; one with the input off keeps its minutes.
     func endRun() {
-        guard phase == .running || phase == .paused else { return }
+        guard phase == .running || phase == .paused || phase == .resting else { return }
+        stopBreakTimer()
         if !runScored { finishUnscored(); return }
         if !accuracies.isEmpty { finish(stoppedEarly: true); return }
         player.onFrame = nil
@@ -506,11 +586,11 @@ final class PlayAlong: ObservableObject {
 
     private func begin(calibrating: Bool) {
         message = nil
-        let scored = audioInput || calibrating
+        let scored = setupAudioInput || calibrating
         if scored && !inputReady(calibrating: calibrating) { return }
-        if !calibrating && intro {
+        if !calibrating && setupIntro {
             phase = .intro
-            let words = IntroText.parts(exercise, bpm: startTempo, session: session, scored: scored)
+            let words = IntroText.parts(setupExercise, bpm: setupTempo, session: setupSession, scored: scored)
             player.voice.speak(parts: words, always: true) { [weak self] in
                 guard let self, self.phase == .intro else { return }
                 self.launch(calibrating: false)
@@ -630,13 +710,26 @@ final class PlayAlong: ObservableObject {
     private func launch(calibrating: Bool) {
         lastCueBeat = -1
         lastCueBPM = 0
-        runExercise = exercise
-        runSettings = session
-        runGuided = guided && !calibrating
-        runScored = audioInput || calibrating
+        runExercise = calibrating ? exercise : setupExercise
+        runSettings = calibrating ? session : setupSession
+        runGuided = !calibrating && setupGuided
+        runScored = calibrating || setupAudioInput
+        runTuning = tuning
         lastRunWasGuided = runGuided
         lastRunWasScored = runScored
-        var startBPM = Double(calibrating ? 80 : startTempo)
+        var startBPM = Double(calibrating ? 80 : setupTempo)
+        // The tempo plan: its top and floor, and for the accuracy-gated plan, the governor (2026-11-24).
+        tempoChanges = []; breaks = 0; breakTotal = 0; breakLog = []; heardPitch = [:]; governor = nil; challenge = nil
+        let plan = runSettings.tempoPlan.normalized
+        let bounds = plan.bounds(start: Int(startBPM), rule: runExercise.tempo)
+        planTop = bounds.top; planFloor = bounds.floor
+        if !calibrating && plan.mode == .accuracy && runScored {
+            governor = TempoGovernor(plan: plan, start: Int(startBPM), top: planTop, floor: planFloor)
+        }
+        if !calibrating && runSettings.kind == .challenge && runScored {
+            challenge = ChallengeClock(targetSeconds: Double(max(1, runSettings.seconds)), percent: runSettings.targetPercent,
+                                       window: runSettings.windowCycles, capSeconds: Double(runSettings.capSeconds))
+        }
         levelUp = nil
         runZoneMax = calibrating ? nil : level()
         // A drill of timed blocks: its blocks on a timeline, every play block moved by as much as the tempo was.
@@ -664,7 +757,8 @@ final class PlayAlong: ObservableObject {
         doneScheduling = false
         plannedEnd = nil
         let beats = runExercise.beatsPerBar
-        let counted = RunBuilder.countIn(beats: countsIn ? beats : 0, bpm: startBPM)
+        let inBars = calibrating ? 1 : max(0, min(4, runSettings.countInBars))
+        let counted = RunBuilder.countIn(beats: countsIn ? beats * inBars : 0, bpm: startBPM)
         let countEvents = counted.events
         let cEnd = counted.end
         countInEnd = cEnd
@@ -682,16 +776,18 @@ final class PlayAlong: ObservableObject {
             switch runSettings.kind {
             case .cycles: plannedEnd = nil
             case .duration: plannedEnd = cEnd + Double(runSettings.seconds)
-            case .endurance: plannedEnd = nil
+            case .endurance, .challenge: plannedEnd = nil
             case .routine: plannedEnd = cEnd + (blocks.last?.end ?? 0)
             }
         }
 
         let q = EventQueue()
         queue = q
+        input.wantsPitch = !calibrating && runExercise.hasPitchedNotes
         if runScored { input.attach(to: player.audio) }
-        let params = EngineParams(bpm: startBPM, beatsPerBar: beats, subdivision: 1, accent: true,
+        var params = EngineParams(bpm: startBPM, beatsPerBar: beats, subdivision: 1, accent: true,
                                   gridClicks: calibrating || gridClicks)
+        if !calibrating { params.clickSound = runSettings.clickSound; params.clickLevel = Float(runSettings.clickLevel) }
         do {
             try player.startPlayAlong(record: runScored, setup: { st, lead in
                 origin = lead
@@ -740,6 +836,9 @@ final class PlayAlong: ObservableObject {
             case .cycles: stop = k >= max(1, runSettings.cycles)
             case .duration: stop = scheduledUntil >= (plannedEnd ?? 0) - 1e-6
             case .endurance: stop = scheduledUntil - countInEnd >= SessionSettings.enduranceCap
+            case .challenge:
+                let cap = runSettings.capSeconds > 0 ? Double(runSettings.capSeconds) : SessionSettings.enduranceCap
+                stop = scheduledUntil - countInEnd >= cap - 1e-6 || (!runScored && scheduledUntil - countInEnd >= Double(runSettings.seconds) - 1e-6)
             case .routine: stop = blockIndex >= blocks.count
             }
             if stop {
@@ -753,10 +852,14 @@ final class PlayAlong: ObservableObject {
                 guard let made = nextBlockSlot(k) else { continue }
                 slot = made
             } else {
-                let bpmNow = k == 0 ? currentBPM : RunBuilder.nextBPM(current: slots[k - 1].bpm, lastPassed: lastPassed,
-                                                                      step: runSettings.ladderStep, maxBPM: ex.tempo.max)
+                let bpmNow = tempoForLoop(k)
                 let limit = runSettings.kind == .duration ? plannedEnd : nil
-                slot = RunBuilder.cycle(ex, index: k, start: scheduledUntil, bpm: bpmNow, guided: runGuided, limit: limit)
+                slot = RunBuilder.cycle(ex, index: k, start: scheduledUntil, bpm: bpmNow, guided: runGuided, limit: limit,
+                                        options: RunBuilder.ClickOptions(runSettings, tuning: runTuning, pitchFree: ex.pitchFree))
+                if k > 0, Int(slots[k - 1].bpm) != Int(bpmNow), runSettings.tempoPlan.mode == .perLoop {
+                    let from = Int(slots[k - 1].bpm), to = Int(bpmNow)
+                    tempoChanges.append(TempoChange(at: scheduledUntil - countInEnd, from: from, to: to, kind: to > from ? .up : .loop))
+                }
             }
             slots.append(slot)
             noteStart.append(notes.count)
@@ -843,7 +946,7 @@ final class PlayAlong: ObservableObject {
     func leave() {
         switch phase {
         case .intro, .syncing, .calibrating: stop()
-        case .running, .paused: endRun()
+        case .running, .paused, .resting: endRun()
         case .ready, .result: break
         }
         player.voice.stop()
@@ -991,6 +1094,11 @@ final class PlayAlong: ObservableObject {
         errors = m.enumerated().map { i, j in j.map { (played[$0].time - notes[i].time) * 1000 } }
         for i in notes.indices {
             if let e = errors[i] {
+                if let j = m[i], !Scoring.pitchMatches(expected: notes[i].pitch, heard: played[j].pitch) {
+                    states[i] = .wrong
+                    if heardPitch[i] == nil, let h = played[j].pitch { heardPitch[i] = h }
+                    continue
+                }
                 let c = scoring.credit(errorMs: e, gap: i < gaps.count ? gaps[i] : 1)
                 states[i] = c >= 0.999 ? .tight : (c >= 0.5 ? .close : .loose)
             } else {
@@ -1041,8 +1149,204 @@ final class PlayAlong: ObservableObject {
                     sustained = s.end - countInEnd
                 }
             }
+            if challenge != nil {
+                if challenge!.judge(accuracy: acc, seconds: s.duration) == .done { finish(stoppedEarly: true); return }
+            }
+            if governor != nil, let c = governor!.judge(accuracy: acc, seconds: s.duration, bpm: Int(s.bpm)) {
+                tempoChanges.append(TempoChange(at: s.end - countInEnd, from: c.from, to: c.to, kind: c.kind))
+                if c.kind == .rest { takeBreak(after: k, resumeAt: c.to); return }
+            }
         }
     }
+
+    /// The tempo of loop `k`: the per-loop plan's, the accuracy governor's, the ladder's (before 0.3.0), or the start.
+    private func tempoForLoop(_ k: Int) -> Double {
+        let start = Int(slots.first?.bpm ?? currentBPM)
+        switch runSettings.tempoPlan.mode {
+        case .perLoop:
+            let p = runSettings.tempoPlan.normalized
+            return Double(p.perLoopBPM(start: start, top: planTop, loop: k, elapsed: scheduledUntil - countInEnd))
+        case .accuracy:
+            if let g = governor { return Double(g.target) }
+            return k == 0 ? currentBPM : slots[k - 1].bpm
+        case .off:
+            if k == 0 { return currentBPM }
+            return RunBuilder.nextBPM(current: slots[k - 1].bpm, lastPassed: lastPassed, step: runSettings.ladderStep,
+                                      maxBPM: runExercise.tempo.max)
+        }
+    }
+
+    // MARK: Breaks the accuracy calls for
+
+    /// The accuracy stayed under the break line: the sound stops, a countdown runs, and the run goes on from the
+    /// next loop (a step slower when the plan says so). The loops already judged stand; the ones queued are dropped.
+    private func takeBreak(after judged: Int, resumeAt bpm: Int) {
+        player.onFrame = nil
+        player.onStopped = nil
+        player.stop()
+        if runScored { _ = input.finish() }
+        level = 0
+        // Forget everything after the last judged loop: the run goes on from its end.
+        let keep = judged + 1
+        if slots.count > keep {
+            let cut = noteStart[keep]
+            slots.removeSubrange(keep...)
+            noteStart.removeSubrange(keep...)
+            if slotBlock.count > keep { slotBlock.removeSubrange(keep...) }
+            notes.removeSubrange(cut...)
+            states.removeSubrange(min(cut, states.count)...)
+            errors.removeSubrange(min(cut, errors.count)...)
+            gaps = Scoring.gaps(notes.map(\.time))
+        }
+        scheduledUntil = slots.last?.end ?? countInEnd
+        played.removeAll { $0.time >= scheduledUntil - 0.02 }
+        doneScheduling = false
+        pausedAt = scheduledUntil
+        resumeBPM = bpm
+        breaks += 1
+        breakLog.append((judged, Double(runSettings.tempoPlan.normalized.breakSeconds)))
+        let length = Double(runSettings.tempoPlan.normalized.breakSeconds)
+        breakLength = length
+        breakLeft = length
+        phase = .resting
+        stopBreakTimer()
+        let started = Date()
+        breakTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.phase == .resting else { return }
+                self.breakLeft = max(0, length - Date().timeIntervalSince(started))
+                if self.breakLeft <= 0 { self.endBreak() }
+            }
+        }
+    }
+
+    private func stopBreakTimer() {
+        if breakTimer != nil && phase == .resting {
+            let took = max(0, breakLength - breakLeft)
+            breakTotal += took
+            if !breakLog.isEmpty { breakLog[breakLog.count - 1].seconds = took }
+        }
+        breakTimer?.invalidate()
+        breakTimer = nil
+    }
+
+    /// The break is over (or skipped): a count-in at the new tempo, then the next loop.
+    func endBreak() {
+        guard phase == .resting else { return }
+        stopBreakTimer()
+        message = nil
+        if runScored && !inputReady(calibrating: false) { phase = .paused; return }
+        let bpm = Double(resumeBPM)
+        currentBPM = bpm
+        let beats = max(1, runExercise.beatsPerBar)
+        let beat = 60 / bpm
+        let from = scheduledUntil - Double(beats) * beat
+        let lead = (0..<beats).map { TimedEvent(time: from + Double($0) * beat, kind: .countIn, beat: $0) }
+        countInUntil = scheduledUntil
+        let q = EventQueue()
+        queue = q
+        if runScored { input.attach(to: player.audio) }
+        var params = EngineParams(bpm: bpm, beatsPerBar: beats, subdivision: 1, accent: true, gridClicks: gridClicks)
+        params.clickSound = runSettings.clickSound
+        params.clickLevel = Float(runSettings.clickLevel)
+        do {
+            try player.startPlayAlong(record: runScored, setup: { st, leadIn in
+                origin = leadIn - from * st.sampleRate
+                st.track = q
+                q.append(lead.map { frameEvent($0, sampleRate: st.sampleRate) })
+            }, params: params)
+        } catch {
+            message = error.localizedDescription
+            phase = .paused
+            return
+        }
+        now = from
+        routeChanged()
+        runRouteKey = route.key
+        phase = .running
+        scheduleAhead()
+        watchPlayer()
+    }
+
+    /// The stretches of the run at each tempo, with the breaks between them (nil when the tempo never moved).
+    private func tempoSteps(judged: Int) -> [TempoStep]? {
+        let n = min(judged, slots.count)
+        guard n > 0 else { return nil }
+        let loops = (0..<n).map { k in (bpm: Int(slots[k].bpm), seconds: slots[k].duration, accuracy: k < accuracies.count ? Optional(accuracies[k]) : nil) }
+        let steps = TempoStep.from(loops: loops, breaks: breakLog)
+        return steps.count > 1 ? steps : nil
+    }
+
+    /// The tempo plan's progress for the run screen.
+    var stepInfo: StepInfo? {
+        guard phase == .running || phase == .paused || phase == .resting else { return nil }
+        let p = runSettings.tempoPlan.normalized
+        let unitLoops = p.windowUnit == .loops
+        func measure(_ covered: Double, _ of: Int, loops: Bool) -> String {
+            loops ? L.ofLoops(Int(covered.rounded()), of) : L.clockOf(covered, Double(of))
+        }
+        switch p.mode {
+        case .off:
+            return nil
+        case .perLoop:
+            let target = planTop
+            let now = Int(currentBPM)
+            if now >= target && p.atTop == .hold { return StepInfo(state: .top, fraction: 1, measure: "", target: target, next: nil) }
+            let k = (currentSlot?.index ?? 0)
+            let next = min(target, now + p.step)
+            if p.everyUnit == .loops {
+                let into = k % p.every
+                return StepInfo(state: .perLoop, fraction: Double(into + 1) / Double(p.every), measure: L.ofLoops(into + 1, p.every), target: target, next: next)
+            }
+            let t = max(0, self.now - countInEnd).truncatingRemainder(dividingBy: Double(p.every))
+            return StepInfo(state: .perLoop, fraction: t / Double(p.every), measure: L.clockOf(t, Double(p.every)), target: target, next: next)
+        case .accuracy:
+            guard let g = governor else { return nil }
+            let target = g.target
+            if g.settling { return StepInfo(state: .settling, fraction: 0, measure: "", target: target, next: nil) }
+            let acc = rolling ?? lastCycleAccuracy
+            let zone = acc.map { p.zone($0) } ?? .hold
+            switch zone {
+            case .up:
+                if target >= planTop { return StepInfo(state: .top, fraction: 1, measure: "", target: target, next: nil) }
+                let f = g.progress()
+                return StepInfo(state: .up, fraction: f, measure: measure(f * Double(p.upWindow), p.upWindow, loops: unitLoops),
+                                target: target, next: min(planTop, target + p.step))
+            case .down:
+                let f = g.progressDown(break: false)
+                return StepInfo(state: .down, fraction: f, measure: measure(f * Double(p.downWindow), p.downWindow, loops: unitLoops),
+                                target: target, next: max(planFloor, target - p.step))
+            case .rest:
+                let f = g.progressDown(break: true)
+                return StepInfo(state: .rest, fraction: f, measure: measure(f * Double(p.breakWindow), p.breakWindow, loops: unitLoops),
+                                target: target, next: nil)
+            case .hold:
+                return StepInfo(state: .hold, fraction: 0, measure: "", target: target, next: nil)
+            }
+        }
+    }
+
+    /// The zone of the accuracy now, for the meter: up, hold, down or break (nil before a loop is judged).
+    var accuracyZone: TempoPlan.Zone? {
+        guard let a = rolling ?? lastCycleAccuracy else { return nil }
+        let p = runSettings.tempoPlan.normalized
+        if p.mode == .accuracy { return p.zone(a) }
+        return a * 100 >= Double(runSettings.targetPercent) ? .up : .hold
+    }
+
+    /// The thresholds the meter's bands are split at (percent): break, down, up; or the pass mark alone.
+    var meterLines: [Int] {
+        let p = runSettings.tempoPlan.normalized
+        guard p.mode == .accuracy else { return [runSettings.kind == .challenge ? runSettings.targetPercent : runSettings.targetPercent] }
+        var out: [Int] = []
+        if p.breakOn { out.append(p.breakPercent) }
+        if p.downOn { out.append(p.downPercent) }
+        out.append(p.upPercent)
+        return out
+    }
+    var runPlan: TempoPlan { runSettings.tempoPlan.normalized }
+    var runSettingsNow: SessionSettings { runSettings }
+    var runExerciseNow: Exercise { runExercise }
 
     /// The end of a run with the audio input off: nothing is scored or saved; the minutes are kept.
     private func finishUnscored() {
@@ -1060,6 +1364,7 @@ final class PlayAlong: ObservableObject {
         score = nil
         saved = nil
         phase = .result
+        onRunEnded?(nil)
     }
 
     /// The fastest play block whose notes, taken together, reached the target: what a run of timed blocks says about
@@ -1081,7 +1386,8 @@ final class PlayAlong: ObservableObject {
 
     private func finish(stoppedEarly: Bool) {
         let wasCalibrating = phase == .calibrating
-        let wasPaused = phase == .paused
+        let wasPaused = phase == .paused || phase == .resting
+        stopBreakTimer()
         let runShift = shift
         player.onFrame = nil
         player.onStopped = nil
@@ -1112,7 +1418,7 @@ final class PlayAlong: ObservableObject {
             return
         }
         // The notes that count: every cycle that was judged (endurance, or a run stopped early), or all of them.
-        let judged = runSettings.kind == .endurance || stoppedEarly ? accuracies.count : slots.count
+        let judged = runSettings.kind == .endurance || runSettings.kind == .challenge || stoppedEarly ? accuracies.count : slots.count
         let upto = judged < noteStart.count ? noteStart[judged] : notes.count
         let counted = Array(notes.prefix(upto))
         let w = window
@@ -1140,7 +1446,7 @@ final class PlayAlong: ObservableObject {
         }
         let isEndurance = runSettings.kind == .endurance
         let held: Double? = isEndurance ? sustained : nil
-        let passed: Bool = isEndurance ? sustained > 0 : r.passed
+        let passed: Bool = isEndurance ? sustained > 0 : (challenge.map { $0.earned >= $0.target - 1e-9 } ?? r.passed)
         let offsetMs: Double? = currentOffset * 1000
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let result = SessionResult(
@@ -1153,7 +1459,15 @@ final class PlayAlong: ObservableObject {
             accuracyPercent: r.score, sustainedSeconds: held, score: r.score, passed: passed,
             accentsPercent: accentsPercent, offsetMs: offsetMs, appVersion: appVersion,
             scoringVersion: 2, fullMs: r.fullMs, zeroMs: r.zeroMs, doubles: doubles,
-            extraOffsetsMs: r.extraOffsets.prefix(400).map { Int($0.rounded()) })
+            extraOffsetsMs: r.extraOffsets.prefix(400).map { Int($0.rounded()) },
+            tempoMode: runSettings.tempoPlan.mode == .off ? nil : runSettings.tempoPlan.mode.rawValue,
+            tempoChanges: tempoChanges.isEmpty ? nil : tempoChanges,
+            breaks: breaks > 0 ? breaks : nil, breakSeconds: breaks > 0 ? breakTotal : nil,
+            earnedSeconds: challenge?.earned, elapsedSeconds: challenge?.elapsed, bestStreakSeconds: challenge?.bestStreak,
+            wrongPitch: runExercise.hasPitchedNotes ? r.wrongPitch : nil,
+            tuning: runExercise.hasPitchedNotes ? runTuning.name : nil,
+            routineRunID: routineRunID,
+            tempoSteps: tempoSteps(judged: judged))
         newBest = false
         if !runGuided, let previous = Stats.best(history.results, exerciseID: result.exerciseID, mode: result.mode, bpm: result.startBPM) {
             newBest = result.bestValue > previous
@@ -1166,6 +1480,7 @@ final class PlayAlong: ObservableObject {
         Task { await history.sync(); await refreshLevels() }
         saved = result
         phase = .result
+        onRunEnded?(r.expected > 0 ? result : nil)
     }
 
     #if DEBUG

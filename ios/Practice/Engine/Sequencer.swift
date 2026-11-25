@@ -3,6 +3,23 @@ import Foundation
 /// What a click is. The audio side turns each into a sound.
 enum ClickKind: Int, Equatable {
     case accent, beat, sub, countIn, change, rest, done, pluck, pluckAccent
+    // The other click sounds (0.3.0): the grid's accent, beat and sub in each. `accent`, `beat` and `sub` are "Click".
+    case woodAccent, woodBeat, woodSub, beepAccent, beepBeat, beepSub, rimAccent, rimBeat, rimSub, chime
+
+    /// The last kind; every kind up to it has a sound.
+    static let last = ClickKind.chime
+
+    /// A grid click in another sound.
+    func voiced(_ sound: SessionSettings.ClickSound) -> ClickKind {
+        let i: Int
+        switch self { case .accent: i = 0; case .beat: i = 1; case .sub: i = 2; default: return self }
+        switch sound {
+        case .click: return self
+        case .wood: return [.woodAccent, .woodBeat, .woodSub][i]
+        case .beep: return [.beepAccent, .beepBeat, .beepSub][i]
+        case .rim: return [.rimAccent, .rimBeat, .rimSub][i]
+        }
+    }
 }
 
 struct ClickEvent: Equatable {

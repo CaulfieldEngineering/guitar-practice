@@ -20,6 +20,27 @@ enum ClickSounds {
             return out
         case .pluck: return pluck(sr, gain: 0.45)
         case .pluckAccent: return pluck(sr, gain: 0.8)
+        // Wood block: a low hollow knock, its partials not in tune with each other.
+        case .woodAccent: return click(sr, freqs: [(1050, 1), (2730, 0.35), (4200, 0.12)], decay: 55, length: 0.07, gain: 0.95)
+        case .woodBeat: return click(sr, freqs: [(820, 1), (2130, 0.3), (3500, 0.1)], decay: 60, length: 0.065, gain: 0.72)
+        case .woodSub: return click(sr, freqs: [(700, 1), (1820, 0.2)], decay: 80, length: 0.04, gain: 0.35)
+        // Beep: a plain sine, an octave up on the one.
+        case .beepAccent: return click(sr, freqs: [(1760, 1)], decay: 30, length: 0.08, gain: 0.8)
+        case .beepBeat: return click(sr, freqs: [(880, 1)], decay: 30, length: 0.08, gain: 0.65)
+        case .beepSub: return click(sr, freqs: [(660, 1)], decay: 45, length: 0.05, gain: 0.3)
+        // Rim: a short bright crack.
+        case .rimAccent: return click(sr, freqs: [(3200, 1), (5300, 0.6), (7400, 0.3)], decay: 120, length: 0.04, gain: 0.95)
+        case .rimBeat: return click(sr, freqs: [(2600, 1), (4500, 0.5), (6800, 0.25)], decay: 130, length: 0.035, gain: 0.72)
+        case .rimSub: return click(sr, freqs: [(2200, 1), (3900, 0.3)], decay: 160, length: 0.025, gain: 0.32)
+        // The routine's block chime: two notes, 880 then 1320 Hz, 110 ms each, under the click.
+        case .chime:
+            var out = [Float](repeating: 0, count: Int(0.5 * sr))
+            for (i, f) in [880.0, 1320.0].enumerated() {
+                let note = click(sr, freqs: [(f, 1), (f * 2, 0.2)], decay: 9, length: 0.28, gain: 0.3)
+                let at = Int(Double(i) * 0.11 * sr)
+                for k in 0..<note.count where at + k < out.count { out[at + k] += note[k] }
+            }
+            return out
         }
     }
 

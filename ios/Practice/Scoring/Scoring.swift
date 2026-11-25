@@ -91,6 +91,10 @@ struct ScoreResult: Equatable {
     /// Each extra note's distance from its nearest note of the drill, ms (positive: after it), so a run shows what
     /// the extras were (0.2.2).
     var extraOffsets: [Double] = []
+    /// Pitched notes played on the wrong pitch (2026-11-24): no credit, timing still in the average and the spread.
+    var wrongPitch: Int = 0
+    /// Each note: whether it was played on the wrong pitch, and the pitch heard (MIDI), for the lane.
+    var wrongNotes: [Bool] = []
 
     var pct20: Int { expected > 0 ? Int((100 * Double(within20) / Double(expected)).rounded()) : 0 }
     var pct40: Int { expected > 0 ? Int((100 * Double(within40) / Double(expected)).rounded()) : 0 }
@@ -151,6 +155,16 @@ enum Scoring {
         return count > 0 ? min(1, credit / count) : 1
     }
 
+    /// Whether a heard pitch is the note asked for (shared/scoring.mjs pitchMatches). `expected` nil is an X note: any
+    /// pitch, or a muted chug, is right. `heard` nil is a pick whose pitch could not be told: not held against him.
+    /// Otherwise the pitch class must match within half a semitone, so the octave the detector lands in does not matter.
+    static func pitchMatches(expected: Int?, heard: Double?) -> Bool {
+        guard let e = expected, let h = heard else { return true }
+        let d = (h - Double(e)).truncatingRemainder(dividingBy: 12)
+        let m = d < 0 ? d + 12 : d
+        return m < 0.5 || m > 11.5
+    }
+
     /// Scores a run. `played` are onset times already moved by the calibration, on the same clock as the notes.
     /// Played notes outside [first note - window, last note + window] are not counted as extra.
     static func score(notes: [Exercise.Note], played: [Onset], window: Double, rule: ScoringRule = .standard,
@@ -160,7 +174,8 @@ enum Scoring {
         let m = match(expected: exp, played: times, window: window)
         let gap = gaps(exp)
         var errors: [Double?] = []
-        var hits = 0, w20 = 0, w40 = 0, full = 0
+        var hits = 0, w20 = 0, w40 = 0, full = 0, wrongPitch = 0
+        var wrong = [Bool](repeating: false, count: notes.count)
         var credit = 0.0
         var fullSum = 0.0, zeroSum = 0.0
         var matched: [Double] = []
@@ -174,7 +189,9 @@ enum Scoring {
             matched.append(ms)
             hits += 1
             let a = abs(ms)
-            let c = config.credit(errorMs: ms, gap: gap[i])
+            let right = pitchMatches(expected: notes[i].pitch, heard: played[j].pitch)
+            if !right { wrongPitch += 1; wrong[i] = true }
+            let c = right ? config.credit(errorMs: ms, gap: gap[i]) : 0
             credit += c
             if c >= 0.999 { full += 1 }
             if a <= rule.tightMs { w20 += 1 }
@@ -217,7 +234,7 @@ enum Scoring {
                            extra: extra, errors: errors, meanError: mean, spread: spread,
                            accentsLanded: landed, accentBeats: beats, score: min(100, max(0, s)), passMark: rule.passMark,
                            full: full, fullMs: exp.isEmpty ? 0 : fullSum / n, zeroMs: exp.isEmpty ? 0 : zeroSum / n,
-                           extraOffsets: extraOffsets)
+                           extraOffsets: extraOffsets, wrongPitch: wrongPitch, wrongNotes: wrong)
     }
 
     /// Adds a pick heard to the run's list, unless it is the same pick heard twice (0.2.2). Two onsets closer than
@@ -246,11 +263,11 @@ enum Scoring {
     /// 20 to 30, a beginner 40 to 60.
     static func band(spreadMs: Double) -> String {
         switch spreadMs {
-        case ..<15: return L.bandLocked
-        case ..<25: return L.bandTight
-        case ..<40: return L.bandGood
-        case ..<60: return L.bandLoose
-        default: return L.bandRough
+        case ..<15: return "Locked"
+        case ..<25: return "Tight"
+        case ..<40: return "Good"
+        case ..<60: return "Loose"
+        default: return "Rough"
         }
     }
 

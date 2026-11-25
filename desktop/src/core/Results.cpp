@@ -75,6 +75,17 @@ juce::var SessionResult::toVar() const
     for (int x : extraOffsetsMs) offs.add (x);
     o->setProperty ("extraOffsetsMs", offs);
     if (device.isNotEmpty()) o->setProperty ("device", device);
+    if (tempoMode.isNotEmpty()) o->setProperty ("tempoMode", tempoMode);
+    if (! tempoChanges.empty()) { juce::Array<juce::var> a; for (auto& c : tempoChanges) a.add (c.toVar()); o->setProperty ("tempoChanges", a); }
+    if (! tempoSteps.empty()) { juce::Array<juce::var> a; for (auto& t : tempoSteps) a.add (t.toVar()); o->setProperty ("tempoSteps", a); }
+    if (breaks) o->setProperty ("breaks", *breaks);
+    if (breakSeconds) o->setProperty ("breakSeconds", *breakSeconds);
+    if (earnedSeconds) o->setProperty ("earnedSeconds", *earnedSeconds);
+    if (elapsedSeconds) o->setProperty ("elapsedSeconds", *elapsedSeconds);
+    if (bestStreakSeconds) o->setProperty ("bestStreakSeconds", *bestStreakSeconds);
+    if (wrongPitch) o->setProperty ("wrongPitch", *wrongPitch);
+    if (tuning.isNotEmpty()) o->setProperty ("tuning", tuning);
+    if (routineRunID.isNotEmpty()) o->setProperty ("routineRunID", routineRunID);
     return juce::var (o);
 }
 
@@ -119,6 +130,17 @@ std::optional<SessionResult> SessionResult::fromVar (const juce::var& v)
     if (isNum (v["doubles"])) r.doubles = (int) v["doubles"];
     if (auto* a = v["extraOffsetsMs"].getArray()) for (auto& x : *a) if (isNum (x)) r.extraOffsetsMs.push_back ((int) x);
     r.device = v["device"].toString();
+    r.tempoMode = v["tempoMode"].toString();
+    if (auto* a = v["tempoChanges"].getArray()) for (auto& x : *a) r.tempoChanges.push_back (TempoChange::fromVar (x));
+    if (auto* a = v["tempoSteps"].getArray()) for (auto& x : *a) r.tempoSteps.push_back (TempoStep::fromVar (x));
+    if (isNum (v["breaks"])) r.breaks = (int) v["breaks"];
+    if (isNum (v["breakSeconds"])) r.breakSeconds = (double) v["breakSeconds"];
+    if (isNum (v["earnedSeconds"])) r.earnedSeconds = (double) v["earnedSeconds"];
+    if (isNum (v["elapsedSeconds"])) r.elapsedSeconds = (double) v["elapsedSeconds"];
+    if (isNum (v["bestStreakSeconds"])) r.bestStreakSeconds = (double) v["bestStreakSeconds"];
+    if (isNum (v["wrongPitch"])) r.wrongPitch = (int) v["wrongPitch"];
+    r.tuning = v["tuning"].toString();
+    r.routineRunID = v["routineRunID"].toString();
     return r;
 }
 
@@ -176,7 +198,14 @@ std::optional<int> fastestPass (const std::vector<SessionResult>& results, const
 
 namespace Library {
 
-std::optional<std::vector<Drill>> decodeDrills (const juce::var& file)
+std::vector<Drill> active (const std::vector<Drill>& list)
+{
+    std::vector<Drill> out;
+    for (auto& d : list) if (! d.archived) out.push_back (d);
+    return out;
+}
+
+std::optional<std::vector<Drill>> decodeDrills (const juce::var& file, bool includeArchived)
 {
     if (! file.isObject() || (int) file.getProperty ("schema", 1) > supportedSchema) return std::nullopt;
     auto* list = file["exercises"].getArray();
@@ -184,7 +213,7 @@ std::optional<std::vector<Drill>> decodeDrills (const juce::var& file)
     std::vector<Drill> out;
     for (auto& e : *list)
         if (auto d = Drill::fromVar (e); d && d->schema <= supportedSchema) out.push_back (*d);
-    return out;
+    return includeArchived ? out : active (out);
 }
 
 std::optional<CatalogContents> read (const juce::File& folder)
@@ -217,7 +246,12 @@ CatalogContents load (const juce::File& bundled, const juce::File& cached, const
     auto add = [&] (const std::vector<Drill>& list) {
         for (auto& d : list) { if (! byID.count (d.id)) order.push_back (d.id); byID[d.id] = d; }
     };
-    for (auto& folder : { bundled, cached })
+    // A newer app brings a newer catalog than the one pulled before it: the old pull is not read (it would bring
+    // back drills the new one has archived).
+    std::vector<juce::File> folders { bundled };
+    const auto bv = read (bundled), cv = read (cached);
+    if (! bv || (cv && cv->version >= bv->version)) folders.push_back (cached);
+    for (auto& folder : folders)
         if (auto c = read (folder))
         {
             add (c->drills);

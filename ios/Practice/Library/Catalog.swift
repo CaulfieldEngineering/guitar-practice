@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // The drill catalog. The same folder layout everywhere:
 //   index.json                 {"schema": 1, "version": 7, "files": [{"path": "exercises/right-hand.json", "kind": "exercises"}, ...]}
@@ -84,10 +87,27 @@ enum Library {
 
     /// The exercises in a file this app understands. A file with a newer schema is refused; an exercise inside it
     /// that asks for a newer schema (`"schema": 2`) or does not decode is skipped.
-    static func decodeExercises(_ data: Data) throws -> [Exercise] {
+    /// An archived drill is skipped too: it stays in the catalog, with his runs, to come back (Joe, 2026-11-24:
+    /// "Let's remove all drills for now except for 'Triplets to 16th's, 4+4'").
+    static func decodeExercises(_ data: Data, includeArchived: Bool = false) throws -> [Exercise] {
         let f = try JSONDecoder().decode(ExercisesFile.self, from: data)
         guard f.schema <= supportedSchema else { throw LibraryError.newerSchema(f.schema) }
-        return f.exercises.compactMap(\.value).filter { $0.schema <= supportedSchema }
+        let all = f.exercises.compactMap(\.value).filter { $0.schema <= supportedSchema }
+        return includeArchived ? all : active(all)
+    }
+
+    /// The drill catalog filter: what is offered.
+    static func active(_ list: [Exercise]) -> [Exercise] { list.filter { !$0.archived } }
+
+    /// The folders to read, oldest first: the app's own catalog, then the one pulled from the drill server, unless
+    /// the app's is newer (a new build brings a newer catalog than the one pulled before it, and the old one would
+    /// bring back the drills the new one has archived).
+    static func folders(bundled: URL?, cache: URL) -> [URL] {
+        func version(_ u: URL) -> Int {
+            (try? Data(contentsOf: u.appendingPathComponent("index.json"))).flatMap { try? decodeIndex($0) }?.version ?? -1
+        }
+        guard let bundled else { return [cache] }
+        return version(cache) >= version(bundled) ? [bundled, cache] : [bundled]
     }
 
     static func decodeRoutines(_ data: Data) throws -> [Routine] {
@@ -159,7 +179,7 @@ enum Library {
         var exLists: [[Exercise]] = [], roLists: [[Routine]] = []
         var zones: TempoZones?
         var scoring: ScoringConfig?
-        for folder in [bundledFolder, cacheFolder].compactMap({ $0 }) {
+        for folder in folders(bundled: bundledFolder, cache: cacheFolder) {
             if let c = read(folder: folder) {
                 exLists.append(c.exercises); roLists.append(c.routines); zones = c.zones ?? zones; scoring = c.scoring ?? scoring
             }
@@ -168,7 +188,7 @@ enum Library {
         for f in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where f.pathExtension == "json" {
             if let d = try? Data(contentsOf: f), let list = try? decodeExercises(d) { exLists.append(list) }
         }
-        let ex = merge(exLists, id: \.id)
+        let ex = active(merge(exLists, id: \.id))
         let ro = merge(roLists, id: \.name)
         return Contents(exercises: ex.isEmpty ? [Exercise.fallback] : ex, routines: ro, zones: zones ?? .standard,
                         scoring: scoring ?? .standard)
@@ -185,7 +205,9 @@ enum DrillServer {
         let c = URLSessionConfiguration.ephemeral
         c.timeoutIntervalForRequest = timeout
         c.timeoutIntervalForResource = timeout * 3
+        #if !canImport(FoundationNetworking)
         c.waitsForConnectivity = false
+        #endif
         return URLSession(configuration: c)
     }
 

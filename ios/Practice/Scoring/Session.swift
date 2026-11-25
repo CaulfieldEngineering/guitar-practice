@@ -4,7 +4,14 @@ import Foundation
 struct SessionSettings: Codable, Equatable, Hashable {
     /// `routine` is a drill made of timed blocks (Exercise.segments): `cycles` is then its number of rounds and
     /// `ladderStep` how much faster each round is.
-    enum Kind: String, Codable, CaseIterable { case cycles, duration, endurance, routine }
+    /// `challenge` (2026-11-24): the clock counts only while the accuracy holds at `targetPercent`; done when it has
+    /// counted `seconds`, or after `capSeconds` in all (0 is no cap).
+    enum Kind: String, Codable, CaseIterable { case cycles, duration, endurance, routine, challenge }
+    /// The click's accent: on beat 1 of the bar, on each beat where the notes per beat change (the start of the
+    /// triplets and of the sixteenths), or none.
+    enum Accent: String, Codable, CaseIterable { case one, groups, off }
+    /// The click's sound.
+    enum ClickSound: String, Codable, CaseIterable { case click, wood, beep, rim }
     var kind: Kind = .cycles
     /// Cycles mode: how many times through the pattern.
     var cycles: Int = 4
@@ -17,8 +24,23 @@ struct SessionSettings: Codable, Equatable, Hashable {
     var toleranceMs: Double = 30
     /// Endurance: the accuracy is taken over this many cycles in a row.
     var windowCycles: Int = 2
-    /// Ladder: this much faster after each passed cycle (0 is off).
+    /// Ladder: this much faster after each passed cycle (0 is off). Before 0.3.0; still read, and still played when
+    /// the tempo plan is off. New runs use `tempoPlan`.
     var ladderStep: Int = 0
+    /// Ascending tempo (0.3.0): per loop, or by accuracy with up, down and break thresholds.
+    var tempoPlan = TempoPlan()
+    /// Challenge: no more than this many seconds in all (0 is no cap).
+    var capSeconds: Int = 0
+    /// Bars of count-in before the first note (0 to 4).
+    var countInBars: Int = 1
+    var accent: Accent = .one
+    var clickSound: ClickSound = .click
+    /// The click's level, 0 to 1.
+    var clickLevel: Double = 1
+    /// The gap trainer: the click is muted on every `gapEvery`th bar (0 is off); the notes go on and are scored.
+    var gapEvery: Int = 0
+    /// A tuning for this drill or block only; nil is the guitar's (Settings).
+    var tuning: Tuning?
 
     init() {}
     init(from d: Decoder) throws {
@@ -30,7 +52,18 @@ struct SessionSettings: Codable, Equatable, Hashable {
         toleranceMs = try c.decodeIfPresent(Double.self, forKey: .toleranceMs) ?? 30
         windowCycles = try c.decodeIfPresent(Int.self, forKey: .windowCycles) ?? 2
         ladderStep = try c.decodeIfPresent(Int.self, forKey: .ladderStep) ?? 0
+        tempoPlan = (try? c.decodeIfPresent(TempoPlan.self, forKey: .tempoPlan)) ?? TempoPlan()
+        capSeconds = try c.decodeIfPresent(Int.self, forKey: .capSeconds) ?? 0
+        countInBars = try c.decodeIfPresent(Int.self, forKey: .countInBars) ?? 1
+        accent = (try? c.decodeIfPresent(Accent.self, forKey: .accent)) ?? .one
+        clickSound = (try? c.decodeIfPresent(ClickSound.self, forKey: .clickSound)) ?? .click
+        clickLevel = try c.decodeIfPresent(Double.self, forKey: .clickLevel) ?? 1
+        gapEvery = try c.decodeIfPresent(Int.self, forKey: .gapEvery) ?? 0
+        tuning = try? c.decodeIfPresent(Tuning.self, forKey: .tuning)
     }
+
+    /// Whether the run's length is set by the player (loops or time) or ends by itself (hold, challenge).
+    var endsItself: Bool { kind == .endurance || kind == .challenge }
 
     /// How a drill of timed blocks starts out: its rounds, and how much faster each round is.
     static func routine(rounds: Int, step: Int) -> SessionSettings {
@@ -79,20 +112,52 @@ enum RunBuilder {
     /// timed run). `guided` adds a pluck for every note, louder on accents and on the first note after the number of
     /// notes in a beat changes (the switch from triplets to sixteenths is heard).
     /// `subdivision` above 1 adds quiet clicks between the beats (a block of a timed routine played solo).
+    /// The click's options for a cycle: where it accents, and which bars it leaves out (the gap trainer).
+    struct ClickOptions: Equatable {
+        var accent: SessionSettings.Accent = .one
+        var gapEvery: Int = 0
+        /// A note's pitch from its string and fret (the tuning in use); nil for an X note.
+        var tuning: Tuning = .standard
+        var pitchFree = false
+        init(accent: SessionSettings.Accent = .one, gapEvery: Int = 0, tuning: Tuning = .standard, pitchFree: Bool = false) {
+            self.accent = accent; self.gapEvery = gapEvery; self.tuning = tuning; self.pitchFree = pitchFree
+        }
+        init(_ s: SessionSettings, tuning: Tuning, pitchFree: Bool) {
+            self.init(accent: s.accent, gapEvery: s.gapEvery, tuning: tuning, pitchFree: pitchFree)
+        }
+    }
+
+    /// Whether bar `bar` (counted from 0, from the first note) is a gap: every `every`th bar is muted.
+    static func isGap(bar: Int, every: Int) -> Bool { every >= 2 && bar >= 0 && (bar + 1) % every == 0 }
+
     static func cycle(_ ex: Exercise, index: Int, start: Double, bpm: Double, guided: Bool, limit: Double? = nil,
-                      subdivision: Int = 1) -> CycleSlot {
+                      subdivision: Int = 1, options: ClickOptions = ClickOptions()) -> CycleSlot {
         let beat = 60 / max(1, bpm)
         let duration = Double(ex.cycleBeats) * beat
         let cap = limit.map { $0 - start } ?? duration
         let seconds = min(duration, cap)
         var notes = ex.notes(bpm: bpm, start: start, seconds: seconds)
-        for i in notes.indices { notes[i].beat += index * ex.cycleBeats }
+        for i in notes.indices {
+            notes[i].beat += index * ex.cycleBeats
+            notes[i].pitch = options.pitchFree || notes[i].x ? nil : options.tuning.pitch(string: notes[i].string, fret: notes[i].fret)
+        }
         var events: [TimedEvent] = []
         let beatsInRun = Int((seconds / beat - 1e-9).rounded(.up))
+        let sizes = groupSizes(ex)
+        let perBar = max(1, ex.beatsPerBar)
         for b in 0..<max(0, beatsInRun) {
             let global = index * ex.cycleBeats + b
-            let inBar = global % max(1, ex.beatsPerBar)
-            events.append(TimedEvent(time: start + Double(b) * beat, kind: inBar == 0 ? .accent : .beat, beat: inBar))
+            let inBar = global % perBar
+            if isGap(bar: global / perBar, every: options.gapEvery) { continue }
+            let accented: Bool
+            switch options.accent {
+            case .one: accented = inBar == 0
+            case .off: accented = false
+            case .groups:
+                let local = b % sizes.count
+                accented = sizes[local] != sizes[(local - 1 + sizes.count) % sizes.count] || (sizes.count == 1 && inBar == 0)
+            }
+            events.append(TimedEvent(time: start + Double(b) * beat, kind: accented ? .accent : .beat, beat: inBar))
             if subdivision > 1 {
                 for s in 1..<subdivision {
                     let t = (Double(b) + Double(s) / Double(subdivision)) * beat
@@ -101,14 +166,14 @@ enum RunBuilder {
             }
         }
         if guided {
-            let sizes = groupSizes(ex)
             for n in notes {
+                if isGap(bar: n.beat / perBar, every: options.gapEvery) { continue }
                 let local = n.beat - index * ex.cycleBeats
                 let prev = sizes[(local - 1 + sizes.count) % sizes.count]
                 let first = n.time - start - Double(local) * beat < 1e-6
                 let changed = first && sizes[local % sizes.count] != prev && prev > 0
                 events.append(TimedEvent(time: n.time, kind: n.accent || changed ? .pluckAccent : .pluck,
-                                         pitch: GuitarBank.pitch(string: n.string, fret: n.fret), up: n.pick == .up))
+                                         pitch: n.pitch ?? GuitarBank.pitch(string: n.string, fret: n.fret), up: n.pick == .up))
             }
         }
         events.sort { $0.time < $1.time }

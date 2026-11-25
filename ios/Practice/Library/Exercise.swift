@@ -30,17 +30,27 @@ struct NoteSpec: Codable, Equatable, Hashable {
     var fret: Int?
     var pick: PickDirection?
     var accent: Bool = false
+    /// An X note (2026-11-24; Joe: "start using an X where correct note doesn't care"): any pitch, or a muted chug,
+    /// is right; only the timing is scored. Written `"x": true` or `"fret": "x"`; a note with no fret is one too.
+    var x: Bool = false
 
-    init(at: GridPosition, string: Int? = nil, fret: Int? = nil, pick: PickDirection? = nil, accent: Bool = false) {
-        self.at = at; self.string = string; self.fret = fret; self.pick = pick; self.accent = accent
+    init(at: GridPosition, string: Int? = nil, fret: Int? = nil, pick: PickDirection? = nil, accent: Bool = false, x: Bool = false) {
+        self.at = at; self.string = string; self.fret = fret; self.pick = pick; self.accent = accent; self.x = x || fret == nil
     }
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         at = try c.decode(GridPosition.self, forKey: .at)
         string = try c.decodeIfPresent(Int.self, forKey: .string)
-        fret = try c.decodeIfPresent(Int.self, forKey: .fret)
+        var marked = false
+        if let f = try? c.decodeIfPresent(Int.self, forKey: .fret) {
+            fret = f
+        } else if let f = try? c.decodeIfPresent(String.self, forKey: .fret), f.lowercased() == "x" {
+            fret = nil
+            marked = true
+        }
         pick = try c.decodeIfPresent(PickDirection.self, forKey: .pick)
         accent = try c.decodeIfPresent(Bool.self, forKey: .accent) ?? false
+        x = (try c.decodeIfPresent(Bool.self, forKey: .x) ?? false) || marked || fret == nil
     }
 }
 
@@ -126,12 +136,18 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
     var stepBPM: Int = 0
     var subdivision: Int = 1
     var countInBeats: Int = 4
+    /// Kept in the catalog but not offered (2026-11-24: every drill but the triplets one). His runs of it stay.
+    var archived = false
+    /// `"pitch": "x"`: every note is an X note, scored on timing only (a rhythm drill).
+    var pitchFree = false
 
     var isRoutine: Bool { !segments.isEmpty }
+    /// Whether any note asks for a pitch (then the input listens for pitch too).
+    var hasPitchedNotes: Bool { !pitchFree && notes.contains { !$0.x } }
 
     private enum CodingKeys: String, CodingKey {
         case schema, version, id, name, detail, intro, category, beatsPerBar, cycleBeats, notes, groups, accent, tempo, scoring, session, levels
-        case segments, rounds, stepBPM, subdivision, countInBeats, pattern, short, say
+        case segments, rounds, stepBPM, subdivision, countInBeats, pattern, short, say, archived, pitch
     }
 
     init(id: String, name: String, detail: String = "", category: String = "Right hand", beatsPerBar: Int = 4,
@@ -156,6 +172,8 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
         stepBPM = step
         subdivision = sub
         countInBeats = try c.decodeIfPresent(Int.self, forKey: .countInBeats) ?? 4
+        archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? false
+        pitchFree = (try? c.decodeIfPresent(String.self, forKey: .pitch))?.lowercased() == "x"
         session = try c.decodeIfPresent(SessionSettings.self, forKey: .session)
             ?? (blocks.isEmpty ? SessionSettings() : SessionSettings.routine(rounds: roundCount, step: step))
         levels = try c.decodeIfPresent([Level].self, forKey: .levels) ?? []
@@ -207,6 +225,8 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
         try c.encode(session, forKey: .session); try c.encode(levels, forKey: .levels)
         if !short.isEmpty { try c.encode(short, forKey: .short) }
         if !say.isEmpty { try c.encode(say, forKey: .say) }
+        if archived { try c.encode(true, forKey: .archived) }
+        if pitchFree { try c.encode("x", forKey: .pitch) }
         if !segments.isEmpty {
             try c.encode(segments, forKey: .segments); try c.encode(rounds, forKey: .rounds); try c.encode(stepBPM, forKey: .stepBPM)
             try c.encode(subdivision, forKey: .subdivision); try c.encode(countInBeats, forKey: .countInBeats)
@@ -275,6 +295,10 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
         var pick: PickDirection? = nil
         var string: Int? = nil
         var fret: Int? = nil
+        /// Any pitch is right.
+        var x: Bool = true
+        /// The pitch asked for (MIDI, in the tuning in use); nil for an X note. Set when the run is built.
+        var pitch: Int? = nil
     }
 
     /// Every note of a run of `seconds` from `start` (seconds) at `bpm`; whole cycles and a partial last one,
@@ -290,7 +314,7 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
                 let b = Double(cycle * cycleBeats) + n.at.beats
                 if b >= totalBeats - 1e-9 { break }
                 out.append(Note(time: start + b * beat, accent: n.accent, beat: cycle * cycleBeats + n.at.beat,
-                                pick: n.pick, string: n.string, fret: n.fret))
+                                pick: n.pick, string: n.string, fret: n.fret, x: pitchFree || n.x))
             }
             cycle += 1
         }
@@ -315,6 +339,11 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
 
 extension Exercise {
     /// Used only if no exercise file could be read.
-    static let fallback = Exercise(id: "alt8", name: "Alternate picking, eighths", detail: "Two notes a beat, down up.",
-                                   cycleBeats: 1, notes: expand(groups: [2], accentFirst: false), tempo: TempoRule(start: 120))
+    static let fallback: Exercise = {
+        var e = Exercise(id: "trip16x4", name: "Triplets to sixteenths, 4 and 4", detail: "Four beats of triplets, then four beats of sixteenths.",
+                         cycleBeats: 8, notes: expand(groups: [3, 3, 3, 3, 4, 4, 4, 4], accentFirst: false), tempo: TempoRule(start: 80, min: 40, max: 200))
+        e.short = "Triplets to 16ths, 4+4"
+        e.pitchFree = true
+        return e
+    }()
 }

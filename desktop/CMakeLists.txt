@@ -29,10 +29,14 @@ set(PRACTICE_CORE
     src/core/Drill.cpp
     src/core/OnsetDetector.cpp
     src/core/Results.cpp
+    src/core/TempoPlan.cpp
+    src/core/RoutineClock.cpp
+    src/core/PitchDetector.cpp
     src/engine/DeviceController.cpp
     src/engine/AudioEngine.cpp
     src/app/Store.cpp
-    src/app/Sync.cpp)
+    src/app/Sync.cpp
+    src/app/Routines.cpp)
 
 set(PRACTICE_DEFS
     PRACTICE_VERSION="${PRACTICE_VERSION}"
@@ -68,12 +72,15 @@ juce_generate_juce_header(Practice)
 target_sources(Practice PRIVATE
     ${PRACTICE_CORE}
     src/app/Model.cpp
+    src/app/RoutineRunner.cpp
     src/app/Voice.cpp
     src/ui/Theme.cpp
     src/ui/Widgets.cpp
+    src/ui/Widgets2.cpp
     src/ui/Screens.cpp
     src/ui/RunScreens.cpp
     src/ui/SettingsScreens.cpp
+    src/ui/RoutineScreens.cpp
     src/ui/MainComponent.cpp
     src/Main.cpp)
 target_compile_definitions(Practice PRIVATE ${PRACTICE_DEFS}
@@ -88,7 +95,7 @@ endif()
 # ---- the tests: scoring parity with the shared vectors, the detector, device picks under stress, sync ----
 juce_add_console_app(PracticeTests PRODUCT_NAME "PracticeTests")
 juce_generate_juce_header(PracticeTests)
-target_sources(PracticeTests PRIVATE ${PRACTICE_CORE} tests/Tests.cpp)
+target_sources(PracticeTests PRIVATE ${PRACTICE_CORE} tests/Tests.cpp tests/PlanTests.cpp)
 target_compile_definitions(PracticeTests PRIVATE ${PRACTICE_DEFS}
     PRACTICE_REPO="${CMAKE_CURRENT_SOURCE_DIR}/.."
     JUCE_APPLICATION_NAME_STRING="PracticeTests" JUCE_APPLICATION_VERSION_STRING="${PRACTICE_VERSION}")

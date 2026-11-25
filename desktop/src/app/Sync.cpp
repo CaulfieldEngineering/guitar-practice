@@ -207,7 +207,9 @@ void SyncWorker::pass()
     // 3. the catalog and the voice
     auto pull = reached ? DrillServer::pullCatalog (b, paths.catalogCache(), catalogVersion ? catalogVersion() : 0) : DrillServer::Pull::unreachable;
     const bool voice = reached && DrillServer::pullVoice (b, paths.voiceCache(), voiceVersion ? voiceVersion() : 0);
-    // 4. a newer desktop build
+    // 4. routines, routine runs and settings
+    if (reached && extra) extra (b);
+    // 5. a newer desktop build
     juce::var update;
     if (reached)
     {

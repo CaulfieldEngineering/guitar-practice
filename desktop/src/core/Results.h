@@ -33,8 +33,21 @@ struct SessionResult {
     std::optional<int> doubles;
     std::vector<int> extraOffsetsMs;
     juce::String device;      // desktop only: which computer ("JPC", "MINI-PC"); the phone ignores it
+    // 0.3.0: the tempo plan and its curve, breaks, Challenge, wrong pitches, the routine run it was a block of
+    juce::String tempoMode;   // "perLoop", "accuracy"; empty: the tempo did not move by plan
+    std::vector<TempoChange> tempoChanges;
+    std::vector<TempoStep> tempoSteps;
+    std::optional<int> breaks;
+    std::optional<double> breakSeconds, earnedSeconds, elapsedSeconds, bestStreakSeconds;
+    std::optional<int> wrongPitch;
+    juce::String tuning, routineRunID;
 
-    double bestValue() const { return mode == "endurance" ? sustainedSeconds.value_or (0) : (double) score; }
+    double bestValue() const
+    {
+        if (mode == "endurance") return sustainedSeconds.value_or (0);
+        if (mode == "challenge") return earnedSeconds.value_or (0);
+        return (double) score;
+    }
     juce::var toVar() const;
     static std::optional<SessionResult> fromVar (const juce::var& v);
     static juce::String isoDate (juce::Time t);
@@ -61,7 +74,9 @@ namespace Library {
     constexpr int supportedSchema = 1;
     /// The drills in a file this app understands; a newer file is refused (nullopt), a drill that does not decode or
     /// asks for a newer schema is skipped alone.
-    std::optional<std::vector<Drill>> decodeDrills (const juce::var& file);
+    std::optional<std::vector<Drill>> decodeDrills (const juce::var& file, bool includeArchived = false);
+    /// The drill catalog filter: what is offered (archived drills stay in the file, with his runs, to come back).
+    std::vector<Drill> active (const std::vector<Drill>& list);
     /// Reads one catalog folder; nullopt when its index is missing or unreadable.
     std::optional<CatalogContents> read (const juce::File& folder);
     /// The bundled catalog, then the cached one pulled from the drill server, then the user folder; the same id later

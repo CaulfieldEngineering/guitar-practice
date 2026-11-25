@@ -87,6 +87,12 @@ public:
     std::atomic<float> guitarGain { 0.7f };
     std::atomic<float> soundsGain { 0.8f };   // clicks, guide and voice
     std::atomic<float> clickGain { 1.0f };
+    /// The metronome's click sound (0.3.0); a run's events carry their own.
+    std::atomic<int> metroSound { 0 };
+    /// The input just heard, for telling a pick's pitch (a drill with pitched notes): copies the samples from engine
+    /// frame `from` into `out` when they are all there and not yet overwritten.
+    bool readInput (juce::int64 from, int count, float* out) const;
+    juce::int64 inputFrames() const { return historyEnd.load(); }
 
     // ---- sounds made in code ----
     std::vector<float> makeClick (ClickKind kind) const;
@@ -139,7 +145,9 @@ private:
     int voiceStopSeen = 0;
 
     std::array<Voice, 64> voices;
-    std::array<std::vector<float>, 9> clicks;   // by ClickKind
+    std::array<std::vector<float>, clickKindCount> clicks;   // by ClickKind
+    std::vector<float> history;                     // the last two seconds of input, mono (pitch)
+    std::atomic<juce::int64> historyEnd { 0 };
 
     // metronome
     std::atomic<bool> metroOn { false };

@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "about": "The starter routine of the Routines section (2026-11-24). A phone or computer with no routines of its own gets it from the drill server; once changed, the changed one is his and lives in data/routines.json on the mini PC.",
+  "routines": [
+    {
+      "id": "5f0c9a52-7e1b-4d3a-9b6e-3c2a1d0e8f11",
+      "name": "Picking session",
+      "updatedAt": "2026-11-24T00:00:00Z",
+      "blocks": [
+        { "id": "a1f0c0de-0001-4000-8000-000000000001", "kind": "warmup", "name": "Warm-up", "seconds": 180, "click": true, "bpm": 80 },
+        { "id": "a1f0c0de-0002-4000-8000-000000000002", "kind": "drill", "name": "Triplets to 16ths, 4+4", "drillID": "trip16x4",
+          "drill": { "bpm": 90, "guided": false, "audioInput": true,
+            "session": { "kind": "duration", "seconds": 300, "targetPercent": 85, "windowCycles": 2,
+              "tempoPlan": { "mode": "perLoop", "endBPM": 120, "step": 4, "every": 2, "everyUnit": "loops", "atTop": "hold" } } } },
+        { "id": "a1f0c0de-0003-4000-8000-000000000003", "kind": "rest", "name": "Break", "seconds": 60 },
+        { "id": "a1f0c0de-0004-4000-8000-000000000004", "kind": "drill", "name": "Challenge", "drillID": "trip16x4",
+          "drill": { "bpm": 100, "guided": false, "audioInput": true,
+            "session": { "kind": "challenge", "seconds": 180, "targetPercent": 90, "windowCycles": 2, "capSeconds": 600 } } },
+        { "id": "a1f0c0de-0005-4000-8000-000000000005", "kind": "free", "name": "Open practice", "seconds": 180, "click": false, "bpm": 90 }
+      ]
+    }
+  ]
+}

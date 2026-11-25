@@ -3,6 +3,8 @@ import Foundation
 struct Onset: Equatable {
     var time: Double      // seconds, on the clock the samples were stamped with
     var strength: Float   // peak energy just after the attack, for accents
+    /// The pitch heard (MIDI, fractional), when the drill asks for pitches and it could be told; nil otherwise.
+    var pitch: Double? = nil
 }
 
 /// Finds pick attacks in a guitar signal. A gentle high-pass (the pick's click, not the string's hum), energy in

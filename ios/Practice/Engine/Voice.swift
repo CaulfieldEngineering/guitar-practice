@@ -213,6 +213,8 @@ enum IntroText {
             out.append(Part(key: "rounds.\(s.cycles)", text: s.cycles == 1 ? "1 round." : "\(s.cycles) rounds."))
         case .endurance:
             out.append(scored ? Part(key: "endurance", text: "Endurance.") : Part(key: "open", text: "Open."))
+        case .challenge:
+            out.append(Part(key: "time.\(s.seconds)", text: spokenTime(Double(s.seconds)) + "."))
         }
         return out
     }

@@ -32,6 +32,7 @@ struct ScoringRule {
 struct Onset {
     double time = 0;     // seconds on the run's clock (calibration applied once it is in the run's list)
     float strength = 0;  // peak energy just after the attack
+    std::optional<double> pitch;   // MIDI, fractional; when the drill asks for pitches and it could be told
 };
 
 enum class Pick { none, down, up };
@@ -44,6 +45,8 @@ struct Note {
     Pick pick = Pick::none;
     int string = 0;      // 1 is high E; 0 when the drill names none
     int fret = -1;
+    bool x = true;       // any pitch is right (an X note: timing only)
+    std::optional<int> pitch;   // the pitch asked for (MIDI, in the tuning in use); none for an X note
 };
 
 struct ScoreResult {
@@ -56,6 +59,8 @@ struct ScoreResult {
     int full = 0;
     double fullMs = 0, zeroMs = 0;
     std::vector<double> extraOffsets;
+    int wrongPitch = 0;              // pitched notes played on the wrong pitch: no credit
+    std::vector<char> wrongNotes;    // per note
 
     int pct (int k) const;
     int pct20() const { return pct (within20); }
@@ -80,6 +85,9 @@ namespace Scoring {
     std::vector<Onset> dropDoubles (const std::vector<Onset>& list, double within, float weakerThan = 0.5f);
     /// "Locked", "Tight", "Good", "Loose" or "Rough", from the spread in ms.
     std::string band (double spreadMs);
+    /// Whether a heard pitch is the note asked for (shared/scoring.mjs pitchMatches): an X note or an unknown pitch
+    /// always is; otherwise the pitch class within half a semitone (the octave does not matter).
+    bool pitchMatches (std::optional<int> expected, std::optional<double> heard);
 
     struct Calibration { double offset, spread; int hits; };
     std::optional<Calibration> calibration (const std::vector<double>& clicks, const std::vector<double>& played);

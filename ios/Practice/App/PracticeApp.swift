@@ -7,7 +7,9 @@ struct PracticeApp: App {
     @StateObject private var player: Player
     @StateObject private var playAlong: PlayAlong
     @StateObject private var history: History
-    @StateObject private var store = RoutineStore()
+    @StateObject private var routines = PracticeRoutineStore()
+    @StateObject private var routineLog: RoutineRunLog
+    @StateObject private var runner: RoutineRunner
     @StateObject private var updater = Updater()
     @StateObject private var audioSetup: AudioSetup
     @Environment(\.scenePhase) private var scenePhase
@@ -32,6 +34,9 @@ struct PracticeApp: App {
         let p = Player()
         let h = History()
         let pa = PlayAlong(player: p, history: h)
+        let log = RoutineRunLog()
+        _routineLog = StateObject(wrappedValue: log)
+        _runner = StateObject(wrappedValue: RoutineRunner(player: p, pa: pa, log: log))
         #if DEBUG
         if UserDefaults.standard.bool(forKey: "seedMax") { pa.seedMaxForScreenshots() }
         #endif
@@ -48,16 +53,19 @@ struct PracticeApp: App {
             RootView()
                 .environmentObject(player)
                 .environmentObject(playAlong)
-                .environmentObject(store)
+                .environmentObject(routines)
+                .environmentObject(routineLog)
+                .environmentObject(runner)
+                .environmentObject(TuningStore.shared)
                 .environmentObject(updater)
                 .environmentObject(history)
                 .environmentObject(player.voice)
                 .environmentObject(audioSetup)
-                .task { await updater.check() }
+                .task { await updater.check(); await TuningStore.shared.sync() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active {
                         audioSetup.resumeIfVisible()
-                        Task { await updater.check(); await history.sync() }
+                        Task { await updater.check(); await history.sync(); await routines.sync(); await routineLog.sync() }
                     }
                     if phase == .background { PracticeApp.releaseInput(player: player, setup: audioSetup) }
                 }
@@ -76,8 +84,7 @@ struct PracticeApp: App {
     /// The tab bar and the sheets' title bars in the house colours: the content's own background, a hairline, no blur.
     private static func styleBars() {
         let tab = UITabBarAppearance()
-        tab.configureWithOpaqueBackground()
-        tab.backgroundColor = Theme.uiBg
+        tab.configureWithDefaultBackground()
         tab.shadowColor = Theme.uiLine
         for item in [tab.stackedLayoutAppearance, tab.inlineLayoutAppearance, tab.compactInlineLayoutAppearance] {
             item.normal.iconColor = Theme.uiMuted
@@ -89,11 +96,14 @@ struct PracticeApp: App {
         UITabBar.appearance().scrollEdgeAppearance = tab
 
         let nav = UINavigationBarAppearance()
-        nav.configureWithOpaqueBackground()
-        nav.backgroundColor = Theme.uiBg
+        nav.configureWithDefaultBackground()
         nav.shadowColor = Theme.uiLine
+        nav.titleTextAttributes = [.font: UIFont.systemFont(ofSize: 17, weight: .semibold)]
+        let edge = UINavigationBarAppearance()
+        edge.configureWithTransparentBackground()
+        edge.titleTextAttributes = nav.titleTextAttributes
         UINavigationBar.appearance().standardAppearance = nav
-        UINavigationBar.appearance().scrollEdgeAppearance = nav
+        UINavigationBar.appearance().scrollEdgeAppearance = edge
         UINavigationBar.appearance().compactAppearance = nav
     }
 }
@@ -101,6 +111,7 @@ struct PracticeApp: App {
 struct RootView: View {
     @EnvironmentObject var player: Player
     @EnvironmentObject var updater: Updater
+    @EnvironmentObject var runner: RoutineRunner
     @State private var tab = 0
 
     var body: some View {
@@ -108,6 +119,10 @@ struct RootView: View {
             .routeNotice()
             .tint(Theme.accentText)
             .preferredColorScheme(forcedScheme)
+            // A routine runs over everything until it is closed.
+            .fullScreenCover(isPresented: Binding(get: { runner.routine != nil }, set: { if !$0 { runner.close() } })) {
+                RoutineRunView().routeNotice().tint(Theme.accentText)
+            }
             .alert(L.couldNotStartAudio, isPresented: Binding(get: { player.errorText != nil }, set: { if !$0 { player.errorText = nil } })) {
                 Button(L.ok, role: .cancel) {}
             } message: { Text(player.errorText ?? "") }
@@ -126,14 +141,18 @@ struct RootView: View {
         #endif
     }
 
-    /// Two tabs, each a line icon of the same weight (the tab bar would otherwise swap in filled ones). Drills holds
-    /// the picking drills and the timed routines; Progress and Settings are icons at the top.
+    /// Four tabs, each an outline symbol: Metronome, Drills, Routines, Progress. Settings is the gear at the top of
+    /// each tab.
     private var tabs: some View {
         TabView(selection: $tab) {
             MetronomeView()
                 .tabItem { tabLabel(L.metronome, "metronome") }.tag(0)
             DrillsView()
-                .tabItem { tabLabel(L.drills, "waveform") }.tag(1)
+                .tabItem { tabLabel(L.drills, "guitars") }.tag(1)
+            RoutinesView()
+                .tabItem { tabLabel(L.routines, "list.bullet.rectangle") }.tag(2)
+            ProgressTab()
+                .tabItem { tabLabel(L.progress, "chart.xyaxis.line") }.tag(3)
         }
     }
 

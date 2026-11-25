@@ -35,8 +35,8 @@ enum L {
     static let progress = "Progress"
 
     // MARK: Metronome
-    static let timeSignature = "Time Signature"
-    static let accentFirstBeat = "Accent First Beat"
+    static let timeSignature = "Time signature"
+    static let accentFirstBeat = "Accent first beat"
     static let subdivision = "Subdivision"
     static let tap = "Tap"
     static let tapTempo = "Tap tempo"
@@ -48,13 +48,13 @@ enum L {
     static let drillPaused = "Drill paused"
     static let routineRunning = "Routine running"
     static let playing = "Playing"
-    static func metronomeAt(_ bpm: Int) -> String { "Metronome · \(bpm) bpm" }
+    static func metronomeAt(_ bpm: Int) -> String { "Metronome at \(bpm) bpm" }
 
     // MARK: The Drills table
     static let sort = "Sort"
     static let sortDefault = "Default"
-    static let sortRecent = "Last Played"
-    static let sortMax = "Max Tempo"
+    static let sortRecent = "Last played"
+    static let sortMax = "Max tempo"
     static let sortName = "Name"
     static let columnDrill = "Drill"
     static let columnPattern = "Pattern"
@@ -63,7 +63,6 @@ enum L {
     static let columnLast = "Last"
     static func lastPlayed(_ ago: String) -> String { ago == "now" ? "just now" : "\(ago) ago" }
     static let columnBest = "Best"
-    static let noDrills = "No drills. Pull to refresh."
     static let noResults = "No results"
 
     // MARK: A drill's setup
@@ -81,25 +80,24 @@ enum L {
     static let open = "Open"
     static let rounds = "Rounds"
     static let duration = "Duration"
-    static let targetAccuracy = "Target Accuracy"
-    static let audioInput = "Audio Input"
+    static let targetAccuracy = "Target accuracy"
+    static let audioInput = "Audio input"
     static let scored = "Scored"
     static let notScored = "Not scored"
     static let options = "Options"
-    static let accuracyWindow = "Accuracy Window"
-    static let passMark = "Pass Mark"
+    static let accuracyWindow = "Accuracy window"
+    static let passMark = "Pass mark"
     static let ladder = "Ladder"
     static let ladderScoredHelp = "Speeds up after each passed cycle"
     static let ladderUnscoredHelp = "Speeds up after each cycle"
     static let click = "Click"
-    static let voiceIntro = "Voice Intro"
-    static let audioRoute = "Audio Route"
+    static let voiceIntro = "Voice intro"
+    static let audioRoute = "Audio route"
     static let chooseOutput = "Choose output"
     static let timing = "Timing"
     static let ladderOff = "Ladder off"
     static let noClick = "no click"
     static let noIntro = "no intro"
-    static let manual = "manual"
     static func cycleCount(_ n: Int) -> String { "\(n) cycle\(n == 1 ? "" : "s")" }
     static func bpmStep(_ n: Int) -> String { "+\(n) bpm" }
     static func ladderSummary(_ n: Int) -> String { "Ladder +\(n)" }
@@ -158,15 +156,15 @@ enum L {
     static func nextBeat(_ what: String) -> String { "\(what) next beat" }
     static func inBeats(_ what: String, _ beats: Int) -> String { "\(what) in \(beats)" }
     static func upNext(_ what: String) -> String { "Next: \(what)" }
-    static let accuracy = "accuracy"
+    static let accuracy = "Accuracy"
     static let cycle = "cycle"
     static let round = "round"
     static let left = "left"
     static let held = "held"
-    static let elapsed = "elapsed"
+    static let elapsed = "Elapsed"
     static let input = "Input"
-    static let early = "early"
-    static let late = "late"
+    static let early = "Early"
+    static let late = "Late"
     static let tapToPause = "Tap anywhere to pause"
     static let paused = "Paused"
     static let pausedHelp = "Resumes after a one-bar count-in."
@@ -182,9 +180,9 @@ enum L {
     // MARK: A result
     static let accuracyPassed = "Accuracy · Passed"
     static func accuracyPassMark(_ pct: Int) -> String { "Accuracy · Pass mark \(pct)%" }
-    static func heldAt(_ pct: Int) -> String { "Held at \(pct)% accuracy" }
+    static func heldAt(_ pct: Int) -> String { "held at \(pct)%" }
     static let newBest = "New best at this tempo"
-    static func newMax(_ to: Int, from: Int) -> String { from > 0 ? "New max: \(to) bpm (was \(from))" : "New max: \(to) bpm" }
+    static func newMax(_ to: Int, from: Int) -> String { from > 0 ? "New max \(to) bpm, up from \(from)" : "New max \(to) bpm" }
     static let timingPerNote = "Timing per note"
     static let statAccuracy = "Accuracy"
     static let statOnBeat = "On the Beat"
@@ -204,15 +202,15 @@ enum L {
     static func durationAndCycles(_ clock: String, _ cycles: Int) -> String {
         cycles > 0 ? "\(clock) · \(cycles) cycle\(cycles == 1 ? "" : "s")" : clock
     }
-    static let playSolo = "Play Solo"
+    static let playSolo = "Play solo"
     static let noNotes = "No notes detected"
-    static func tempoRange(_ from: Int, _ to: Int) -> String { to > from ? "\(from)–\(to) bpm" : "\(from) bpm" }
+    static func tempoRange(_ from: Int, _ to: Int) -> String { to > from ? "\(from) to \(to)" : "\(from)" }
     static func chip(guided: Bool, tempo: String) -> String { "\(guided ? "Guided" : "Solo") · \(tempo)" }
     static func unscoredTotal(_ minutes: String) -> String { "Not scored · \(minutes) total" }
 
     // MARK: Calibration
     static func calibrationStep(_ n: Int) -> String { "Calibration · \(n) of 2" }
-    static let displaySync = "Display Sync"
+    static let displaySync = "Display sync"
     static let inputSync = "Input"
     static let displaySyncHelp = "Adjust until each mark crosses the line on the click."
     static let inputSyncHelp = "Play one note as each mark crosses the line."
@@ -225,7 +223,7 @@ enum L {
     static let notes = "notes"
 
     // MARK: Progress
-    static let syncing = "Syncing…"
+    static let syncing = "Syncing"
     static func synced(pending: Int) -> String { pending == 0 ? "Synced" : "Synced · \(pending) pending" }
     static func offline(pending: Int) -> String { pending == 0 ? "Offline" : "Offline · \(pending) pending" }
     static let noRuns = "No runs yet"
@@ -246,21 +244,21 @@ enum L {
 
     // MARK: Settings
     static let sound = "Sound"
-    static let clickVolume = "Click Volume"
-    static let keepScreenOn = "Keep Screen On"
-    static let lockScreenControls = "Lock Screen Controls"
-    static let soundFooter = "Lock Screen Controls pause other apps' audio while Practice plays."
+    static let clickVolume = "Click volume"
+    static let keepScreenOn = "Keep screen on"
+    static let lockScreenControls = "Lock screen controls"
+    static let soundFooter = "Lock screen controls pause other apps' audio while Practice plays."
     static let voice = "Voice"
-    static let voiceCues = "Voice Cues"
+    static let voiceCues = "Voice cues"
     static let preview = "Preview"
     static let previewParts = [IntroText.Part(key: "say.trip16x4", text: "Triplets to sixteenths. Four and four."),
                                IntroText.Part(key: "bpm.120", text: "120."), IntroText.Part(key: "cycles.8", text: "8 cycles.")]
     static let voiceFooter = "Intros and cues use a recorded voice. The voice chosen here speaks anything it has no recording for."
     static let timingFooter = "Calibrate once for each audio setup."
     static let sync = "Sync"
-    static let updateDrills = "Update Drills"
-    static let pendingRuns = "Pending Runs"
-    static let syncNow = "Sync Now"
+    static let updateDrills = "Update drills"
+    static let pendingRuns = "Pending runs"
+    static let syncNow = "Sync now"
     static let syncFooter = "Drills and runs sync with the mini PC over Tailscale."
     static let about = "About"
     static let version = "Version"
@@ -278,7 +276,7 @@ enum L {
     static let noOutputName = "No output"
     static let pickedDevice = "The device you picked"
     static let phoneSpeaker = "iPhone Speaker"
-    static let otherOutput = "Other Output…"
+    static let otherOutput = "Other output"
     static func inputOf(_ name: String, _ n: Int) -> String { "\(name) · Input \(n)" }
     static func inputsBoth(_ name: String) -> String { "\(name) · Inputs 1 and 2" }
     static let micPosition = "Mic"
@@ -286,19 +284,19 @@ enum L {
     static func channelName(_ c: InputChannel) -> String {
         switch c { case .both: return "Inputs 1 and 2"; case .first: return "Input 1"; case .second: return "Input 2" }
     }
-    static let inputGain = "Input Gain"
+    static let inputGain = "Input gain"
     static let level = "Level"
     static func verdict(_ v: LevelVerdict) -> String {
         switch v { case .noSignal: return "No signal"; case .tooQuiet: return "Too quiet"; case .good: return "Good"; case .clipping: return "Clipping" }
     }
     static let notListening = "Not listening"
-    static let testTone = "Test Tone"
-    static let clickTest = "Click Test"
-    static let appSounds = "App Sounds"
+    static let testTone = "Test tone"
+    static let clickTest = "Click test"
+    static let appSounds = "App sounds"
     static let appSoundsFooter = "Clicks, guide and voice, against the guitar. Kept for each output."
     static let monitoring = "Monitoring"
-    static let hearGuitar = "Hear Guitar"
-    static let guitarLevel = "Guitar Level"
+    static let hearGuitar = "Hear guitar"
+    static let guitarLevel = "Guitar level"
     static let monitorBluetooth = "Bluetooth adds delay. Listen through the interface's own headphone out."
     static let monitorSpeaker = "Off on the iPhone speaker and mic, which would feed back."
     static let latency = "Latency"
@@ -310,7 +308,7 @@ enum L {
     static let notCalibrated = "Not calibrated"
     static func calibratedOn(_ ms: Int, _ date: String) -> String { "\(ms) ms, \(date)" }
     static let check = "Check"
-    static let sessionDetails = "Session Details"
+    static let sessionDetails = "Session details"
     static let category = "Category"
     static let mode = "Mode"
     static let sessionOptions = "Options"
@@ -322,11 +320,11 @@ enum L {
     static let notFound = "Not found"
     static let inputsListed = "Inputs"
     static let outputsListed = "Outputs"
-    static let sampleRate = "Sample Rate"
+    static let sampleRate = "Sample rate"
     static let channels = "Channels"
-    static let openSettings = "Open Settings"
+    static let openSettings = "Open settings"
     static let allow = "Allow"
-    static func useInput(_ n: Int) -> String { "Use Input \(n)" }
+    static func useInput(_ n: Int) -> String { "Use input \(n)" }
     static func deviceChanged(_ name: String) -> String { "Audio device changed: \(name)" }
     static func hz(_ rate: Double) -> String { "\(Int(rate.rounded())) Hz" }
 
@@ -355,11 +353,11 @@ enum L {
     static let diagOnInterface = "Sound goes to the interface"
     static let diagStepPickShokz = "Pick the Shokz under Output"
     static let diagGainZero = "Input gain is at zero"
-    static let diagStepRaiseGain = "Raise Input Gain above"
+    static let diagStepRaiseGain = "Raise the input gain above"
     static func diagOtherInput(_ n: Int) -> String { "The guitar is on Input \(n)" }
     static let diagNoSignal = "No guitar signal"
     static let diagStepPlay = "Play a few notes"
-    static let diagStepBoth = "Set Channel to Inputs 1 and 2"
+    static let diagStepBoth = "Set Channel to inputs 1 and 2"
     static let diagStepGain = "Turn up the gain knob on the interface"
     static let diagStepInst = "Use the instrument (Inst or Hi-Z) input"
     static let diagStepCable = "Check the cable and the guitar's volume knob"
