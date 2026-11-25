@@ -5,11 +5,12 @@ Joe, 2026-11-14: "Let new drills and levels be added without an iOS update. Let 
 ## Add a drill or a level (no app build needed)
 
 1. Edit `catalog/exercises/*.json` (a new file also goes in `catalog/index.json` `files`). The shape, both the `groups` shorthand and the full `notes` form, is in README.md, "How to add a drill". A level is an entry in a drill's `levels`: `{"name": "Level 5", "bpm": 110, "session": {"kind": "endurance", "targetPercent": 85, "toleranceMs": 30}}`.
-2. Give every drill a `say`: the name and the pattern, short and plain ("Triplets to sixteenths. Four and four."); the voice adds the tempo and the goal. No coaching in it (Joe, 2026-11-14: "Don't need to say keep the motions small etc"): how to play goes in `detail`, which the drill's screen shows. Also a `short` name and a `category` for the Drills table. Then `node scripts/make-voice.mjs` records the line (README.md, "The recorded voice"). Right-hand drills first (Joe: "The first games can be right hand exercises"); his source is the vault page `Databases/Training Vault/Perfect Picking Course.md`; use its names. A left-hand drill gives each note its `string` and `fret`: it shows as tablature and plays on the guide guitar (it is not yet scored for pitch).
-3. Never reuse or rename an `id`: results are kept by it. Raise the drill's own `version` when its notes change.
-4. Raise `version` in `catalog/index.json` by one. The phone only pulls a catalog with a higher number.
-5. `npm run check` and `npm test` in this repo; both must pass. Commit and push.
-6. The drill server serves the folder as it is on disk (no restart). Check with `curl http://127.0.0.1:4700/health` (`ok: true`, the new `catalogVersion`).
+2. Give every drill a `say`: the name and the pattern, short and plain ("Triplets to sixteenths. Four and four."); the voice adds the tempo and the goal. No coaching in it (Joe, 2026-11-14: "Don't need to say keep the motions small etc"): how to play goes in `detail`, which the drill's screen shows. Also a `short` name and a `category` for the Drills table. Then `node scripts/make-voice.mjs` records the line (README.md, "The recorded voice"). Right-hand drills first (Joe: "The first games can be right hand exercises"); his source is the vault page `Databases/Training Vault/Perfect Picking Course.md`; use its names. A left-hand drill gives each note its `string` and `fret`: it shows as tablature, plays on the guide guitar and is scored for pitch in his tuning.
+3. Only `trip16x4` is offered since 2026-11-24 (Joe: "Let's remove all drills for now except for 'Triplets to 16th's, 4+4'"): the others carry `"archived": true` and stay in the file with his runs. Take the flag off (and bump the index) only when he asks for a drill back. A note whose pitch does not matter is an X (`"x": true`, `"fret": "x"`, or no fret; a whole drill `"pitch": "x"`): scored on timing only. A note with a `string` and a numeric `fret` is checked for pitch in his tuning.
+4. Never reuse or rename an `id`: results are kept by it. Raise the drill's own `version` when its notes change.
+5. Raise `version` in `catalog/index.json` by one. The phone only pulls a catalog with a higher number.
+6. `npm run check` and `npm test` in this repo; both must pass. Commit and push.
+7. The drill server serves the folder as it is on disk (no restart). Check with `curl http://127.0.0.1:4700/health` (`ok: true`, the new `catalogVersion`).
 
 ## Tune how accuracy is judged (no app build needed)
 

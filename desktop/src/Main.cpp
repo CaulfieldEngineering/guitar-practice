@@ -84,9 +84,9 @@ private:
                 break;
             case 3:
             {
-                model.select ("alt8");
+                model.select (model.drills.front().id);   // the one drill offered (trip16x4, 8 beats a loop)
                 model.setAudioInput (false); model.setIntro (false); model.setGuided (true); model.setManual (true); model.setBPM (200);
-                auto s = model.session; s.kind = SessionSettings::Kind::cycles; s.cycles = 8; s.ladderStep = 0; model.setSession (s);
+                auto s = model.session; s.kind = SessionSettings::Kind::cycles; s.cycles = 2; s.ladderStep = 0; s.tempoPlan.mode = TempoPlan::Mode::off; model.setSession (s);
                 model.start();
                 check (model.phase == P::running, "an unscored run starts");
                 next();
@@ -104,7 +104,7 @@ private:
                 break;
             case 5:
             {
-                auto s = model.session; s.cycles = 12; model.setSession (s);
+                auto s = model.session; s.cycles = 3; model.setSession (s);
                 model.start();
                 next();
                 break;
@@ -117,7 +117,7 @@ private:
                 break;
             case 8:
                 if (model.phase == P::result) { check (model.unscored.has_value(), "the resumed run ends"); model.clearResult(); next(); }
-                else if (since() > 10) { check (false, "the resumed run ends"); finish(); }
+                else if (since() > 16) { check (false, "the resumed run ends"); finish(); }
                 break;
             case 9:
             {
