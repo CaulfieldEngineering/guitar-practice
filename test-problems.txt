@@ -1,0 +1,25 @@
+        XCTAssertEqual(try History.decoder.decode(SessionResult.self, from: data), r)
+2026-11-25 05:19:37.927210+0000 Practice[13508:42060] [catalog] Query for com.apple.MobileAsset.VoiceServicesVocalizerVoice failed: 2
+2026-11-25 05:19:37.929246+0000 Practice[13508:42060] [asset] #FactoryInstall Unable to query results, error: 5
+2026-11-25 05:19:37.945449+0000 Practice[13508:42060] [catalog] Query for com.apple.MobileAsset.VoiceServices.GryphonVoice failed: 2
+2026-11-25 05:19:37.950225+0000 Practice[13508:42060] [catalog] Query for com.apple.MobileAsset.VoiceServices.CustomVoice failed: 2
+2026-11-25 05:19:38.056764+0000 Practice[13508:42064] [connection] nw_protocol_socket_set_no_wake_from_sleep [C2:2] setsockopt SO_NOWAKEFROMSLEEP failed [22: Invalid argument]
+2026-11-25 05:19:38.056864+0000 Practice[13508:42064] [] nw_protocol_socket_set_no_wake_from_sleep setsockopt SO_NOWAKEFROMSLEEP failed [22: Invalid argument]
+2026-11-25 05:19:38.211543+0000 Practice[13508:42064] [connection] nw_endpoint_flow_failed_with_error [C2 127.0.0.1:4700 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] already failing, returning
+2026-11-25 05:19:38.211757+0000 Practice[13508:42064] [Default] Connection 2: failed to connect 1:61, reason -1
+2026-11-25 05:19:38.242654+0000 Practice[13508:42064] [Default] Task <8CEDCAA4-B8FD-4734-AB74-C3EA4560948A>.<1> HTTP load failed, 0/0 bytes (error code: -1004 [1:61])
+2026-11-25 05:19:38.379143+0000 Practice[13508:42064] [connection] nw_protocol_socket_set_no_wake_from_sleep [C3:2] setsockopt SO_NOWAKEFROMSLEEP failed [22: Invalid argument]
+2026-11-25 05:19:38.379234+0000 Practice[13508:42064] [] nw_protocol_socket_set_no_wake_from_sleep setsockopt SO_NOWAKEFROMSLEEP failed [22: Invalid argument]
+2026-11-25 05:19:38.379731+0000 Practice[13508:42064] [connection] nw_endpoint_flow_failed_with_error [C3 127.0.0.1:4700 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] already failing, returning
+2026-11-25 05:19:38.388854+0000 Practice[13508:42064] [Default] Connection 3: failed to connect 1:61, reason -1
+2026-11-25 05:19:38.396978+0000 Practice[13508:42064] [Default] Task <A0A66CA7-6546-45FD-B68E-93E4EEA37B13>.<1> HTTP load failed, 0/0 bytes (error code: -1004 [1:61])
+2026-11-25 05:19:40.609576+0000 Practice[13508:42064] [connection] nw_protocol_socket_set_no_wake_from_sleep [C4:2] setsockopt SO_NOWAKEFROMSLEEP failed [22: Invalid argument]
+2026-11-25 05:19:40.609684+0000 Practice[13508:42064] [] nw_protocol_socket_set_no_wake_from_sleep setsockopt SO_NOWAKEFROMSLEEP failed [22: Invalid argument]
+2026-11-25 05:19:40.609909+0000 Practice[13508:42064] [connection] nw_endpoint_flow_failed_with_error [C4 127.0.0.1:4700 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] already failing, returning
+2026-11-25 05:19:40.610289+0000 Practice[13508:42064] [Default] Connection 4: failed to connect 1:61, reason -1
+Test Case '-[PracticeTests.AudioDiagnosisTests testBluetoothLimitAnd2026-11-25 05:19:40.852483+0000 Practice[13508:42064] [Default] Task <4BFF4B4F-DE65-4E0A-A9DF-44956026AE0D>.<1> HTTP load failed, 0/0 bytes (error code: -1004 [1:61])
+2026-11-25 05:19:44.957264+0000 Practice[13508:41291] [as_client]     SessionAPIUtilities.h:176   AudioSessionGetProperty (kMXSessionProperty_HasEchoCancelledInput) failed with error: -50 (sessionID: 0x0)
+2026-11-25 05:19:44.957502+0000 Practice[13508:41291] [as_client]     SessionAPIUtilities.h:176   AudioSessionGetProperty (kMXSessionProperty_HasEchoCancelledInput) failed with error: -50 (sessionID: 0x0)
+2026-11-25 05:19:48.523290+0000 Practice[13508:42060] [catalog] Query for com.apple.MobileAsset.VoiceServicesVocalizerVoice failed: 2
+2026-11-25 05:19:48.754431+0000 Practice[13508:42060] [catalog] Query for com.apple.MobileAsset.VoiceServices.GryphonVoice failed: 2
+2026-11-25 05:19:48.813981+0000 Practice[13508:42060] [catalog] Query for com.apple.MobileAsset.VoiceServices.CustomVoice failed: 2
