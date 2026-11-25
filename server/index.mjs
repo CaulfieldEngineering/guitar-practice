@@ -19,7 +19,8 @@
 // remove all drills for now except for Triplets to 16th's, 4+4"), so every app, old or new, lists only the rest.
 //
 // Runs are kept in one place, data/sessions.jsonl (one JSON object a line, never rewritten, only appended).
-// No dependencies; node server/index.mjs. Port and addresses: PRACTICE_PORT, PRACTICE_HOSTS (comma separated).
+// No dependencies; node server/index.mjs. Port and addresses: PRACTICE_PORT, PRACTICE_HOSTS (comma separated); without
+// PRACTICE_HOSTS, "hosts" in config.local.json at the repo root (not in git; config.example.json shows it), else loopback.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,7 +36,14 @@ const VOICE = process.env.PRACTICE_VOICE || path.join(ROOT, 'voice');
 // The desktop app's newest installer and its latest.json (desktop/scripts/build.ps1 writes them here; not in git).
 const RELEASES = process.env.PRACTICE_RELEASES || path.join(ROOT, 'desktop', 'release');
 const PORT = Number(process.env.PRACTICE_PORT || 4700);
-const HOSTS = (process.env.PRACTICE_HOSTS || '127.0.0.1,DRILL_SERVER_HOST').split(',').map((h) => h.trim()).filter(Boolean);
+const localConfig = () => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'config.local.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+};
+const HOSTS = String(process.env.PRACTICE_HOSTS || localConfig().hosts || '127.0.0.1').split(',').map((h) => h.trim()).filter(Boolean);
 
 export function createApp({ catalog = CATALOG, data = DATA, voice = VOICE, releases = RELEASES } = {}) {
   const store = createStore(path.join(data, 'sessions.jsonl'));

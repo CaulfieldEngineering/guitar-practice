@@ -27,7 +27,7 @@ The proof is `shared/scoring-vectors.json`: thirteen whole runs (from a tight pl
 
 ## The common backend
 
-The drill server (`server/index.mjs`, http://DRILL_SERVER_HOST:4700) is the source of the drills, the scoring numbers and the voice for both apps, and the store of every run (`data/sessions.jsonl`). The desktop app (`src/app/Sync`, a worker thread, every 30 seconds and right after a run):
+The drill server (`server/index.mjs`, port 4700 on the mini PC; the address is `serverUrl` in `config.local.json`, not in git, and Settings can change it) is the source of the drills, the scoring numbers and the voice for both apps, and the store of every run (`data/sessions.jsonl`). The desktop app (`src/app/Sync`, a worker thread, every 30 seconds and right after a run):
 
 - sends each run it made until the server answers with its id (`POST /api/sessions`); away from the server they wait in `%APPDATA%\Practice\runs.json` and go at the next sync,
 - reads every run from every device (`GET /api/sessions`) and his max per drill (`GET /api/levels`); the last copy is kept for Progress offline,

@@ -38,8 +38,13 @@ set(PRACTICE_CORE
     src/app/Sync.cpp
     src/app/Routines.cpp)
 
+# The drill server the app talks to until Settings names another. build.ps1 passes the one in config.local.json
+# (not in git); without it, this machine's own server.
+set(PRACTICE_DEFAULT_SERVER "http://127.0.0.1:4700" CACHE STRING "The drill server's address, http://host:port")
+
 set(PRACTICE_DEFS
     PRACTICE_VERSION="${PRACTICE_VERSION}"
+    PRACTICE_DEFAULT_SERVER="${PRACTICE_DEFAULT_SERVER}"
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_DISPLAY_SPLASH_SCREEN=0

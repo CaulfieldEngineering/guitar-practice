@@ -33,6 +33,10 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- The drill server's address, from the PRACTICE_SERVER_URL build setting (a secret on the build machine, not in the
+	     source); empty in builds without it. Settings > Sync > Server overrides it. -->
+	<key>PracticeServerURL</key>
+	<string>$(PRACTICE_SERVER_URL)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- The drill server on the mini PC is plain http on its Tailscale address (the iPhone cannot look up Tailscale names). -->

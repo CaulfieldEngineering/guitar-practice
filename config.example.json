@@ -1,0 +1,10 @@
+{
+  "serverUrl": "http://<drill-server-host>:4700",
+  "hosts": "127.0.0.1,<drill-server-host>",
+  "apple": {
+    "keyId": "<App Store Connect API key id>",
+    "issuerId": "<App Store Connect issuer id>",
+    "keyPath": "<path to AuthKey_<key id>.p8>",
+    "teamId": "<Apple team id>"
+  }
+}

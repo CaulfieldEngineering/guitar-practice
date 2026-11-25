@@ -7,10 +7,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { apple } from './local-config.mjs';
 
-const KEY_ID = 'ASC_KEY_ID_REDACTED';
-const ISSUER = 'ASC_ISSUER_ID_REDACTED';
-const P8 = 'ASC_KEY_PATH_REDACTED';
+// The API key's ids and its .p8 file: config.local.json ("apple"), or ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH.
+const { keyId: KEY_ID, issuerId: ISSUER, keyPath: P8 } = apple();
 const BLOCKS = 'C:/Users/Joe/.apple/blocks'; // the shared certificate (dist.p12) and its id
 const ALL = [
   { bundle: 'com.caulfieldengineering.practice', name: 'Practice', profileName: 'Practice AdHoc', file: 'Practice_AdHoc.mobileprovision' },

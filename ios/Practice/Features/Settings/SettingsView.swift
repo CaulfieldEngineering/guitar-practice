@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("audio.lockScreen") private var lockScreen = false
     @AppStorage("sound.chime") private var chime = true
     @AppStorage("sound.ticks") private var ticks = true
+    @AppStorage(DrillServer.addressKey) private var serverAddress = ""
 
     var body: some View {
         NavigationStack {
@@ -72,14 +73,23 @@ struct SettingsView: View {
                     Toggle(L.lockScreenControls, isOn: $lockScreen).tint(Theme.accent)
                 }
 
-                Section(L.sync) {
+                Section {
+                    LabeledContent(L.server) {
+                        TextField(DrillServer.base.absoluteString, text: $serverAddress)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .foregroundStyle(Theme.muted)
+                            .accessibilityIdentifier("settings.server")
+                    }
                     LabeledContent(L.drills, value: pa.catalogNote ?? L.upToDate)
                     LabeledContent(L.runsWaiting) { Text("\(history.pendingCount)").font(Typo.figure(.body)) }
                     Button(L.syncNow) {
                         Task { await pa.refresh(); await routines.sync(); await tunings.sync() }
                     }
                     .foregroundStyle(Theme.accentText)
-                }
+                } header: { Text(L.sync) } footer: { Text(L.syncFooter) }
 
                 Section(L.about) {
                     LabeledContent(L.version) { Text(updater.current).font(Typo.figure(.body)) }

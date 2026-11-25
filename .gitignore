@@ -5,3 +5,4 @@ logs/
 .DS_Store
 desktop/build/
 desktop/release/
+config.local.json

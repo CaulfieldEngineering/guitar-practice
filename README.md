@@ -97,7 +97,7 @@ Rules the app keeps: a file whose `schema` is newer than the app knows is skippe
 
 ## The drill server (mini PC)
 
-`server/index.mjs`, no dependencies, scheduled task **Practice Drill Server** (`scripts/register-task.ps1`, at logon, hidden, restarted on failure, log in `logs/service.log`), on `127.0.0.1:4700` and the tailnet address `DRILL_SERVER_HOST:4700` only (it waits for the tailnet address if Tailscale is not up yet).
+`server/index.mjs`, no dependencies, scheduled task **Practice Drill Server** (`scripts/register-task.ps1`, at logon, hidden, restarted on failure, log in `logs/service.log`), on `127.0.0.1:4700` and the tailnet address only (`hosts` in `config.local.json` at the repo root, not in git; `config.example.json` shows its shape) (it waits for the tailnet address if Tailscale is not up yet).
 
 | Route | What |
 |---|---|
@@ -208,7 +208,7 @@ Settings > Audio, and the Input and Output rows on a drill's screen (Joe, 2026-1
 
 The same route as the HQ and Browser iPhone apps. `.github/workflows/ios-build.yml` runs on a push touching `ios/`, `catalog/` or itself: XcodeGen makes the project from `ios/project.yml`, the unit tests run on the iPhone simulator and must pass, then on `main` it archives, exports ad hoc, and publishes `app.ipa`, `manifest.plist`, `version.json`, the icon and the install page to the public repo `CaulfieldEngineering/practice-install` (GitHub Pages). The version is the one line in `ios/VERSION` (raise it for each release; on `main` the run stops before building if it is not newer than the published one, since the phone would see no update); the build number is the run number. Other branches build and test only. The UI test's screenshots of every screen, dark and light, are kept with each run as the `screens` artifact.
 
-Signing: Blocks' Apple team (`APPLE_TEAM_ID_REDACTED`), App Store Connect API key and Apple Distribution certificate, with Practice's own App ID `com.caulfieldengineering.practice` and ad-hoc profile `Practice AdHoc`. `node scripts/apple-provision.mjs` makes the App ID and the profile for every registered iPhone (into `C:\Users\Joe\.apple\practice`, never a new certificate); `npm i --no-save libsodium-wrappers && node scripts/apple-secrets.mjs` puts the certificate, its password, the profile, the team and the install repo's deploy key (`C:\Users\Joe\.apple\practice\install_key`) in this repo's Actions secrets. Every year, after Blocks' certificate is renewed, run both again, then the workflow, then reinstall. A new iPhone: register it, then run both again.
+Signing: Blocks' Apple team, App Store Connect API key (their ids and the key's path are `apple` in `config.local.json`, and the team id is the `IOS_TEAM_ID` secret) and Apple Distribution certificate, with Practice's own App ID `com.caulfieldengineering.practice` and ad-hoc profile `Practice AdHoc`. `node scripts/apple-provision.mjs` makes the App ID and the profile for every registered iPhone (into `C:\Users\Joe\.apple\practice`, never a new certificate); `npm i --no-save libsodium-wrappers && node scripts/apple-secrets.mjs` puts the certificate, its password, the profile, the team and the install repo's deploy key (`C:\Users\Joe\.apple\practice\install_key`) in this repo's Actions secrets. Every year, after Blocks' certificate is renewed, run both again, then the workflow, then reinstall. A new iPhone: register it, then run both again.
 
 The icon is drawn by `python scripts/make-icon.py` (the charcoal and teal of his other icons).
 

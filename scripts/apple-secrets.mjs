@@ -2,12 +2,14 @@
 //   npm i --no-save libsodium-wrappers && node scripts/apple-secrets.mjs
 // The certificate is Blocks' (C:\Users\Joe\.apple\blocks\dist.p12 and its password), the profile is Practice's own
 // (C:\Users\Joe\.apple\practice\Practice_AdHoc.mobileprovision), and INSTALL_DEPLOY_KEY lets the build push to the
-// public install page repo (CaulfieldEngineering/practice-install). Nothing is printed but the secret names. Names
+// public install page repo (CaulfieldEngineering/practice-install). IOS_TEAM_ID and PRACTICE_SERVER_URL come from
+// config.local.json (not in git). Nothing is printed but the secret names. Names
 // given as arguments set only those secrets.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import sodium from 'libsodium-wrappers';
+import { apple, need } from './local-config.mjs';
 
 const REPO = 'CaulfieldEngineering/guitar-practice';
 const BLOCKS = 'C:/Users/Joe/.apple/blocks';
@@ -37,7 +39,9 @@ const secrets = {
   IOS_DIST_CERT_PASSWORD: () => fs.readFileSync(`${BLOCKS}/p12-password.txt`, 'utf8').trim(),
   IOS_ADHOC_PROFILE_BASE64: () => b64file(`${OWN}/Practice_AdHoc.mobileprovision`),
   IOS_KEYCHAIN_PASSWORD: () => crypto.randomBytes(16).toString('hex'),
-  IOS_TEAM_ID: () => 'APPLE_TEAM_ID_REDACTED',
+  IOS_TEAM_ID: () => apple().teamId,
+  // The drill server the phone app talks to (the Release build bakes it in; Settings can change it on the phone).
+  PRACTICE_SERVER_URL: () => need('PRACTICE_SERVER_URL', (c) => c.serverUrl, 'The drill server address'),
   INSTALL_DEPLOY_KEY: () => fs.readFileSync(`${OWN}/install_key`, 'utf8'),
 };
 // Names on the command line set only those: node scripts/apple-secrets.mjs IOS_APPSTORE_PROFILE_BASE64 ASC_KEY_ID

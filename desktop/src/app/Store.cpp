@@ -119,7 +119,7 @@ void Settings::addUnscored (const juce::String& drill, double seconds)
 juce::String Settings::serverBase() const
 {
     auto s = get ("server").toString();
-    return s.isNotEmpty() ? s.trimCharactersAtEnd ("/") : juce::String ("http://DRILL_SERVER_HOST:4700");
+    return s.isNotEmpty() ? s.trimCharactersAtEnd ("/") : juce::String (PRACTICE_DEFAULT_SERVER);
 }
 
 // ---- history and the send queue ----

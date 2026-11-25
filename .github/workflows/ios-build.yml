@@ -171,10 +171,14 @@ jobs:
 
       - name: Archive
         if: steps.signing.outputs.signed == 'true'
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          SERVER_URL: ${{ secrets.PRACTICE_SERVER_URL }}
         run: |
+          if [ -z "$SERVER_URL" ]; then echo "::warning::PRACTICE_SERVER_URL is not set: the build will look for the drill server only where Settings says."; fi
           xcodebuild archive -project ios/Practice.xcodeproj -scheme Practice -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Practice.xcarchive" \
-            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" > "$RUNNER_TEMP/archive.log" 2>&1 || true
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}"             DEVELOPMENT_TEAM="$TEAM_ID" PRACTICE_SERVER_URL="$SERVER_URL" > "$RUNNER_TEMP/archive.log" 2>&1 || true
           grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)" "$RUNNER_TEMP/archive.log" | head -80 || true
           grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/archive.log"
 

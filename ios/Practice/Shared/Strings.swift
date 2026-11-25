@@ -259,6 +259,7 @@ enum L {
     static let updateDrills = "Update drills"
     static let pendingRuns = "Pending runs"
     static let syncNow = "Sync now"
+    static let server = "Server"
     static let syncFooter = "Drills and runs sync with the mini PC over Tailscale."
     static let about = "About"
     static let version = "Version"

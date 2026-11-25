@@ -27,5 +27,5 @@ Runs with the audio input off are not runs: nothing about them reaches the serve
 ## The pieces
 
 - App: `ios/` (README.md has the architecture). Install page https://caulfieldengineering.github.io/practice-install/.
-- Server: `server/index.mjs`, scheduled task "Practice Drill Server", port 4700 on 127.0.0.1 and DRILL_SERVER_HOST. Log: `logs/service.log`.
+- Server: `server/index.mjs`, scheduled task "Practice Drill Server", port 4700 on 127.0.0.1 and the tailnet address in `config.local.json` (not in git; `config.example.json` shows its shape). Log: `logs/service.log`.
 - Vault: Apps row `Apps/List/Practice.md`, Systems row `AI/Systems/Practice drill server.md`, the line on `AI/Memory/Small apps.md`.

@@ -17,7 +17,11 @@ $build = Join-Path $desktop 'build'
 $version = (Get-Content (Join-Path $desktop 'VERSION') -TotalCount 1).Trim()
 Write-Host "Practice for Windows $version"
 
-cmake -S $desktop -B $build -G "Visual Studio 17 2022" -A x64 -DPRACTICE_TESTS_ONLY=OFF | Out-Null
+# The drill server's address comes from config.local.json at the repo root (not in git); without it, 127.0.0.1.
+$server = 'http://127.0.0.1:4700'
+$localConfig = Join-Path $repo 'config.local.json'
+if (Test-Path $localConfig) { $c = Get-Content $localConfig -Raw | ConvertFrom-Json; if ($c.serverUrl) { $server = $c.serverUrl.TrimEnd('/') } }
+cmake -S $desktop -B $build -G "Visual Studio 17 2022" -A x64 -DPRACTICE_TESTS_ONLY=OFF "-DPRACTICE_DEFAULT_SERVER=$server" | Out-Null
 if ($LASTEXITCODE) { throw 'cmake configure failed' }
 cmake --build $build --config Release -- /m /v:minimal
 if ($LASTEXITCODE) { throw 'build failed' }

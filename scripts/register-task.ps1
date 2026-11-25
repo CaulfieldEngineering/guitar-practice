@@ -8,7 +8,7 @@ $user = "$env:USERDOMAIN\$env:USERNAME"
 $xml = @"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.3" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo><URI>\Practice Drill Server</URI><Description>Practice drill server: the drill catalog and run results for the Practice iPhone app, tailnet and loopback only (http://DRILL_SERVER_HOST:4700). Repo: $repo</Description></RegistrationInfo>
+  <RegistrationInfo><URI>\Practice Drill Server</URI><Description>Practice drill server: the drill catalog and run results for the Practice iPhone app, tailnet and loopback only (port 4700, addresses in config.local.json). Repo: $repo</Description></RegistrationInfo>
   <Principals><Principal id="Author"><UserId>$user</UserId><LogonType>InteractiveToken</LogonType></Principal></Principals>
   <Settings>
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>

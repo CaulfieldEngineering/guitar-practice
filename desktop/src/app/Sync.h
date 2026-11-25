@@ -1,5 +1,5 @@
 #pragma once
-// The common backend: the drill server on the mini PC (server/index.mjs, http://DRILL_SERVER_HOST:4700) is where both
+// The common backend: the drill server on the mini PC (server/index.mjs, port 4700; its address is set in Settings, by default the one in config.local.json) is where both
 // apps get their drills, the scoring numbers and the voice, and where every run from either app is kept. This side:
 //   - sends every run not yet acknowledged (POST /api/sessions, 50 at a time) until the server answers with its id;
 //     away from the server the runs wait in the queue (History) and go at the next sync,

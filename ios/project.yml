@@ -36,7 +36,9 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
-        DEVELOPMENT_TEAM: APPLE_TEAM_ID_REDACTED
+        # The team id and the drill server address are given to xcodebuild by the workflow, from the repo's secrets.
+        DEVELOPMENT_TEAM: ""
+        PRACTICE_SERVER_URL: ""
       configs:
         Release:
           CODE_SIGN_STYLE: Manual

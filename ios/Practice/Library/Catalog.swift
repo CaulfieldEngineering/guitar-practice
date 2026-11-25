@@ -8,7 +8,7 @@ import FoundationNetworking
 //   exercises/<name>.json      {"schema": 1, "exercises": [...]}
 //   routines/<name>.json       {"schema": 1, "routines": [...]}
 // It ships inside the app (the repo's catalog/ folder, the starter set), is served by the drill server on the mini PC
-// (server/, http://DRILL_SERVER_HOST:4700/catalog/), and the newest one the phone has pulled is cached in Application
+// (server/, <drill server>/catalog/, see DrillServer.base), and the newest one the phone has pulled is cached in Application
 // Support/catalog, so the app works away from Tailscale. Loading order: bundled, then cached, then the user folder
 // (Documents/Exercises); the same id later replaces the earlier one.
 
@@ -199,7 +199,28 @@ enum Library {
 
 /// Talks to the drill server on the mini PC: pulls the catalog, posts session results, reads stats.
 enum DrillServer {
-    static let base = URL(string: "http://DRILL_SERVER_HOST:4700")!
+    /// Where the drill server is: what Settings > Sync > Server says, else the address the build carries
+    /// (PracticeServerURL in Info.plist, from the PRACTICE_SERVER_URL build setting, a secret on the build machine,
+    /// never in the source), else this device itself.
+    static var base: URL {
+        url(from: UserDefaults.standard.string(forKey: addressKey))
+            ?? url(from: Bundle.main.object(forInfoDictionaryKey: "PracticeServerURL") as? String)
+            ?? fallback
+    }
+    static let addressKey = "server.url"
+    static let fallback = URL(string: "http://127.0.0.1:4700")!
+    /// The address as typed: blanks are nothing, "host" or "host:port" gets http://, port 4700 when none is given,
+    /// and a trailing slash goes.
+    static func url(from text: String?) -> URL? {
+        var s = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        while s.hasSuffix("/") { s.removeLast() }
+        guard !s.isEmpty, !s.contains("$(") else { return nil }
+        if !s.contains("://") { s = "http://" + s }
+        guard var c = URLComponents(string: s), let host = c.host, !host.isEmpty,
+              c.scheme == "http" || c.scheme == "https" else { return nil }
+        if c.port == nil { c.port = 4700 }
+        return c.url
+    }
 
     static func session(timeout: Double = 5) -> URLSession {
         let c = URLSessionConfiguration.ephemeral
